@@ -18,4 +18,6 @@ db.sqlite3
 .DS_Store
 
 # VS Code
-.vscode/
+.vscode/.idea/
+venv/
+/.idea/
