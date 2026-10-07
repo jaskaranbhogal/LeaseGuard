@@ -1,3 +1,5 @@
+import AuthNavigator from './AuthNavigator';
+
 export default function RootNavigator() {
-  return null;
+  return <AuthNavigator />;
 }
