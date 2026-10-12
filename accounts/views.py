@@ -1,12 +1,15 @@
 import json
+import hashlib
 from functools import wraps
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.cache import never_cache
@@ -61,6 +64,48 @@ def read_body(request):
 @require_GET
 def csrf_token(request):
     return JsonResponse({'csrfToken': get_token(request)})
+
+
+@never_cache
+@require_POST
+@csrf_protect
+@rate_limit('register', 5)
+@sensitive_post_parameters()
+def register(request):
+    try:
+        data, email = read_body(request)
+    except ValidationError:
+        return JsonResponse({'detail': 'Enter a valid email address.'}, status=400)
+    name = data.get('name')
+    password = data.get('password')
+    if not isinstance(name, str) or not name.strip() or len(name.strip()) > 150:
+        return JsonResponse({'detail': 'Enter your full name (up to 150 characters).'}, status=400)
+    if not isinstance(password, str) or not password or len(password) > 4096:
+        return JsonResponse({'detail': 'Enter a password (up to 4096 characters).'}, status=400)
+    if password != data.get('confirmPassword'):
+        return JsonResponse({'detail': 'Passwords do not match.'}, status=400)
+    User = get_user_model()
+    email = email.lower()
+    # Django's unique username prevents concurrent registrations for the same
+    # normalized email without changing the existing User model. The lookup
+    # also protects accounts created previously with arbitrary usernames.
+    username = 'email_' + hashlib.sha256(email.encode('utf-8')).hexdigest()
+    user = User(username=username, email=email, first_name=name.strip())
+    try:
+        validate_password(password, user)
+    except ValidationError as error:
+        return JsonResponse({'detail': ' '.join(error.messages)}, status=400)
+    duplicate = {'detail': 'An account with this email already exists. Sign in or reset your password.'}
+    if User.objects.filter(email__iexact=email).exists():
+        return JsonResponse(duplicate, status=409)
+    user.set_password(password)
+    try:
+        with transaction.atomic():
+            user.save()
+    except IntegrityError:
+        return JsonResponse(duplicate, status=409)
+    return JsonResponse({'user': {'id': user.pk, 'email': user.email,
+                                 'name': user.get_full_name()}}, status=201)
 
 
 @never_cache

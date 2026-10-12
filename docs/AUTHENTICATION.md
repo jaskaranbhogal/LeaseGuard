@@ -1,6 +1,6 @@
 # Authentication development and verification
 
-The four assigned screens are implemented on `jaskaran`. No dependencies were added or upgraded. Registration, landlord, tenant, and notification screens remain unchanged. The changes are organized into the seven commits listed below.
+The original four authentication screens are implemented on `jaskaran`. Registration is now implemented as a follow-up change, described below. No dependencies were added or upgraded. Landlord, tenant, and notification screens remain unchanged. The original changes are organized into the seven commits listed below.
 
 ## iOS lifecycle fix
 
@@ -39,7 +39,7 @@ In a second terminal, start **one** reset worker using the same environment/data
 venv/bin/python manage.py send_password_resets
 ```
 
-Use `--once` to process one batch and exit. Development defaults to the console email backend: eligible reset links appear in the worker terminal; no mail is delivered. Use a real existing Django account with an active flag, usable password, and email address. The existing Django User model does not enforce unique emails, so Login deliberately rejects multiple matching accounts. No registration implementation or hardcoded app credentials were added.
+Use `--once` to process one batch and exit. Development defaults to the console email backend: eligible reset links appear in the worker terminal; no mail is delivered. Use a real existing Django account with an active flag, usable password, and email address. The existing Django User model does not enforce unique emails, so Login deliberately rejects multiple matching accounts. New accounts can now be created through Register. No hardcoded app credentials were added.
 
 Start Metro from `frontend` with `npm start`, then run the `frontend` scheme in `frontend/ios/frontend.xcworkspace`. A Debug build requires Metro to be reachable. Keep the existing local Xcode Node configuration appropriate to your machine.
 
@@ -80,7 +80,7 @@ Tested with Xcode 27.0 (27A266a), iPhone 18 Pro simulator running iOS 27.0, Reac
 - `venv/bin/python manage.py test accounts`: 11 tests passed. These cover actual authentication, CSRF, unknown/inactive/ambiguous accounts, uniform reset responses, throttling, console/unconfigured modes, delivery retries, password validation, expired/invalid/used tokens, and signing in with a reset password.
 - Debug iOS build: succeeded using the workspace and existing CocoaPods integration. The app installed, launched, connected to Metro, rendered JavaScript, and remained usable through repeated launches and form interactions.
 - Simulator UI: Login validation, editable fields, rejected credentials, real successful sign-in and sign-out using an isolated test account, Forgot Password validation, accepted API request, submitted-email display, and Return to sign in were exercised. Loading, Login, Forgot Password, and confirmation were visually inspected.
-- The Register route is covered by navigation tests; its existing screen still returns null. The actual registration feature is not implemented or claimed to work.
+- The original verification covered only navigation to the placeholder Register route. Follow-up registration verification is recorded below.
 - Release/device/Android builds and real SMTP inbox delivery were not tested. Xcode emitted upstream React Native nullability/deprecation and script-output warnings, but no build errors.
 
 ## Files
@@ -93,7 +93,7 @@ Frontend files added: `src/services/api.config.json`, `src/utils/useAuthRequest.
 
 Backend files modified: `backend/settings.py`, `backend/urls.py`, and `.gitignore`. Added `.env.example`; `accounts/models.py`, `accounts/views.py`, `accounts/tests.py`, `accounts/migrations/0001_initial.py`, `accounts/management/commands/send_password_resets.py`, package `__init__.py` files, and five reset templates under `accounts/templates/registration/`. Added this document.
 
-No edits were made to App.tsx, RootNavigator, AuthNavigator, RegisterScreen, landlord/tenant/notification features, dependencies, or the logo asset.
+The original work did not edit App.tsx, RootNavigator, AuthNavigator, RegisterScreen, landlord/tenant/notification features, dependencies, or the logo asset. The registration follow-up replaces the RegisterScreen placeholder.
 
 ## Commit sequence
 
@@ -104,3 +104,14 @@ No edits were made to App.tsx, RootNavigator, AuthNavigator, RegisterScreen, lan
 5. `feat: implement login screen with authentication and validation`
 6. `feat: implement password reset and email confirmation screens`
 7. `test: cover authentication flows and document setup`
+
+
+## Registration follow-up
+
+Register now collects full name, email, password, and password confirmation using the existing form components and visual theme. It validates required fields, email format, name length, password length, and matching passwords; both password fields use secure entry. The form disables editing during submission, prevents duplicate requests, shows API failures inline, and cancels pending UI updates when unmounted. Confirmed creation clears password state and offers Back to sign in, which resets navigation to one Login screen.
+
+`POST /api/auth/register/` accepts `name`, `email`, `password`, and `confirmPassword`. It uses the existing CSRF handshake, applies Django's configured password validators, hashes passwords, and creates an ordinary non-staff Django user. The full name is stored in `first_name` (maximum 150 characters). Emails are trimmed and lowercased. Existing case-insensitive email matches are rejected with 409; a deterministic email-derived unique username prevents concurrent registration requests from creating duplicate accounts. Accounts created through other admin/import paths still need email uniqueness checks because Django's email column remains non-unique. Registration is limited to five attempts per minute per remote IP using the existing cache limiter.
+
+Success returns HTTP 201 with the created user; it does not start a session or send verification email. The user signs in through the existing Login flow. Role selection and dashboard routing remain outside this change because the current account model has no tenant/landlord role. No migration or new dependency is required.
+
+Follow-up validation: 19 frontend tests and 16 backend tests pass, including form validation, API errors, duplicate submission prevention, cancellation, confirmation/navigation, CSRF, password policy, duplicate email rejection, and signing in with a newly registered account. TypeScript, ESLint, Django system checks, and migration drift checks pass. Registration has not been manually exercised in the simulator. The registration changes are grouped into one follow-up commit.

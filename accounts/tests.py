@@ -137,3 +137,65 @@ class AuthenticationTests(TestCase):
         PasswordResetRequest.objects.filter(pk=item.pk).update(created_at=timezone.now() - timedelta(hours=2))
         call_command('send_password_resets', once=True)
         self.assertEqual(len(mail.outbox), 0)
+
+
+class RegistrationTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.data = {'name': ' New Resident ', 'email': ' NEW@example.com ',
+                     'password': 'Fresh-Passphrase-583!', 'confirmPassword': 'Fresh-Passphrase-583!'}
+
+    def post(self, data=None, client=None, **extra):
+        return (client or self.client).post('/api/auth/register/',
+                                            json.dumps(self.data if data is None else data),
+                                            content_type='application/json', **extra)
+
+    def test_registration_creates_hashed_account_that_can_sign_in(self):
+        response = self.post()
+        self.assertEqual(response.status_code, 201)
+        user = get_user_model().objects.get(pk=response.json()['user']['id'])
+        self.assertEqual(user.email, 'new@example.com')
+        self.assertEqual(user.get_full_name(), 'New Resident')
+        self.assertTrue(user.check_password(self.data['password']))
+        self.assertNotEqual(user.password, self.data['password'])
+        self.assertFalse(user.is_staff)
+        self.assertFalse(user.is_superuser)
+        self.assertNotIn('_auth_user_id', self.client.session)
+        response = self.client.post('/api/auth/login/', json.dumps({
+            'email': user.email, 'password': self.data['password']}), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+
+    def test_duplicate_email_including_existing_accounts_is_rejected(self):
+        get_user_model().objects.create_user(username='legacy', email='NEW@example.com',
+                                             password='Existing-Passphrase-123!')
+        self.assertEqual(self.post().status_code, 409)
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    def test_repeated_registration_is_rejected(self):
+        self.assertEqual(self.post().status_code, 201)
+        self.assertEqual(self.post().status_code, 409)
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    def test_invalid_fields_and_password_policy_do_not_create_accounts(self):
+        for overrides in ({'name': ''}, {'name': 'a' * 151}, {'name': []}, {'email': 'bad'},
+                          {'password': []}, {'confirmPassword': 'different'},
+                          {'password': '12345678', 'confirmPassword': '12345678'},
+                          {'password': 'tiny', 'confirmPassword': 'tiny'},
+                          {'password': 'new@example.com', 'confirmPassword': 'new@example.com'},
+                          {'password': 'x' * 4097, 'confirmPassword': 'x' * 4097}):
+            with self.subTest(overrides=overrides):
+                cache.clear()
+                self.assertEqual(self.post({**self.data, **overrides}).status_code, 400)
+        cache.clear()
+        self.assertEqual(self.post([]).status_code, 400)
+        self.assertFalse(get_user_model().objects.exists())
+
+    def test_csrf_method_and_throttling(self):
+        client = Client(enforce_csrf_checks=True)
+        self.assertEqual(self.post(client=client).status_code, 403)
+        token = client.get('/api/auth/csrf/').json()['csrfToken']
+        self.assertEqual(self.post(client=client, HTTP_X_CSRFTOKEN=token).status_code, 201)
+        self.assertEqual(self.client.get('/api/auth/register/').status_code, 405)
+        for _ in range(4):
+            self.assertEqual(self.post().status_code, 409)
+        self.assertEqual(self.post().status_code, 429)

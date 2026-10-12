@@ -23,6 +23,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/csrf/', views.csrf_token),
     path('api/auth/login/', views.sign_in),
+    path('api/auth/register/', views.register),
     path('api/auth/logout/', views.sign_out),
     path('api/auth/password-reset/', views.password_reset),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),

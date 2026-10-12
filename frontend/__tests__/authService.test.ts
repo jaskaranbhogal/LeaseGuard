@@ -1,4 +1,8 @@
-import { login, requestPasswordReset } from '../src/services/authService';
+import {
+  login,
+  register,
+  requestPasswordReset,
+} from '../src/services/authService';
 import { request } from '../src/services/api';
 
 const fetchMock = jest.fn();
@@ -81,4 +85,41 @@ it('times out stalled requests', async () => {
     expect(request('/auth/csrf/')).rejects.toThrow('timed out'),
     jest.advanceTimersByTimeAsync(15000),
   ]);
+});
+
+it('registers with CSRF, trimmed identity fields, and unchanged passwords', async () => {
+  const details = {
+    name: ' Person ',
+    email: ' person@example.com ',
+    password: ' Password-583! ',
+    confirmPassword: ' Password-583! ',
+  };
+  csrf();
+  fetchMock.mockResolvedValueOnce(
+    response(
+      {
+        user: {
+          id: 9,
+          name: 'Person',
+          email: 'person@example.com',
+        },
+      },
+      201,
+    ),
+  );
+  expect((await register(details)).id).toBe(9);
+  expect(fetchMock.mock.calls[1][0]).toContain('/auth/register/');
+  expect(fetchMock.mock.calls[1][1]).toMatchObject({
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-CSRFToken': 'test-csrf' },
+    body: JSON.stringify({
+      ...details,
+      name: 'Person',
+      email: 'person@example.com',
+    }),
+  });
+  csrf();
+  fetchMock.mockResolvedValueOnce(response({}));
+  await expect(register(details)).rejects.toThrow('did not confirm');
 });

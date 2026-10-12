@@ -9,6 +9,7 @@ import { Image, TextInput } from 'react-native';
 import AuthNavigator from '../src/navigation/AuthNavigator';
 import type { AuthStackParamList } from '../src/navigation/types';
 import LoginScreen from '../src/screens/auth/LoginScreen';
+import RegisterScreen from '../src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../src/screens/auth/ForgotPasswordScreen';
 import ResetEmailSentScreen from '../src/screens/auth/ResetEmailSentScreen';
 import Button from '../src/components/Button';
@@ -198,6 +199,126 @@ it('cancels requests when leaving the reset form', async () => {
   expect(signal?.aborted).toBe(true);
   await act(async () => {
     accept('email');
+  });
+  expect(navigation.getCurrentRoute()?.name).toBe('Login');
+});
+
+async function registrationForm() {
+  await act(async () => {
+    navigation.navigate('Register');
+  });
+  return app.root.findByType(RegisterScreen);
+}
+async function fillRegistration(
+  form: ReturnType<typeof screen>,
+  confirmation = 'Fresh-Passphrase-583!',
+) {
+  await act(async () => {
+    const fields = form.findAllByType(TextInput);
+    [
+      'New Resident',
+      'new@example.com',
+      'Fresh-Passphrase-583!',
+      confirmation,
+    ].forEach((value, index) => fields[index].props.onChangeText(value));
+  });
+}
+it('validates registration fields and confirmation before sending credentials', async () => {
+  const form = await registrationForm();
+  await act(async () => {
+    form.findByType(Button).props.onPress();
+  });
+  expect(auth.register).not.toHaveBeenCalled();
+  expect(JSON.stringify(app.toJSON())).toContain('Enter your full name');
+  await fillRegistration(form, 'mismatch');
+  await act(async () => {
+    form.findByType(Button).props.onPress();
+  });
+  expect(auth.register).not.toHaveBeenCalled();
+  expect(JSON.stringify(app.toJSON())).toContain('Passwords do not match.');
+  expect(
+    form
+      .findAllByType(TextInput)
+      .slice(2)
+      .every(field => field.props.secureTextEntry),
+  ).toBe(true);
+});
+it('keeps failed registrations editable and allows retry', async () => {
+  const form = await registrationForm();
+  await fillRegistration(form);
+  jest
+    .mocked(auth.register)
+    .mockRejectedValue(
+      new ApiError('An account with this email already exists.'),
+    );
+  await act(async () => {
+    form.findByType(Button).props.onPress();
+  });
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'An account with this email already exists.',
+  );
+  expect(form.findAllByType(TextInput)).toHaveLength(4);
+  expect(form.findByType(Button).props.loading).toBe(false);
+});
+it('blocks duplicate registration and confirms creation before returning to sign in', async () => {
+  const form = await registrationForm();
+  await fillRegistration(form);
+  let accept!: (value: Awaited<ReturnType<typeof auth.register>>) => void;
+  jest.mocked(auth.register).mockImplementation(
+    () =>
+      new Promise(resolve => {
+        accept = resolve;
+      }),
+  );
+  await act(async () => {
+    form.findByType(Button).props.onPress();
+    form.findByType(Button).props.onPress();
+  });
+  expect(auth.register).toHaveBeenCalledTimes(1);
+  expect(
+    form.findAllByType(TextInput).every(field => !field.props.editable),
+  ).toBe(true);
+  expect(auth.register).toHaveBeenCalledWith(
+    {
+      name: 'New Resident',
+      email: 'new@example.com',
+      password: 'Fresh-Passphrase-583!',
+      confirmPassword: 'Fresh-Passphrase-583!',
+    },
+    expect.any(AbortSignal),
+  );
+  await act(async () => {
+    accept({ id: 10, name: 'New Resident', email: 'new@example.com' });
+  });
+  expect(JSON.stringify(app.toJSON())).toContain('Account created');
+  expect(form.findAllByType(TextInput)).toHaveLength(0);
+  await act(async () => {
+    form.findByType(Button).props.onPress();
+  });
+  expect(navigation.getRootState()!.routes.map(route => route.name)).toEqual([
+    'Login',
+  ]);
+});
+it('cancels registration on leaving the screen', async () => {
+  const form = await registrationForm();
+  await fillRegistration(form);
+  let accept!: (value: Awaited<ReturnType<typeof auth.register>>) => void;
+  jest.mocked(auth.register).mockImplementation(
+    () =>
+      new Promise(resolve => {
+        accept = resolve;
+      }),
+  );
+  await act(async () => {
+    form.findByType(Button).props.onPress();
+  });
+  const signal = jest.mocked(auth.register).mock.calls[0][1];
+  await act(async () => {
+    navigation.goBack();
+  });
+  expect(signal?.aborted).toBe(true);
+  await act(async () => {
+    accept({ id: 10, name: 'New Resident', email: 'new@example.com' });
   });
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
 });
