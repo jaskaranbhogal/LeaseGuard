@@ -21,3 +21,6 @@ db.sqlite3
 .vscode/.idea/
 venv/
 /.idea/
+
+# Generated local Django signing key
+.django-dev-secret

@@ -10,7 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,17 +22,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6odln!s7j4g3rlbifv3it$krs)+0e$cp8(5@p_8d)6ajr$&kvi'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    if os.environ.get('DJANGO_DEBUG', 'true').lower() != 'true':
+        raise RuntimeError('DJANGO_SECRET_KEY is required in production')
+    # Local-only key survives reloads without committing a credential.
+    from django.core.management.utils import get_random_secret_key
+    _key_path = BASE_DIR / '.django-dev-secret'
+    try:
+        with open(_key_path, 'x', opener=lambda path, flags: os.open(path, flags, 0o600)) as key_file:
+            key_file.write(get_random_secret_key())
+    except FileExistsError:
+        pass
+    SECRET_KEY = _key_path.read_text().strip()
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'true').lower() == 'true'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]').split(',')
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'accounts',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -76,7 +91,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.environ.get('DJANGO_DATABASE_PATH', BASE_DIR / 'db.sqlite3'),
     }
 }
 
@@ -121,3 +136,36 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Development uses console output only; SMTP must be explicitly configured.
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() == 'true'
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or 'LeaseGuard <noreply@localhost>'
+PASSWORD_RESET_BASE_URL = os.environ.get('PASSWORD_RESET_BASE_URL', 'http://localhost:8000' if DEBUG else '')
+PASSWORD_RESET_TIMEOUT = 3600
+try:
+    _reset_origin = urlsplit(PASSWORD_RESET_BASE_URL)
+    _reset_origin_valid = (
+        _reset_origin.scheme in ('http', 'https') and bool(_reset_origin.netloc)
+        and _reset_origin.path in ('', '/') and not _reset_origin.query
+        and not _reset_origin.fragment and not _reset_origin.username
+        and not _reset_origin.password and (DEBUG or _reset_origin.scheme == 'https')
+    )
+except ValueError:
+    _reset_origin_valid = False
+PASSWORD_RESET_DELIVERY = (
+    'console' if DEBUG and _reset_origin_valid and EMAIL_BACKEND == 'django.core.mail.backends.console.EmailBackend'
+    else 'email' if EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend'
+    and EMAIL_HOST and _reset_origin_valid and os.environ.get('DEFAULT_FROM_EMAIL')
+    else 'unconfigured'
+)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
