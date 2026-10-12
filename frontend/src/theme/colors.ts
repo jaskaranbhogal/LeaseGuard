@@ -8,4 +8,10 @@ export const colors = {
   placeholder: '#808A99',
   border: '#D1DBE8',
   white: '#FFFFFF',
+  actionBlue: '#1557F2',
+  headerNavy: '#0B172A',
+  success: '#0C884B',
+  headerSubtitle: '#C4D2E8',
+  progress: '#5C83FA',
+  error: '#B42318',
 } as const;
