@@ -1,14 +1,13 @@
 export const reportMaintenanceMockData = {
   title: 'Report maintenance',
-  subtitle: 'Show the landlord exactly what needs repair.',
+  subtitle: 'Try the maintenance form with a sample issue.',
   areaPlaceholder: 'e.g. Kitchen • Sink',
   descriptionPlaceholder: 'Describe what needs repair...',
   maxMediaFiles: 3,
   urgency: {
-    label: 'AI SUGGESTION',
+    label: 'SAMPLE URGENCY',
     value: 'Medium urgency',
     note: 'Demo preview — not yet AI-generated',
   },
-  footer:
-    'Once submitted, the landlord will receive a notification with a summary of the issue.',
+  footer: 'Demo only. No request is saved or sent and no landlord is notified.',
 };

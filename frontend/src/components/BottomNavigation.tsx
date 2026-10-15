@@ -9,7 +9,7 @@ import {
 import type {BottomTabBarProps} from '@react-navigation/bottom-tabs';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-type UserRole = 'tenant' | 'landlord';
+import type { UserRole } from '../types/user';
 
 type Props = BottomTabBarProps & {
   role: UserRole;

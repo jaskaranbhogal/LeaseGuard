@@ -1,4 +1,8 @@
+import { colors } from '../../theme/colors';
+import DemoNotice from '../../components/DemoNotice';
 import React from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { useInspection } from '../../context/InspectionContext';
 import {
   Alert,
   Pressable,
@@ -14,8 +18,8 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import NotificationBell from '../../components/NotificationBell';
 
-import type { TenantTabParamList } from '../../navigation/TenantTabs';
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantTabParamList } from '../../navigation/types';
+import type { TenantStackParamList } from '../../navigation/types';
 
 import { tenantMockData } from '../../data/tenantMockData';
 
@@ -25,8 +29,8 @@ type Props = CompositeScreenProps<
 >;
 
 const COLORS = {
-  background: '#F5F9FC',
-  white: '#FFFFFF',
+  background: colors.background,
+  white: colors.white,
   primary: '#1459EB',
   primaryLight: '#EBF2FF',
   text: '#131824',
@@ -39,6 +43,8 @@ const COLORS = {
 };
 
 export default function TenantDashboardScreen({ navigation }: Props) {
+  const { user } = useAuth();
+  const demo = useInspection();
   const { tenant, inspection, recentMaintenance } = tenantMockData;
 
   return (
@@ -52,7 +58,9 @@ export default function TenantDashboardScreen({ navigation }: Props) {
           {/* Tenant information */}
           <View style={styles.header}>
             <View style={styles.headerText}>
-              <Text style={styles.greeting}>Hi, {tenant.firstName}</Text>
+              <Text style={styles.greeting}>
+                Hi, {user?.name || user?.email}
+              </Text>
 
               <Text style={styles.property}>
                 {tenant.propertyAddress} • Unit {tenant.unitNumber}
@@ -70,6 +78,7 @@ export default function TenantDashboardScreen({ navigation }: Props) {
             />
           </View>
 
+          <DemoNotice />
           {/* Upcoming inspection */}
           {inspection ? (
             <View style={styles.inspectionCard}>
@@ -89,9 +98,20 @@ export default function TenantDashboardScreen({ navigation }: Props) {
               <Pressable
                 accessibilityRole="button"
                 style={styles.primaryButton}
-                onPress={() => navigation.navigate('GuidedInspection')}
+                onPress={() => {
+                  if (demo.complete) {
+                    demo.restart();
+                  }
+                  navigation.navigate('GuidedInspection');
+                }}
               >
-                <Text style={styles.primaryButtonText}>Start inspection</Text>
+                <Text style={styles.primaryButtonText}>
+                  {demo.complete
+                    ? 'Start another demo'
+                    : demo.acceptedCount
+                    ? 'Resume inspection demo'
+                    : 'Start inspection demo'}
+                </Text>
               </Pressable>
             </View>
           ) : (
@@ -119,7 +139,7 @@ export default function TenantDashboardScreen({ navigation }: Props) {
 
               <Text style={styles.quickTitle}>Report issue</Text>
 
-              <Text style={styles.quickSubtitle}>Photo or video</Text>
+              <Text style={styles.quickSubtitle}>Demo form</Text>
             </Pressable>
 
             <Pressable
@@ -144,7 +164,11 @@ export default function TenantDashboardScreen({ navigation }: Props) {
             <Pressable
               accessibilityRole="button"
               style={styles.activityCard}
-              onPress={() => navigation.navigate('MaintenanceDetail')}
+              onPress={() =>
+                navigation.navigate('MaintenanceDetail', {
+                  requestId: recentMaintenance.requestId,
+                })
+              }
             >
               <View style={styles.statusBadge}>
                 <Text style={styles.statusText}>

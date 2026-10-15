@@ -1,4 +1,7 @@
+import { colors } from '../../theme/colors';
+import DemoNotice from '../../components/DemoNotice';
 import React, { useState } from 'react';
+import Button from '../../components/Button';
 import {
   Pressable,
   ScrollView,
@@ -10,17 +13,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantStackParamList } from '../../navigation/types';
 import {
-  maintenanceDetailMockData,
+  findMaintenanceRequest,
   type MaintenanceStatus,
 } from '../../data/maintenanceDetailMockData';
 
 type Props = NativeStackScreenProps<TenantStackParamList, 'MaintenanceDetail'>;
 
 const COLORS = {
-  background: '#F5F9FC',
-  white: '#FFFFFF',
+  background: colors.background,
+  white: colors.white,
   primary: '#2865F3',
   text: '#131824',
   muted: '#9099AA',
@@ -40,10 +43,29 @@ const PROGRESS_STEPS: {
   { id: 'resolved', label: 'Resolved' },
 ];
 
-export default function MaintenanceDetailScreen({ navigation }: Props) {
-  const request = maintenanceDetailMockData;
+export default function MaintenanceDetailScreen({ navigation, route }: Props) {
+  const request = findMaintenanceRequest(route.params?.requestId);
   const [showProgress, setShowProgress] = useState(true);
 
+  function back() {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.replace('TenantTabs', { screen: 'History' });
+    }
+  }
+  if (!request) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.content}>
+          <Text accessibilityRole="alert" style={styles.title}>
+            Sample request not found
+          </Text>
+          <Button title="Back to my requests" onPress={back} />
+        </View>
+      </SafeAreaView>
+    );
+  }
   const currentStep = PROGRESS_STEPS.findIndex(
     step => step.id === request.status,
   );
@@ -55,6 +77,7 @@ export default function MaintenanceDetailScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Maintenance request</Text>
+        <DemoNotice />
 
         <Text style={styles.subtitle}>{request.location}</Text>
 
@@ -132,12 +155,7 @@ export default function MaintenanceDetailScreen({ navigation }: Props) {
           })}
         </View>
 
-        <Pressable
-          accessibilityRole="switch"
-          accessibilityState={{ checked: showProgress }}
-          onPress={() => setShowProgress(value => !value)}
-          style={styles.toggleCard}
-        >
+        <View style={styles.toggleCard}>
           <View style={styles.toggleInfo}>
             <Text style={styles.toggleIcon}>◎</Text>
 
@@ -147,6 +165,7 @@ export default function MaintenanceDetailScreen({ navigation }: Props) {
           </View>
 
           <Switch
+            accessibilityLabel="Show maintenance progress"
             value={showProgress}
             onValueChange={setShowProgress}
             trackColor={{
@@ -155,7 +174,7 @@ export default function MaintenanceDetailScreen({ navigation }: Props) {
             }}
             thumbColor={COLORS.white}
           />
-        </Pressable>
+        </View>
 
         {showProgress ? (
           <View style={styles.updatesCard}>
@@ -181,7 +200,7 @@ export default function MaintenanceDetailScreen({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={back}
         >
           <Text style={styles.backButtonText}>Back to my requests</Text>
         </Pressable>

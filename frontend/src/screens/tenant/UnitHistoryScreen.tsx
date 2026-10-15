@@ -1,19 +1,21 @@
+import { colors } from '../../theme/colors';
+import DemoNotice from '../../components/DemoNotice';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { TenantTabParamList } from '../../navigation/TenantTabs';
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantTabParamList } from '../../navigation/types';
+import type { TenantStackParamList } from '../../navigation/types';
 import {
   unitHistoryMockData,
   type HistoryEntryType,
 } from '../../data/unitHistoryMockData';
 
 const COLORS = {
-  background: '#F5F9FC',
-  white: '#FFFFFF',
+  background: colors.background,
+  white: colors.white,
   primary: '#1459EB',
   primaryLight: '#EBF2FF',
   text: '#131824',
@@ -59,12 +61,13 @@ export default function UnitHistoryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{title}</Text>
+        <DemoNotice />
 
         <Text style={styles.subtitle}>{subtitle}</Text>
 
@@ -80,8 +83,10 @@ export default function UnitHistoryScreen() {
                 disabled={!isMaintenance}
                 accessibilityRole={isMaintenance ? 'button' : undefined}
                 onPress={() => {
-                  if (isMaintenance) {
-                    stackNavigation?.navigate('MaintenanceDetail');
+                  if (entry.type === 'maintenance') {
+                    stackNavigation?.navigate('MaintenanceDetail', {
+                      requestId: entry.requestId,
+                    });
                   }
                 }}
               >

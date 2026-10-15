@@ -1,13 +1,20 @@
+import type { MaintenanceRequestId } from '../types/maintenance';
+
 export type HistoryEntryType = 'move-in' | 'inspection' | 'maintenance';
 
-export interface UnitHistoryEntry {
+type HistoryEntryDetails = {
   id: string;
-  type: HistoryEntryType;
   badge: string;
   title: string;
   details: string;
   status?: string;
-}
+};
+
+export type UnitHistoryEntry = HistoryEntryDetails &
+  (
+    | { type: 'maintenance'; requestId: MaintenanceRequestId }
+    | { type: 'move-in' | 'inspection' }
+  );
 
 export interface UnitHistoryData {
   title: string;
@@ -41,11 +48,21 @@ export const unitHistoryMockData: UnitHistoryData = {
     },
     {
       id: 'maintenance-1',
+      requestId: 'maintenance-1',
       type: 'maintenance',
       badge: 'MAINTENANCE',
       title: 'Kitchen sink leak',
       details: 'Reported Sep 21',
       status: 'Status: In progress',
+    },
+    {
+      id: 'maintenance-2',
+      requestId: 'maintenance-2',
+      type: 'maintenance',
+      badge: 'MAINTENANCE',
+      title: 'Bedroom window latch',
+      details: 'Reported Sep 28',
+      status: 'Status: In review',
     },
   ],
 

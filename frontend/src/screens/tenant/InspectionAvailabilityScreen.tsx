@@ -1,3 +1,5 @@
+import { colors } from '../../theme/colors';
+import DemoNotice from '../../components/DemoNotice';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -10,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { inspectionAvailabilityMockData } from '../../data/inspectionAvailabilityMockData';
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<
   TenantStackParamList,
@@ -18,8 +20,8 @@ type Props = NativeStackScreenProps<
 >;
 
 const COLORS = {
-  background: '#F5F9FC',
-  white: '#FFFFFF',
+  background: colors.background,
+  white: colors.white,
   primary: '#1459EB',
   primaryLight: '#EBF2FF',
   text: '#131824',
@@ -48,8 +50,8 @@ export default function InspectionAvailabilityScreen({ navigation }: Props) {
     }
 
     Alert.alert(
-      'Availability selected',
-      'Your selected time slots are ready. Sending them to your landlord will be enabled when backend integration is complete.',
+      'Demo availability selected',
+      'Demo only. Your selections have not been saved or sent to a landlord.',
       [{ text: 'OK' }],
     );
   }
@@ -61,6 +63,7 @@ export default function InspectionAvailabilityScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{inspectionAvailabilityMockData.title}</Text>
+        <DemoNotice />
 
         <Text style={styles.subtitle}>
           {inspectionAvailabilityMockData.description}
@@ -102,7 +105,9 @@ export default function InspectionAvailabilityScreen({ navigation }: Props) {
           style={styles.primaryButton}
           onPress={sendAvailability}
         >
-          <Text style={styles.primaryButtonText}>Send availability</Text>
+          <Text style={styles.primaryButtonText}>
+            Preview demo availability
+          </Text>
         </Pressable>
 
         <Pressable
@@ -114,7 +119,8 @@ export default function InspectionAvailabilityScreen({ navigation }: Props) {
         </Pressable>
 
         <Text style={styles.footerText}>
-          The selected options will appear on the landlord's inspection request.
+          Demo selections stay on this screen only. Nothing is sent to a
+          landlord.
         </Text>
       </ScrollView>
     </SafeAreaView>

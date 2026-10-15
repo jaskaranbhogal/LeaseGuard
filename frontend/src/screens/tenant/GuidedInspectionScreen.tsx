@@ -1,4 +1,7 @@
+import { colors } from '../../theme/colors';
 import React from 'react';
+import { useInspection } from '../../context/InspectionContext';
+import DemoNotice from '../../components/DemoNotice';
 import {
   Alert,
   Pressable,
@@ -10,44 +13,45 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantStackParamList } from '../../navigation/types';
 import { guidedInspectionMockData } from '../../data/guidedInspectionMockData';
 
 type Props = NativeStackScreenProps<TenantStackParamList, 'GuidedInspection'>;
 
 const COLORS = {
-  background: '#F5F9FC',
+  background: colors.background,
   primary: '#1459EB',
   primaryLight: '#EBF2FF',
   text: '#131824',
   muted: '#5E6B80',
   border: '#D6DEEB',
-  white: '#FFFFFF',
+  white: colors.white,
   track: '#EBEDF2',
   camera: '#333B4A',
   guide: '#CCD9EB',
 };
 
 export default function GuidedInspectionScreen({ navigation }: Props) {
-  const currentStepIndex = 0;
-  const totalSteps = 4;
+  const { currentStepIndex, totalSteps } = useInspection();
 
   const step = guidedInspectionMockData.steps[currentStepIndex];
 
   function handleCapture() {
-    navigation.navigate('ReviewInspectionPhoto');
+    navigation.navigate('ReviewInspectionPhoto', {
+      stepIndex: currentStepIndex,
+    });
   }
 
   function handleCancel() {
     Alert.alert(
       'Cancel inspection?',
-      'Are you sure you want to leave this inspection?',
+      'Leave this demo? Your step progress stays available until you log out or close the app.',
       [
         { text: 'Keep inspecting', style: 'cancel' },
         {
           text: 'Leave inspection',
           style: 'destructive',
-          onPress: () => navigation.goBack(),
+          onPress: () => navigation.popTo('TenantTabs'),
         },
       ],
     );
@@ -59,6 +63,7 @@ export default function GuidedInspectionScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <DemoNotice />
         <Text style={styles.title}>{guidedInspectionMockData.title}</Text>
 
         <Text style={styles.subtitle}>
@@ -87,7 +92,7 @@ export default function GuidedInspectionScreen({ navigation }: Props) {
         </View>
 
         <View style={styles.cameraPreview}>
-          <Text style={styles.cameraTitle}>CAMERA PREVIEW</Text>
+          <Text style={styles.cameraTitle}>DEMO PLACEHOLDER</Text>
 
           <View style={styles.cameraGuide} />
 
@@ -99,7 +104,7 @@ export default function GuidedInspectionScreen({ navigation }: Props) {
           style={styles.captureButton}
           onPress={handleCapture}
         >
-          <Text style={styles.captureButtonText}>Capture photo</Text>
+          <Text style={styles.captureButtonText}>Review placeholder photo</Text>
         </Pressable>
 
         <Pressable

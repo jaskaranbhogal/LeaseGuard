@@ -1,3 +1,5 @@
+import { colors } from '../../theme/colors';
+import DemoNotice from '../../components/DemoNotice';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -11,14 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantStackParamList } from '../../navigation/types';
 import { reportMaintenanceMockData } from '../../data/reportMaintenanceMockData';
 
 type Props = NativeStackScreenProps<TenantStackParamList, 'ReportMaintenance'>;
 
 const COLORS = {
-  background: '#F5F9FC',
-  white: '#FFFFFF',
+  background: colors.background,
+  white: colors.white,
   primary: '#1459EB',
   primaryLight: '#EBF2FF',
   text: '#131824',
@@ -54,7 +56,7 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
     }
 
     Alert.alert(
-      'Request ready',
+      'Demo form complete',
       'Your form is complete. Maintenance submissions will be enabled when backend integration is ready. Nothing has been submitted yet.',
       [{ text: 'OK' }],
     );
@@ -84,6 +86,7 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{reportMaintenanceMockData.title}</Text>
+        <DemoNotice />
 
         <Text style={styles.subtitle}>
           {reportMaintenanceMockData.subtitle}
@@ -156,7 +159,7 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
           onPress={handleSubmit}
         >
           <Text style={styles.submitButtonText}>
-            Submit maintenance request
+            Preview demo request
           </Text>
         </Pressable>
 

@@ -1,16 +1,13 @@
+import { colors } from '../../theme/colors';
 import React from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useInspection } from '../../context/InspectionContext';
+import { guidedInspectionMockData } from '../../data/guidedInspectionMockData';
+import Button from '../../components/Button';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantStackParamList } from '../../navigation/types';
 import { reviewInspectionPhotoMockData } from '../../data/reviewInspectionPhotoMockData';
 
 type Props = NativeStackScreenProps<
@@ -19,8 +16,8 @@ type Props = NativeStackScreenProps<
 >;
 
 const COLORS = {
-  background: '#F5F9FC',
-  white: '#FFFFFF',
+  background: colors.background,
+  white: colors.white,
   primary: '#1459EB',
   text: '#131824',
   muted: '#5E6B80',
@@ -30,14 +27,36 @@ const COLORS = {
   greenLight: '#E5FAF0',
 };
 
-export default function ReviewInspectionPhotoScreen({ navigation }: Props) {
+export default function ReviewInspectionPhotoScreen({
+  navigation,
+  route,
+}: Props) {
   const data = reviewInspectionPhotoMockData;
 
-  function handleUsePhoto() {
-    Alert.alert(
-      'Photo review preview',
-      'Photo acceptance will be available after camera integration. No photo has been saved yet.',
+  const { currentStepIndex, totalSteps, complete, acceptStep } =
+    useInspection();
+  const step = guidedInspectionMockData.steps[currentStepIndex];
+  if (complete || route.params?.stepIndex !== currentStepIndex) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <Text style={styles.title}>This demo step is no longer active.</Text>
+        <Button
+          title="Return to inspection"
+          onPress={() => navigation.popTo('GuidedInspection')}
+        />
+      </SafeAreaView>
     );
+  }
+  function handleUsePhoto() {
+    acceptStep(currentStepIndex);
+    if (currentStepIndex + 1 === totalSteps) {
+      navigation.reset({
+        index: 1,
+        routes: [{ name: 'TenantTabs' }, { name: 'InspectionSubmitted' }],
+      });
+    } else {
+      navigation.popTo('GuidedInspection');
+    }
   }
 
   function handleRetake() {
@@ -53,7 +72,7 @@ export default function ReviewInspectionPhotoScreen({ navigation }: Props) {
         <Text style={styles.title}>{data.title}</Text>
 
         <Text style={styles.subtitle}>
-          {data.area} • Step {data.step} of {data.totalSteps}
+          {step.area} • Step {currentStepIndex + 1} of {totalSteps}
         </Text>
 
         <View style={styles.photoPreview}>
@@ -79,7 +98,11 @@ export default function ReviewInspectionPhotoScreen({ navigation }: Props) {
           style={styles.primaryButton}
           onPress={handleUsePhoto}
         >
-          <Text style={styles.primaryButtonText}>Use this photo</Text>
+          <Text style={styles.primaryButtonText}>
+            {currentStepIndex + 1 === totalSteps
+              ? 'Complete demo'
+              : 'Use placeholder and continue'}
+          </Text>
         </Pressable>
 
         <Pressable
@@ -87,7 +110,7 @@ export default function ReviewInspectionPhotoScreen({ navigation }: Props) {
           style={styles.secondaryButton}
           onPress={handleRetake}
         >
-          <Text style={styles.secondaryButtonText}>Retake</Text>
+          <Text style={styles.secondaryButtonText}>Retake demo photo</Text>
         </Pressable>
 
         <Text style={styles.footer}>{data.footer}</Text>

@@ -1,3 +1,6 @@
+import type { MaintenanceRequestId } from '../types/maintenance';
+import { guidedInspectionMockData } from './guidedInspectionMockData';
+
 export type TenantDashboardData = {
   tenant: {
     firstName: string;
@@ -11,6 +14,7 @@ export type TenantDashboardData = {
     estimatedMinutes: number;
   } | null;
   recentMaintenance: {
+    requestId: MaintenanceRequestId;
     title: string;
     status: string;
     update: string;
@@ -31,10 +35,11 @@ export const tenantMockData: TenantDashboardData = {
   inspection: {
     title: 'Routine condition inspection',
     dueDate: 'Oct 8',
-    requiredAreas: 4,
+    requiredAreas: guidedInspectionMockData.steps.length,
     estimatedMinutes: 5,
   },
   recentMaintenance: {
+    requestId: 'maintenance-1',
     title: 'Kitchen sink leak',
     status: 'In progress',
     update: 'Landlord scheduled a plumber for Sep 25',

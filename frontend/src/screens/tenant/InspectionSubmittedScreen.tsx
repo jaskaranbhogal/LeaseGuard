@@ -1,9 +1,11 @@
+import { colors } from '../../theme/colors';
 import React from 'react';
+import { useInspection } from '../../context/InspectionContext';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import type { TenantStackParamList } from '../../navigation/TenantNavigator';
+import type { TenantStackParamList } from '../../navigation/types';
 
 type Props = NativeStackScreenProps<
   TenantStackParamList,
@@ -11,16 +13,17 @@ type Props = NativeStackScreenProps<
 >;
 
 const COLORS = {
-  background: '#F5F9FC',
+  background: colors.background,
   blue: '#1459EB',
-  white: '#FFFFFF',
+  white: colors.white,
   green: '#14874A',
   muted: '#5E6B80',
 };
 
 export default function InspectionSubmittedScreen({ navigation }: Props) {
+  const { acceptedCount, complete } = useInspection();
   function backToDashboard() {
-    navigation.navigate('TenantTabs');
+    navigation.popTo('TenantTabs', { screen: 'Home' });
   }
 
   return (
@@ -31,10 +34,15 @@ export default function InspectionSubmittedScreen({ navigation }: Props) {
             <Text style={styles.checkMark}>✓</Text>
           </View>
 
-          <Text style={styles.title}>Inspection submitted</Text>
+          <Text style={styles.title}>
+            {complete
+              ? 'Inspection demo complete'
+              : 'Inspection demo incomplete'}
+          </Text>
 
           <Text style={styles.subtitle}>
-            Your landlord will be notified when the AI comparison is ready.
+            No photos were captured, analyzed, saved, or submitted. No landlord
+            was notified.
           </Text>
         </View>
 
@@ -47,7 +55,9 @@ export default function InspectionSubmittedScreen({ navigation }: Props) {
             <Text style={styles.dashboardButtonText}>Back to dashboard</Text>
           </Pressable>
 
-          <Text style={styles.summary}>4 areas documented • Sep 23, 2026</Text>
+          <Text style={styles.summary}>
+            {acceptedCount} placeholder areas reviewed · Demo only
+          </Text>
         </View>
       </View>
     </SafeAreaView>
@@ -64,7 +74,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   successHero: {
-    height: 330,
+    minHeight: 330,
+    paddingBottom: 24,
     backgroundColor: COLORS.blue,
     alignItems: 'center',
     paddingHorizontal: 24,
