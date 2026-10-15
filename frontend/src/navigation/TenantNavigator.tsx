@@ -1,5 +1,4 @@
-
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import TenantTabs from './TenantTabs';
 
@@ -24,47 +23,47 @@ const Stack = createNativeStackNavigator<TenantStackParamList>();
 
 export default function TenantNavigator() {
   return (
-    <Stack.Navigator initialRouteName="TenantTabs">
+    <Stack.Navigator>
       <Stack.Screen
         name="TenantTabs"
         component={TenantTabs}
-        options={{headerShown: false}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="GuidedInspection"
         component={GuidedInspectionScreen}
-        options={{title: 'Guided Inspection'}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="ReportMaintenance"
         component={ReportMaintenanceScreen}
-        options={{title: 'Report Maintenance'}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="InspectionAvailability"
         component={InspectionAvailabilityScreen}
-        options={{title: 'Inspection Availability'}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="MaintenanceDetail"
         component={MaintenanceDetailScreen}
-        options={{title: 'Maintenance Details'}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="ReviewInspectionPhoto"
         component={ReviewInspectionPhotoScreen}
-        options={{title: 'Review Photo'}}
+        options={{ headerShown: false }}
       />
 
       <Stack.Screen
         name="InspectionSubmitted"
         component={InspectionSubmittedScreen}
-        options={{title: 'Inspection Submitted'}}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
