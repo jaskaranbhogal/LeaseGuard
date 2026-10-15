@@ -1,9 +1,11 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { TenantTabParamList } from '../../navigation/TenantTabs';
+import type { TenantStackParamList } from '../../navigation/TenantNavigator';
 import {
   unitHistoryMockData,
   type HistoryEntryType,
@@ -47,6 +49,9 @@ const BADGE_COLORS = {
 export default function UnitHistoryScreen() {
   const navigation =
     useNavigation<BottomTabNavigationProp<TenantTabParamList>>();
+
+  const stackNavigation =
+    navigation.getParent<NativeStackNavigationProp<TenantStackParamList>>();
   const { title, subtitle, entries, comparison } = unitHistoryMockData;
 
   function getStatusColor(type: HistoryEntryType) {
@@ -66,9 +71,20 @@ export default function UnitHistoryScreen() {
         <View style={styles.historyList}>
           {entries.map(entry => {
             const badgeColors = BADGE_COLORS[entry.type];
+            const isMaintenance = entry.type === 'maintenance';
 
             return (
-              <View key={entry.id} style={styles.historyCard}>
+              <Pressable
+                key={entry.id}
+                style={styles.historyCard}
+                disabled={!isMaintenance}
+                accessibilityRole={isMaintenance ? 'button' : undefined}
+                onPress={() => {
+                  if (isMaintenance) {
+                    stackNavigation?.navigate('MaintenanceDetail');
+                  }
+                }}
+              >
                 <View
                   style={[
                     styles.badge,
@@ -99,7 +115,7 @@ export default function UnitHistoryScreen() {
                     </Text>
                   ) : null}
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
