@@ -12,11 +12,11 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
-import { login, logout } from '../../services/authService';
+import { login } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-import type { User } from '../../types/user';
+import { useAuth } from '../../context/AuthContext';
 import { emailError } from '../../utils/validation';
 import { useAuthRequest } from '../../utils/useAuthRequest';
 
@@ -25,7 +25,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const { completeSignIn } = useAuth();
   const passwordInput = useRef<ComponentRef<typeof TextInput>>(null);
   const request = useAuthRequest();
   const invalidEmail = submitted ? emailError(email) : undefined;
@@ -43,7 +43,7 @@ export default function LoginScreen({ navigation }: Props) {
       authenticated => {
         setPassword('');
         setSubmitted(false);
-        setUser(authenticated);
+        completeSignIn(authenticated);
       },
     );
   }
@@ -53,100 +53,73 @@ export default function LoginScreen({ navigation }: Props) {
       <Text style={styles.brand}>LeaseGuard</Text>
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.subtitle}>Sign in to your account</Text>
-      {user ? (
-        <View style={styles.form}>
-          <Text accessibilityRole="alert" style={styles.signedIn}>
-            Signed in as {user.email}
+      <View style={styles.form}>
+        <Input
+          label="Email"
+          placeholder="Enter your email"
+          value={email}
+          onChangeText={value => {
+            setEmail(value);
+            request.clearError();
+          }}
+          error={invalidEmail}
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
+          editable={!request.loading}
+          returnKeyType="next"
+          onSubmitEditing={() => passwordInput.current?.focus()}
+        />
+        <Input
+          ref={passwordInput}
+          label="Password"
+          placeholder="Enter your password"
+          value={password}
+          onChangeText={value => {
+            setPassword(value);
+            request.clearError();
+          }}
+          error={invalidPassword}
+          secureTextEntry
+          autoComplete="current-password"
+          textContentType="password"
+          editable={!request.loading}
+          returnKeyType="go"
+          onSubmitEditing={submit}
+        />
+        <Pressable
+          accessibilityRole="link"
+          disabled={request.loading}
+          style={styles.forgot}
+          onPress={() =>
+            navigation.navigate('ForgotPassword', { email: email.trim() })
+          }
+        >
+          <Text style={styles.link}>Forgot password?</Text>
+        </Pressable>
+        {request.error ? (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {request.error}
           </Text>
-          <Text style={styles.subtitle}>
-            Your account is authenticated. Dashboard access is not available in
-            this build yet.
+        ) : null}
+        <Button
+          title="Login"
+          loading={request.loading}
+          onPress={submit}
+          style={styles.login}
+        />
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Register"
+          disabled={request.loading}
+          style={styles.register}
+          onPress={() => navigation.navigate('Register')}
+        >
+          <Text style={styles.registerText}>
+            Don’t have an account? Register
           </Text>
-          <Button
-            title="Sign out"
-            loading={request.loading}
-            onPress={() =>
-              request.run(
-                signal => logout(signal),
-                () => setUser(null),
-              )
-            }
-          />
-        </View>
-      ) : (
-        <View style={styles.form}>
-          <Input
-            label="Email"
-            placeholder="Enter your email"
-            value={email}
-            onChangeText={value => {
-              setEmail(value);
-              request.clearError();
-            }}
-            error={invalidEmail}
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-            editable={!request.loading}
-            returnKeyType="next"
-            onSubmitEditing={() => passwordInput.current?.focus()}
-          />
-          <Input
-            ref={passwordInput}
-            label="Password"
-            placeholder="Enter your password"
-            value={password}
-            onChangeText={value => {
-              setPassword(value);
-              request.clearError();
-            }}
-            error={invalidPassword}
-            secureTextEntry
-            autoComplete="current-password"
-            textContentType="password"
-            editable={!request.loading}
-            returnKeyType="go"
-            onSubmitEditing={submit}
-          />
-          <Pressable
-            accessibilityRole="link"
-            disabled={request.loading}
-            style={styles.forgot}
-            onPress={() =>
-              navigation.navigate('ForgotPassword', { email: email.trim() })
-            }
-          >
-            <Text style={styles.link}>Forgot password?</Text>
-          </Pressable>
-          {request.error ? (
-            <Text accessibilityRole="alert" style={styles.error}>
-              {request.error}
-            </Text>
-          ) : null}
-          <Button
-            title="Login"
-            loading={request.loading}
-            onPress={submit}
-            style={styles.login}
-          />
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel="Register"
-            disabled={request.loading}
-            style={styles.register}
-            onPress={() => navigation.navigate('Register')}
-          >
-            <Text style={styles.registerText}>
-              Don’t have an account? Register
-            </Text>
-          </Pressable>
-        </View>
-      )}
-      {user && request.error ? (
-        <Text accessibilityRole="alert" style={styles.error}>
-          {request.error}
-        </Text>
-      ) : null}
+        </Pressable>
+      </View>
     </ScreenContainer>
   );
 }

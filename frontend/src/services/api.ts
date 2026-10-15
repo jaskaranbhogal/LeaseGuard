@@ -18,7 +18,11 @@ function baseUrl(): string {
 }
 export const API_BASE_URL = baseUrl();
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(message: string, public readonly status?: number) {
+    super(message);
+  }
+}
 
 export async function request<T>(
   path: string,
@@ -57,6 +61,7 @@ export async function request<T>(
           : 'Unable to complete your request. Please try again.';
       throw new ApiError(
         typeof data?.detail === 'string' ? data.detail : fallback,
+        response.status,
       );
     }
     if (!data || typeof data !== 'object') {
