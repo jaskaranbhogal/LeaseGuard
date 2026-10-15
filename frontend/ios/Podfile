@@ -1,3 +1,4 @@
+
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -30,5 +31,14 @@ target 'frontend' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Fix outdated iOS deployment target for SVG filters
+    installer.pods_project.targets.each do |target|
+      if target.name == 'RNSVG-RNSVGFilters'
+        target.build_configurations.each do |config|
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+        end
+      end
+    end
   end
 end
