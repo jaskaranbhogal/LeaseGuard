@@ -35,10 +35,7 @@ export default function GuidedInspectionScreen({ navigation }: Props) {
   const step = guidedInspectionMockData.steps[currentStepIndex];
 
   function handleCapture() {
-    Alert.alert(
-      'Camera integration coming soon',
-      'The camera preview is currently a placeholder. Photo capture will be connected in a later step.',
-    );
+    navigation.navigate('ReviewInspectionPhoto');
   }
 
   function handleCancel() {
