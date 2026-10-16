@@ -6,7 +6,8 @@ import {
 } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Image, TextInput } from 'react-native';
-import AuthNavigator from '../src/navigation/AuthNavigator';
+import RootNavigator from '../src/navigation/RootNavigator';
+import { AuthProvider } from '../src/context/AuthContext';
 import type { AuthStackParamList } from '../src/navigation/types';
 import LoginScreen from '../src/screens/auth/LoginScreen';
 import RegisterScreen from '../src/screens/auth/RegisterScreen';
@@ -27,13 +28,16 @@ let navigation: ReturnType<
 beforeEach(async () => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  jest.mocked(auth.getSession).mockResolvedValue(null);
   navigation = createNavigationContainerRef<AuthStackParamList>();
   await act(async () => {
     app = create(
       <SafeAreaProvider>
-        <NavigationContainer ref={navigation}>
-          <AuthNavigator />
-        </NavigationContainer>
+        <AuthProvider>
+          <NavigationContainer ref={navigation}>
+            <RootNavigator />
+          </NavigationContainer>
+        </AuthProvider>
       </SafeAreaProvider>,
     );
   });
@@ -100,19 +104,21 @@ it('passes credentials to the service and never treats a rejection as success', 
   );
   expect(JSON.stringify(app.toJSON())).not.toContain('Signed in as');
 });
-it('acknowledges an authenticated account without opening an unfinished dashboard', async () => {
+it('acknowledges a legacy account without granting access to a role dashboard', async () => {
   login.mockResolvedValue({
     id: 1,
     email: 'resident@example.com',
     name: 'Resident',
+    role: null,
   });
   await typeLogin('resident@example.com', 'test-fixture-only');
   await act(async () => {
     screen().findByType(Button).props.onPress();
   });
   expect(JSON.stringify(app.toJSON())).toContain('Signed in as');
-  expect(screen().findAllByType(TextInput)).toHaveLength(0);
-  expect(navigation.getCurrentRoute()?.name).toBe('Login');
+  expect(app.root.findAllByType(LoginScreen)).toHaveLength(0);
+  expect(JSON.stringify(app.toJSON())).toContain('Account type not assigned');
+  expect(JSON.stringify(app.toJSON())).not.toContain('Start inspection');
 });
 it('validates reset input and preserves request failures on the form', async () => {
   await forgot();
@@ -214,6 +220,7 @@ async function fillRegistration(
   confirmation = 'Fresh-Passphrase-583!',
 ) {
   await act(async () => {
+    form.findAllByProps({ accessibilityLabel: 'Tenant' })[0].props.onPress();
     const fields = form.findAllByType(TextInput);
     [
       'New Resident',
@@ -280,6 +287,7 @@ it('blocks duplicate registration and confirms creation before returning to sign
   ).toBe(true);
   expect(auth.register).toHaveBeenCalledWith(
     {
+      role: 'tenant',
       name: 'New Resident',
       email: 'new@example.com',
       password: 'Fresh-Passphrase-583!',
@@ -288,7 +296,12 @@ it('blocks duplicate registration and confirms creation before returning to sign
     expect.any(AbortSignal),
   );
   await act(async () => {
-    accept({ id: 10, name: 'New Resident', email: 'new@example.com' });
+    accept({
+      id: 10,
+      name: 'New Resident',
+      email: 'new@example.com',
+      role: 'tenant',
+    });
   });
   expect(JSON.stringify(app.toJSON())).toContain('Account created');
   expect(form.findAllByType(TextInput)).toHaveLength(0);
@@ -318,7 +331,58 @@ it('cancels registration on leaving the screen', async () => {
   });
   expect(signal?.aborted).toBe(true);
   await act(async () => {
-    accept({ id: 10, name: 'New Resident', email: 'new@example.com' });
+    accept({
+      id: 10,
+      name: 'New Resident',
+      email: 'new@example.com',
+      role: 'tenant',
+    });
   });
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
 });
+
+it('requires an explicit role even when every registration field is valid', async () => {
+  const form = await registrationForm();
+  await act(async () => {
+    const fields = form.findAllByType(TextInput);
+    [
+      'New Resident',
+      'new@example.com',
+      'Fresh-Passphrase-583!',
+      'Fresh-Passphrase-583!',
+    ].forEach((value, index) => fields[index].props.onChangeText(value));
+  });
+  await act(async () => form.findByType(Button).props.onPress());
+  expect(auth.register).not.toHaveBeenCalled();
+  expect(JSON.stringify(app.toJSON())).toContain('Select Tenant or Landlord.');
+});
+it.each(['tenant', 'landlord'] as const)(
+  'sends the selected %s role and preserves registration success',
+  async role => {
+    const form = await registrationForm();
+    await fillRegistration(form);
+    await act(async () =>
+      form
+        .findAllByProps({
+          accessibilityLabel: role === 'tenant' ? 'Tenant' : 'Landlord',
+        })[0]
+        .props.onPress(),
+    );
+    jest
+      .mocked(auth.register)
+      .mockResolvedValueOnce({
+        id: 20,
+        name: 'New Resident',
+        email: 'new@example.com',
+        role,
+      });
+    await act(async () => form.findByType(Button).props.onPress());
+    expect(auth.register).toHaveBeenCalledWith(
+      expect.objectContaining({ role }),
+      expect.any(AbortSignal),
+    );
+    expect(JSON.stringify(app.toJSON())).toContain('Account created');
+    expect(auth.login).not.toHaveBeenCalled();
+    expect(navigation.getCurrentRoute()?.name).toBe('Register');
+  },
+);

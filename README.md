@@ -54,7 +54,7 @@ The following features represent the planned application scope. See the Developm
 - Account registration and login.
 - Secure password handling.
 - Forgot password and password reset functionality.
-- Session-based authentication.
+- Session-based authentication with launch/foreground session checks and role-specific navigation.
 - Separate landlord and tenant experiences planned.
 
 ### 2. Property and Unit Management
@@ -335,7 +335,7 @@ Keep Metro running while developing the mobile application.
 
 iOS development requires macOS, Xcode, and CocoaPods.
 
-From the `frontend` directory, install the Ruby dependencies:
+From the `frontend` directory, use the version in `.ruby-version` (Ruby 2.6.10, matching Dev’s committed lockfile) and Bundler 1.17.2, then install the Ruby dependencies:
 
 ```bash
 bundle install
@@ -410,11 +410,11 @@ LeaseGuard includes an authentication implementation using Django and React Nati
 
 ### Implemented Authentication Features
 
-- Registration with name, email, and password.
+- Registration with name, email, password, and explicit tenant/landlord selection.
 - Email and password login.
 - Secure password hashing using Django.
 - Form validation and error handling.
-- Session-based authentication.
+- Session-based authentication with launch/foreground session checks and role-specific navigation.
 - CSRF-protected API requests.
 - Forgot password requests.
 - Password reset token generation and confirmation.
@@ -426,7 +426,8 @@ LeaseGuard includes an authentication implementation using Django and React Nati
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/auth/csrf/` | Obtain a CSRF token |
-| POST | `/api/auth/register/` | Register a new account |
+| POST | `/api/auth/register/` | Register a tenant or landlord account |
+| GET | `/api/auth/session/` | Return the signed-in user and persisted role (401 if signed out) |
 | POST | `/api/auth/login/` | Authenticate a user |
 | POST | `/api/auth/logout/` | End the authenticated session |
 | POST | `/api/auth/password-reset/` | Request a password reset |
@@ -437,7 +438,7 @@ For request formats, configuration, and verification details, refer to:
 
 [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
 
-**Current limitation:** The authentication backend does not yet provide landlord/tenant role selection or automatic routing to role-specific dashboards.
+**Current scope:** Tenants reach the tenant demo, landlords reach a coming-soon screen with logout, and legacy accounts without roles see an assignment-needed screen. Property ownership and unit membership are not granted by account type. See [tenant integration and verification](docs/TENANT_INTEGRATION.md).
 
 ---
 
