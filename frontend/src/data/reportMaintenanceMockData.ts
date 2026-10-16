@@ -3,7 +3,7 @@ export const reportMaintenanceMockData = {
   subtitle: 'Try the maintenance form with a sample issue.',
   areaPlaceholder: 'e.g. Kitchen • Sink',
   descriptionPlaceholder: 'Describe what needs repair...',
-  maxMediaFiles: 3,
+  maxMediaFiles: 5,
   urgency: {
     label: 'SAMPLE URGENCY',
     value: 'Medium urgency',
