@@ -1,8 +1,8 @@
-import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,11 +10,19 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+  type ImagePickerResponse,
+} from 'react-native-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { TenantStackParamList } from '../../navigation/types';
 import { reportMaintenanceMockData } from '../../data/reportMaintenanceMockData';
+import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
 
 type Props = NativeStackScreenProps<TenantStackParamList, 'ReportMaintenance'>;
 
@@ -33,12 +41,125 @@ const COLORS = {
 export default function ReportMaintenanceScreen({ navigation }: Props) {
   const [area, setArea] = useState('');
   const [description, setDescription] = useState('');
+  const [photos, setPhotos] = useState<Asset[]>([]);
+  const [isPicking, setIsPicking] = useState(false);
+  // A ref also guards taps before React has rendered the disabled state.
+  const pickerOpen = useRef(false);
+
+  const maxPhotos = reportMaintenanceMockData.maxMediaFiles;
+
+  function savePhotos(assets: Asset[] = []) {
+    setPhotos(current => {
+      const next = [...current];
+      for (const asset of assets) {
+        if (!asset.uri || (asset.type && !asset.type.startsWith('image/'))) {
+          continue;
+        }
+        // Pickers may return a new cache URI for a previously selected photo.
+        const duplicate = next.some(
+          photo =>
+            photo.uri === asset.uri ||
+            Boolean(asset.id && photo.id === asset.id) ||
+            Boolean(
+              asset.originalPath && photo.originalPath === asset.originalPath,
+            ) ||
+            Boolean(
+              asset.fileName &&
+                asset.fileSize != null &&
+                photo.fileName === asset.fileName &&
+                photo.fileSize === asset.fileSize &&
+                photo.width === asset.width &&
+                photo.height === asset.height,
+            ),
+        );
+        if (!duplicate && next.length < maxPhotos) next.push(asset);
+      }
+      return next;
+    });
+  }
+
+  function handlePickerResult(
+    result: ImagePickerResponse,
+    source: 'camera' | 'library',
+  ) {
+    if (result.didCancel) return;
+    if (result.errorCode === 'camera_unavailable') {
+      Alert.alert(
+        'Camera unavailable',
+        'This device has no available camera. In the iOS simulator, choose photos from the library instead.',
+      );
+    } else if (result.errorCode === 'permission') {
+      Alert.alert(
+        'Permission required',
+        `Allow LeaseGuard to access your ${
+          source === 'camera' ? 'camera' : 'photos'
+        } in Settings, then try again.`,
+      );
+    } else if (result.errorCode) {
+      Alert.alert(
+        'Unable to add photos',
+        'Please try again or choose another photo.',
+      );
+    } else {
+      savePhotos(result.assets);
+    }
+  }
+
+  async function pickPhotos(source: 'camera' | 'library') {
+    if (pickerOpen.current) return;
+    const remaining = maxPhotos - photos.length;
+    if (remaining <= 0) {
+      Alert.alert('Limit reached', 'Remove a photo before adding another.');
+      return;
+    }
+
+    pickerOpen.current = true;
+    setIsPicking(true);
+    try {
+      const result =
+        source === 'camera'
+          ? await launchCamera({
+              mediaType: 'photo',
+              cameraType: 'back',
+              saveToPhotos: false,
+              quality: 0.8,
+            })
+          : await launchImageLibrary({
+              mediaType: 'photo',
+              selectionLimit: remaining,
+              quality: 0.8,
+            });
+      handlePickerResult(result, source);
+    } catch {
+      Alert.alert(
+        'Unable to add photos',
+        `Unable to open the ${
+          source === 'camera' ? 'camera' : 'photo library'
+        }. Please try again.`,
+      );
+    } finally {
+      pickerOpen.current = false;
+      setIsPicking(false);
+    }
+  }
 
   function handleAddMedia() {
-    Alert.alert(
-      'Media upload coming soon',
-      'Photo and video selection will be enabled when media upload is integrated.',
-    );
+    if (pickerOpen.current || photos.length >= maxPhotos) return;
+    Alert.alert('Add Photos', 'How would you like to add a photo?', [
+      {
+        text: 'Take Photo',
+        onPress: () => {
+          pickPhotos('camera');
+        },
+      },
+      {
+        text: 'Choose from Library',
+        onPress: () => {
+          pickPhotos('library');
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   function handleSubmit() {
@@ -63,7 +184,7 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
   }
 
   function handleCancel() {
-    if (!area.trim() && !description.trim()) {
+    if (!area.trim() && !description.trim() && photos.length === 0) {
       navigation.goBack();
       return;
     }
@@ -107,20 +228,57 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Add photo or video"
+          accessibilityLabel="Add photos"
+          accessibilityHint={`${photos.length} of ${maxPhotos} photos selected. Remove a photo to make room when full.`}
+          accessibilityState={{
+            disabled: isPicking || photos.length >= maxPhotos,
+            busy: isPicking,
+          }}
+          disabled={isPicking || photos.length >= maxPhotos}
           onPress={handleAddMedia}
-          style={styles.mediaCard}
+          style={[
+            styles.mediaCard,
+            (isPicking || photos.length >= maxPhotos) && styles.disabled,
+          ]}
         >
           <View style={styles.addIcon}>
             <Text style={styles.plusText}>+</Text>
           </View>
 
-          <Text style={styles.mediaTitle}>Add photo or video</Text>
+          <Text style={styles.mediaTitle}>
+            {isPicking ? 'Opening photos…' : 'Add photos'}
+          </Text>
 
           <Text style={styles.mediaSubtitle}>
-            Up to {reportMaintenanceMockData.maxMediaFiles} files
+            {photos.length} of {maxPhotos} photos selected
           </Text>
         </Pressable>
+
+        {photos.length > 0 && (
+          <View style={styles.photos}>
+            {photos.map((photo, index) => (
+              <View key={photo.uri} style={styles.photoCard}>
+                <Image
+                  source={{ uri: photo.uri }}
+                  style={styles.photo}
+                  accessibilityLabel={`Selected photo ${index + 1}`}
+                />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove photo ${index + 1}`}
+                  onPress={() =>
+                    setPhotos(current =>
+                      current.filter(item => item.uri !== photo.uri),
+                    )
+                  }
+                  style={styles.removePhoto}
+                >
+                  <Text style={styles.removePhotoText}>Remove</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.descriptionLabel}>Description</Text>
 
@@ -158,9 +316,7 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
           style={styles.submitButton}
           onPress={handleSubmit}
         >
-          <Text style={styles.submitButtonText}>
-            Preview demo request
-          </Text>
+          <Text style={styles.submitButtonText}>Preview demo request</Text>
         </Pressable>
 
         <Pressable
@@ -214,6 +370,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingHorizontal: 13,
   },
+  disabled: { opacity: 0.65 },
+  photos: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  photoCard: { width: 88 },
+  photo: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    backgroundColor: COLORS.border,
+  },
+  removePhoto: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removePhotoText: { color: COLORS.primary, fontSize: 12, fontWeight: '600' },
   mediaLabel: {
     fontSize: 12,
     fontWeight: '500',
