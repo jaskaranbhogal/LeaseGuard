@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .models import PasswordResetRequest
+from .models import AccountProfile, PasswordResetRequest
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -143,7 +143,8 @@ class RegistrationTests(TestCase):
     def setUp(self):
         cache.clear()
         self.data = {'name': ' New Resident ', 'email': ' NEW@example.com ',
-                     'password': 'Fresh-Passphrase-583!', 'confirmPassword': 'Fresh-Passphrase-583!'}
+                     'password': 'Fresh-Passphrase-583!', 'confirmPassword': 'Fresh-Passphrase-583!',
+                     'role': 'tenant'}
 
     def post(self, data=None, client=None, **extra):
         return (client or self.client).post('/api/auth/register/',
@@ -199,3 +200,92 @@ class RegistrationTests(TestCase):
         for _ in range(4):
             self.assertEqual(self.post().status_code, 409)
         self.assertEqual(self.post().status_code, 429)
+
+    def test_both_roles_persist_through_login_and_session(self):
+        for role in AccountProfile.Role.values:
+            with self.subTest(role=role):
+                data = {**self.data, 'email': f'{role}@example.com', 'role': role}
+                response = self.post(data)
+                self.assertEqual(response.status_code, 201)
+                self.assertEqual(response.json()['user']['role'], role)
+                user = get_user_model().objects.get(pk=response.json()['user']['id'])
+                self.assertEqual(user.account_profile.role, role)
+                self.assertTrue(user.check_password(data['password']))
+                self.assertFalse(user.is_staff)
+                login = self.client.post('/api/auth/login/', json.dumps({
+                    'email': data['email'], 'password': data['password'],
+                    'role': 'landlord' if role == 'tenant' else 'tenant',
+                }), content_type='application/json')
+                self.assertEqual(login.json()['user']['role'], role)
+                session = self.client.get('/api/auth/session/')
+                self.assertEqual(session.json()['user'], login.json()['user'])
+                self.assertIn('no-store', session['Cache-Control'])
+                self.client.post('/api/auth/logout/')
+                self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+
+    def test_missing_and_invalid_roles_are_rejected(self):
+        missing = {key: value for key, value in self.data.items() if key != 'role'}
+        for data in [missing] + [{**self.data, 'role': role}
+                                for role in [None, '', 'admin', 'Tenant', [], {}, 1]]:
+            with self.subTest(data=data):
+                cache.clear()
+                self.assertEqual(self.post(data).status_code, 400)
+        self.assertFalse(get_user_model().objects.exists())
+        self.assertFalse(AccountProfile.objects.exists())
+
+    def test_profile_failure_rolls_back_user_creation(self):
+        from django.db import IntegrityError
+        with patch('accounts.views.AccountProfile.objects.create', side_effect=IntegrityError):
+            self.assertEqual(self.post().status_code, 409)
+        self.assertFalse(get_user_model().objects.exists())
+
+    def test_database_rejects_invalid_role(self):
+        from django.db import IntegrityError, transaction
+        self.post()
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            AccountProfile.objects.update(role='admin')
+
+
+class SessionTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_legacy_and_staff_users_remain_unassigned(self):
+        for staff in [False, True]:
+            with self.subTest(staff=staff):
+                user = get_user_model().objects.create_user(
+                    username=f'legacy-{staff}', email=f'legacy-{staff}@example.com',
+                    password='Legacy-Passphrase-583!', is_staff=staff, is_superuser=staff)
+                response = self.client.post('/api/auth/login/', json.dumps({
+                    'email': user.email, 'password': 'Legacy-Passphrase-583!', 'role': 'landlord',
+                }), content_type='application/json')
+                self.assertEqual(response.status_code, 200)
+                self.assertIsNone(response.json()['user']['role'])
+                self.assertIsNone(self.client.get('/api/auth/session/').json()['user']['role'])
+                self.assertFalse(AccountProfile.objects.filter(user=user).exists())
+
+    def test_session_requires_authentication_and_get(self):
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+        self.assertEqual(self.client.post('/api/auth/session/').status_code, 405)
+
+    def test_expired_and_inactive_sessions_are_rejected(self):
+        user = get_user_model().objects.create_user(username='session-user')
+        self.client.force_login(user)
+        session = self.client.session
+        session.set_expiry(-1)
+        session.save()
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+        self.client.force_login(user)
+        user.is_active = False
+        user.save()
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+
+    def test_logout_requires_csrf_and_invalidates_session(self):
+        user = get_user_model().objects.create_user(username='logout-user')
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(user)
+        self.assertEqual(client.post('/api/auth/logout/').status_code, 403)
+        self.assertEqual(client.get('/api/auth/session/').status_code, 200)
+        token = client.get('/api/auth/csrf/').json()['csrfToken']
+        self.assertEqual(client.post('/api/auth/logout/', HTTP_X_CSRFTOKEN=token).status_code, 200)
+        self.assertEqual(client.get('/api/auth/session/').status_code, 401)

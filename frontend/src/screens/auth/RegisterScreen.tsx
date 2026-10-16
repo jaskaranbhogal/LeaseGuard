@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { UserRole } from '../../types/user';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
@@ -21,6 +22,7 @@ import { useAuthRequest } from '../../utils/useAuthRequest';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 export default function RegisterScreen({ navigation }: Props) {
+  const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -50,12 +52,19 @@ export default function RegisterScreen({ navigation }: Props) {
 
   function submit() {
     setSubmitted(true);
-    if (invalidName || invalidEmail || invalidPassword || invalidConfirmation) {
+    if (
+      !role ||
+      invalidName ||
+      invalidEmail ||
+      invalidPassword ||
+      invalidConfirmation
+    ) {
       return;
     }
     Keyboard.dismiss();
     request.run(
-      signal => register({ name, email, password, confirmPassword }, signal),
+      signal =>
+        register({ name, email, password, confirmPassword, role }, signal),
       user => {
         setPassword('');
         setConfirmPassword('');
@@ -84,6 +93,51 @@ export default function RegisterScreen({ navigation }: Props) {
         <>
           <Text style={styles.subtitle}>Get started with LeaseGuard</Text>
           <View style={styles.form}>
+            <Text style={styles.roleLabel}>Select role</Text>
+            <View style={styles.roles} accessibilityRole="radiogroup">
+              {(['landlord', 'tenant'] as const).map(option => (
+                <Pressable
+                  key={option}
+                  accessibilityRole="radio"
+                  accessibilityLabel={
+                    option === 'tenant' ? 'Tenant' : 'Landlord'
+                  }
+                  accessibilityState={{
+                    checked: role === option,
+                    disabled: request.loading,
+                  }}
+                  disabled={request.loading}
+                  onPress={() => {
+                    setRole(option);
+                    request.clearError();
+                  }}
+                  style={[
+                    styles.roleCard,
+                    role === option && styles.selectedRole,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roleText,
+                      role === option && styles.selectedRoleText,
+                    ]}
+                  >
+                    <Text
+                      accessibilityElementsHidden
+                      importantForAccessibility="no"
+                    >
+                      {option === 'tenant' ? '⌂' : '▥'}{' '}
+                    </Text>
+                    {option === 'tenant' ? 'Tenant' : 'Landlord'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            {submitted && !role ? (
+              <Text accessibilityRole="alert" style={styles.error}>
+                Select Tenant or Landlord.
+              </Text>
+            ) : null}
             <Input
               label="Full name"
               placeholder="Enter your full name"
@@ -200,6 +254,33 @@ const styles = StyleSheet.create({
   },
   subtitle: { fontSize: 14, color: colors.textSecondary, lineHeight: 21 },
   form: { marginTop: spacing.xl, gap: spacing.md },
+  roleLabel: {
+    color: colors.label,
+    fontSize: 14,
+    fontWeight: typography.semibold,
+  },
+  roles: { flexDirection: 'row', gap: 10 },
+  roleCard: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.sm,
+  },
+  selectedRole: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  roleText: {
+    color: colors.label,
+    fontSize: 15,
+    fontWeight: typography.semibold,
+  },
+  selectedRoleText: { color: colors.white },
   hint: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
   error: { color: colors.error, fontSize: 14, lineHeight: 20 },
   signIn: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
