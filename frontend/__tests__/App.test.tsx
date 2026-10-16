@@ -2,9 +2,12 @@ import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { Image, TextInput } from 'react-native';
 import App from '../App';
+import { getSession } from '../src/services/authService';
+jest.mock('../src/services/authService');
 
 it('renders Loading, then the real Login screen', async () => {
   jest.useFakeTimers();
+  jest.mocked(getSession).mockResolvedValue(null);
   let app!: ReactTestRenderer;
   await act(async () => {
     app = create(<App />);

@@ -17,7 +17,21 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import PasswordResetRequest
+from .models import AccountProfile, PasswordResetRequest
+
+
+def user_data(user):
+    role = AccountProfile.objects.filter(user=user).values_list('role', flat=True).first()
+    return {'id': user.pk, 'email': user.email,
+            'name': user.get_full_name() or user.get_username(), 'role': role}
+
+
+@never_cache
+@require_GET
+def session_status(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'Please sign in.'}, status=401)
+    return JsonResponse({'user': user_data(request.user)})
 
 
 def rate_limit(scope, limit):
@@ -84,6 +98,9 @@ def register(request):
         return JsonResponse({'detail': 'Enter a password (up to 4096 characters).'}, status=400)
     if password != data.get('confirmPassword'):
         return JsonResponse({'detail': 'Passwords do not match.'}, status=400)
+    role = data.get('role')
+    if role not in AccountProfile.Role.values:
+        return JsonResponse({'detail': 'Select Tenant or Landlord.'}, status=400)
     User = get_user_model()
     email = email.lower()
     # Django's unique username prevents concurrent registrations for the same
@@ -102,10 +119,10 @@ def register(request):
     try:
         with transaction.atomic():
             user.save()
+            AccountProfile.objects.create(user=user, role=role)
     except IntegrityError:
         return JsonResponse(duplicate, status=409)
-    return JsonResponse({'user': {'id': user.pk, 'email': user.email,
-                                 'name': user.get_full_name()}}, status=201)
+    return JsonResponse({'user': user_data(user)}, status=201)
 
 
 @never_cache
@@ -133,8 +150,7 @@ def sign_in(request):
     if user is None:
         return JsonResponse({'detail': 'Email or password is incorrect.'}, status=401)
     login(request, user)
-    return JsonResponse({'user': {'id': user.pk, 'email': user.email,
-                                 'name': user.get_full_name() or user.get_username()}})
+    return JsonResponse({'user': user_data(user)})
 
 
 @never_cache

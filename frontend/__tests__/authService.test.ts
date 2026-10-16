@@ -1,4 +1,6 @@
 import {
+  getSession,
+  logout,
   login,
   register,
   requestPasswordReset,
@@ -27,7 +29,14 @@ function csrf() {
 it('uses a CSRF handshake and cookie-backed session for login', async () => {
   csrf();
   fetchMock.mockResolvedValueOnce(
-    response({ user: { id: 8, email: 'person@example.com', name: 'Person' } }),
+    response({
+      user: {
+        id: 8,
+        email: 'person@example.com',
+        name: 'Person',
+        role: 'tenant',
+      },
+    }),
   );
   expect((await login(' person@example.com ', 'fixture-password')).id).toBe(8);
   expect(fetchMock.mock.calls[1][1]).toMatchObject({
@@ -89,6 +98,7 @@ it('times out stalled requests', async () => {
 
 it('registers with CSRF, trimmed identity fields, and unchanged passwords', async () => {
   const details = {
+    role: 'landlord' as const,
     name: ' Person ',
     email: ' person@example.com ',
     password: ' Password-583! ',
@@ -101,6 +111,7 @@ it('registers with CSRF, trimmed identity fields, and unchanged passwords', asyn
         user: {
           id: 9,
           name: 'Person',
+          role: 'landlord',
           email: 'person@example.com',
         },
       },
@@ -122,4 +133,51 @@ it('registers with CSRF, trimmed identity fields, and unchanged passwords', asyn
   csrf();
   fetchMock.mockResolvedValueOnce(response({}));
   await expect(register(details)).rejects.toThrow('did not confirm');
+});
+
+it('restores only a valid server session and treats only 401 as signed out', async () => {
+  const user = {
+    id: 1,
+    email: 'tenant@example.com',
+    name: 'Tenant',
+    role: 'tenant',
+  };
+  fetchMock.mockResolvedValueOnce(response({ user }));
+  await expect(getSession()).resolves.toEqual(user);
+  expect(fetchMock.mock.calls[0][1].credentials).toBe('include');
+  fetchMock.mockResolvedValueOnce(response({ detail: 'Please sign in.' }, 401));
+  await expect(getSession()).resolves.toBeNull();
+  fetchMock.mockResolvedValueOnce(response({}, 503));
+  await expect(getSession()).rejects.toThrow();
+  fetchMock.mockRejectedValueOnce(new Error('offline'));
+  await expect(getSession()).rejects.toThrow('Unable to reach');
+});
+it.each(['admin', undefined, 1])('rejects an untrusted role %s', async role => {
+  csrf();
+  fetchMock.mockResolvedValueOnce(
+    response({ user: { id: 1, email: 'a@example.com', name: 'A', role } }),
+  );
+  await expect(login('a@example.com', 'password')).rejects.toThrow(
+    'invalid sign-in',
+  );
+});
+it('preserves legacy null roles and posts logout with a fresh CSRF token', async () => {
+  csrf();
+  fetchMock.mockResolvedValueOnce(
+    response({
+      user: { id: 1, email: 'a@example.com', name: 'A', role: null },
+    }),
+  );
+  await expect(login('a@example.com', 'password')).resolves.toMatchObject({
+    role: null,
+  });
+  csrf();
+  fetchMock.mockResolvedValueOnce(response({ detail: 'Signed out.' }));
+  await logout();
+  expect(fetchMock.mock.calls[3][0]).toContain('/auth/logout/');
+  expect(fetchMock.mock.calls[3][1]).toMatchObject({
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-CSRFToken': 'test-csrf' },
+  });
 });

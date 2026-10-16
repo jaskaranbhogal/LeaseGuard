@@ -8,12 +8,10 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { AuthStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'Loading'>;
-export default function LoadingScreen({ navigation }: Props) {
+type Props = { onReady: () => void };
+export default function LoadingScreen({ onReady }: Props) {
   const { width } = useWindowDimensions();
   const logoWidth = Math.min(width - 48, 330);
   const [logoReady, setLogoReady] = useState(false);
@@ -29,12 +27,12 @@ export default function LoadingScreen({ navigation }: Props) {
       useNativeDriver: false,
     });
     animation.start();
-    const timer = setTimeout(() => navigation.replace('Login'), 1400);
+    const timer = setTimeout(onReady, 1400);
     return () => {
       clearTimeout(timer);
       animation.stop();
     };
-  }, [logoReady, navigation, progress]);
+  }, [logoReady, onReady, progress]);
 
   return (
     <SafeAreaView style={styles.container}>
