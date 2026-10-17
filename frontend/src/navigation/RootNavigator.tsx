@@ -37,9 +37,9 @@ export default function RootNavigator() {
               message="Your existing account has no tenant or landlord role. Contact the LeaseGuard team to assign the correct account type before using a dashboard."
             />
           )
-        ) : (
-          <AuthNavigator />
-        )}
+         ) : (
+  <AuthNavigator />
+)}
       </View>
       {checking || sessionError ? (
         <View style={styles.overlay} accessibilityViewIsModal>
