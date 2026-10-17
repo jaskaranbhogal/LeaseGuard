@@ -1,3 +1,4 @@
+
 # LeaseGuard
 
 **Smarter Property Monitoring Through AI-Powered Inspections**
@@ -16,6 +17,86 @@ Built with React Native, TypeScript, Python, and Django, LeaseGuard is being dev
 - [GitHub Project Board](https://github.com/users/jaskaranbhogal/projects/1/views/1)
 - [GitHub Repository](https://github.com/jaskaranbhogal/LeaseGuard)
 - [User Stories](USER_STORIES.md)
+
+---
+
+## Prototype
+
+LeaseGuard's user-centered prototype was designed in Figma to demonstrate how landlords and tenants interact with the application. The prototype follows the product goal of providing landlords with remote visibility into rental-unit conditions while giving tenants a consistent way to document inspections, maintenance issues, and property changes.
+
+**[View the LeaseGuard Figma Prototype](https://www.figma.com/design/28N5do1M7uUQwJWH3uKGSb/LeaseGuard-%E2%80%93-Sprint-Prototype)**
+
+### User Personas
+
+Two personas were developed to represent the application's primary users.
+
+**Primary Persona — Marcus Reed (Landlord)**
+
+Marcus is a 42-year-old landlord managing six rental units across Long Island and Queens. His primary goal is to monitor property conditions remotely without having to visit every property.
+
+His main challenges include identifying property damage early, maintaining consistent inspection documentation, and tracking unresolved maintenance requests.
+
+LeaseGuard addresses these needs through property management, inspection scheduling, AI-assisted findings, and maintenance tracking.
+
+**Secondary Persona — Alyssa Patel (Tenant)**
+
+Alyssa is a 27-year-old tenant who rents a one-bedroom apartment and works full time. She wants an easy way to document property conditions, complete inspections, and report maintenance problems.
+
+Her challenges include knowing which photographs landlords need, documenting pre-existing damage, and tracking the status of maintenance requests.
+
+LeaseGuard provides guided inspections, maintenance reporting, availability submissions, and property condition history.
+
+### Context Diagram
+
+The Figma prototype includes a context diagram identifying LeaseGuard's system boundary and its external actors.
+
+These include:
+
+- **Landlord:** Manages properties, schedules inspections, reviews findings, and tracks maintenance.
+- **Tenant:** Completes inspections, reports maintenance problems, and submits availability.
+- **AI Analysis Service (Planned):** Analyzes inspection photographs and identifies potential property changes.
+- **Notification Service (Planned):** Delivers inspection reminders, maintenance updates, and review alerts.
+
+### User Interface Design
+
+The prototype includes mobile interface designs for:
+
+- Loading, login, registration, and password reset.
+- Landlord and tenant dashboards.
+- Property and unit management.
+- Inspection scheduling and guided inspections.
+- AI-assisted inspection findings.
+- Maintenance requests and progress tracking.
+- Property condition history.
+- Notifications and settings.
+
+The design uses consistent navigation, styling, and interface components to support usability across both user roles.
+
+### User Experience Workflows
+
+The prototype demonstrates two primary user journeys.
+
+**Landlord Workflow:**
+
+1. Sign in to the application.
+2. Add or select a rental property.
+3. Schedule an inspection.
+4. Review submitted inspection photographs.
+5. Assess AI-generated findings.
+6. Make a final decision on identified changes.
+7. Track maintenance and property condition history.
+
+**Tenant Workflow:**
+
+1. Open the tenant dashboard.
+2. Start a scheduled inspection.
+3. Follow guided photography instructions.
+4. Review and submit inspection photographs.
+5. Report maintenance issues.
+6. Submit inspection availability.
+7. Review property condition history.
+
+These workflows demonstrate how LeaseGuard's proposed features support the product goal and provide a consistent experience for landlords and tenants.
 
 ---
 
@@ -55,7 +136,7 @@ The following features represent the planned application scope. See the Developm
 - Secure password handling.
 - Forgot password and password reset functionality.
 - Session-based authentication with launch/foreground session checks and role-specific navigation.
-- Separate landlord and tenant experiences planned.
+- Separate landlord and tenant experiences.
 
 ### 2. Property and Unit Management
 
@@ -118,7 +199,7 @@ The following features represent the planned application scope. See the Developm
 | Planned AI Integration | Vision-capable AI API (provider to be finalized) |
 | iOS Development | Xcode, CocoaPods |
 | Android Development | Android Studio, Android SDK |
-| Frontend Testing | Jest, React Native Testing Library tools |
+| Frontend Testing | Jest, React Test Renderer |
 | Backend Testing | Django Test Framework |
 | Code Quality | ESLint, TypeScript |
 | CI | GitHub Actions |
@@ -130,50 +211,109 @@ The current backend uses SQLite for development. A production database and AI se
 
 ---
 
-## Application Architecture
+## Architecture
 
-LeaseGuard follows a frontend-backend architecture.
+LeaseGuard follows a **client-server architecture** organized into presentation, application, and data layers. This architecture separates the mobile user interface from backend business logic and database operations.
 
-### Frontend
+The layered structure allows the frontend and backend to be developed, tested, and maintained independently while supporting future integrations such as AI-assisted inspections and notification services.
 
-The React Native application provides the mobile interface used by landlords and tenants.
+### 1. Frontend — Presentation Layer
 
-Responsibilities include:
+The mobile frontend is developed using React Native and TypeScript, allowing LeaseGuard to support both iOS and Android.
 
-- User interface and navigation.
-- Authentication forms.
-- User input validation.
-- API communication.
-- Displaying property and inspection information.
-- Future camera and photo submission functionality.
+The frontend is responsible for:
 
-### Backend
+- Displaying user interfaces for landlords and tenants.
+- Managing navigation between application screens.
+- Validating user input.
+- Handling authentication state and user interactions.
+- Communicating with the Django backend.
+- Displaying property, inspection, and maintenance information.
 
-The Django application handles server-side logic and data management.
+React Navigation is used to manage application navigation. Authentication state is maintained through a shared React context, which determines whether users access authentication screens or role-specific navigation.
 
-Current responsibilities include:
+The application currently includes functional authentication screens and tenant prototype workflows. The landlord dashboard remains under development.
 
-- User registration.
-- User authentication.
+The tenant prototype uses local sample data for inspections, maintenance records, and property history. These demonstrations will be connected to backend services as development progresses.
+
+### 2. Backend — Application Layer
+
+The backend is developed using Python and the Django framework.
+
+Django is responsible for processing application requests, enforcing authentication rules, managing server-side logic, and interacting with the database.
+
+Current backend functionality includes:
+
+- User registration and authentication.
+- Tenant and landlord account role validation.
+- Secure password hashing and validation.
 - Session management and CSRF protection.
-- Password reset requests.
-- Account validation.
-- SQLite database operations.
+- Password reset requests and confirmation.
+- User account and database operations.
 
-Future backend functionality will include property management, inspections, maintenance requests, image processing, and AI-assisted condition assessments.
+The frontend communicates with Django through HTTP API endpoints that exchange JSON data.
 
-### Planned AI Integration
+For example, when a user logs in, the mobile application sends credentials to the Django authentication endpoint. Django validates the credentials and establishes a session. The frontend then retrieves the authenticated user's role and displays the appropriate navigation experience.
 
-The planned AI workflow will:
+Future backend functionality will include property management, inspection scheduling, maintenance requests, photo submissions, and condition history.
 
-1. Receive baseline property photos.
-2. Receive new inspection photos.
-3. Compare images from corresponding property areas.
-4. Identify possible visible changes.
-5. Generate findings and severity recommendations.
-6. Present results for landlord review.
+### 3. Database — Data Layer
 
-AI-generated findings will be recommendations rather than final determinations.
+LeaseGuard currently uses SQLite as its development database.
+
+Django's Object-Relational Mapper (ORM) provides an interface for storing and retrieving data without requiring raw SQL for routine database operations.
+
+The database currently manages:
+
+- User account information.
+- Authentication and session data.
+- Tenant and landlord account roles.
+- Password reset request records.
+
+Future database models will support:
+
+- Rental properties and units.
+- Tenant-property assignments.
+- Inspection schedules and records.
+- Maintenance requests and their statuses.
+- Property condition history.
+- References to inspection photographs.
+
+A production database solution will be evaluated as the project approaches deployment.
+
+### 4. Planned AI Integration
+
+LeaseGuard plans to introduce AI-assisted image analysis for property inspections.
+
+The planned workflow will:
+
+1. Store baseline photographs documenting property conditions at move-in.
+2. Receive new photographs from tenant inspections.
+3. Compare photographs of corresponding property areas.
+4. Identify possible visible changes or damage.
+5. Generate findings with recommended severity levels.
+6. Present the findings to landlords for review.
+
+The AI analysis will support decision-making rather than automatically determining whether tenants are responsible for property damage.
+
+The AI provider and image storage solution have not yet been finalized. This functionality remains part of the planned architecture.
+
+### 5. Architecture Diagram
+
+The following diagram illustrates the current client-server structure and planned integrations.
+
+```mermaid
+flowchart TD
+    A[Landlord / Tenant] --> B[React Native Mobile App]
+    B -->|HTTP API Requests| C[Django Backend]
+    C --> D[(SQLite Database)]
+    B --> E[Local Tenant Prototype Data]
+    C -. Future Integration .-> F[Property and Inspection Services]
+    F -. Future Integration .-> G[Photo Storage and AI Analysis]
+    F -. Future Integration .-> H[Notification Service]
+```
+
+The solid connections represent the current application architecture. Dashed connections represent features planned for future development.
 
 ---
 
@@ -335,7 +475,7 @@ Keep Metro running while developing the mobile application.
 
 iOS development requires macOS, Xcode, and CocoaPods.
 
-From the `frontend` directory, use the version in `.ruby-version` (Ruby 2.6.10, matching Dev’s committed lockfile) and Bundler 1.17.2, then install the Ruby dependencies:
+From the `frontend` directory, use the version in `.ruby-version` (Ruby 2.6.10, matching the committed lockfile) and Bundler 1.17.2, then install the Ruby dependencies:
 
 ```bash
 bundle install
@@ -442,11 +582,123 @@ For request formats, configuration, and verification details, refer to:
 
 ---
 
-## Testing
+## Test Plan
 
-LeaseGuard includes frontend and backend automated tests.
+LeaseGuard uses unit testing, integration testing, and manual system testing to verify that application components function correctly and communicate reliably.
 
-### Frontend Tests
+Testing focuses on detecting errors, preventing regressions, validating user interactions, and ensuring that new features meet their acceptance criteria.
+
+Automated testing is integrated into the development process through GitHub Actions.
+
+### 1. Unit Testing
+
+Unit testing verifies individual functions, components, and backend logic independently.
+
+**Tools:**
+
+- Jest for React Native frontend tests.
+- React Test Renderer for component testing.
+- Django's built-in testing framework for backend tests.
+
+**Test Cases:**
+
+| Test | Expected Result |
+|------|-----------------|
+| Register with valid account information | Account is created successfully |
+| Register with missing or invalid fields | Registration is rejected with an appropriate error |
+| Submit an unsupported account role | Backend rejects the request |
+| Log in with invalid credentials | Authentication fails without creating a session |
+| Validate tenant inspection steps | Inspection progress behaves correctly |
+| Validate maintenance form fields | Missing required fields prevent submission |
+| Request a password reset | A valid request is processed securely |
+
+Unit tests help verify individual functions and components before they are integrated into larger workflows.
+
+### 2. Integration Testing
+
+Integration testing verifies that different application components work correctly together.
+
+LeaseGuard's current integration testing focuses on authentication, navigation, sessions, and database interactions.
+
+**Tools:**
+
+- Django's test client and testing framework.
+- Jest tests using mocked frontend API responses.
+- Manual React Native and Django API testing.
+
+**Test Cases:**
+
+| Test | Expected Result |
+|------|-----------------|
+| Register a landlord or tenant | The correct account role is saved in the database |
+| Log in with valid credentials | Django creates an authenticated session |
+| Retrieve the current user session | Backend returns the authenticated user's information |
+| Navigate after authentication | User reaches the appropriate role-specific experience |
+| Log out of the application | Backend session is invalidated |
+| Restore an existing session | Application restores the authenticated state when the session remains valid |
+| Handle an expired session | User is redirected to authentication |
+| Handle a backend network error | Application displays an error and supports retrying |
+
+These tests help ensure that the mobile frontend, backend authentication services, and database behave consistently.
+
+Frontend tests that use mocked API responses verify application behavior, while backend tests verify actual server-side data processing.
+
+### 3. Manual System Testing
+
+Manual system testing evaluates user workflows and application behavior from the user's perspective.
+
+Testing is performed using available iOS simulators and Android development environments.
+
+**Test Scenarios:**
+
+1. Launch the application and verify the loading screen.
+2. Register a new tenant account.
+3. Log in and verify tenant dashboard navigation.
+4. Navigate through the guided inspection prototype.
+5. Test inspection progress and review screens.
+6. Open maintenance reporting and availability forms.
+7. Log out and verify navigation returns to authentication.
+8. Register and log in as a landlord.
+9. Verify landlord-specific navigation.
+10. Test password reset and account recovery functionality.
+
+**Expected Result:**
+
+Users should be able to navigate supported workflows without unexpected crashes, incorrect screen transitions, or misleading success messages.
+
+Prototype-only features should clearly indicate that inspection photographs and maintenance data have not yet been submitted to the backend.
+
+Native platform verification will continue as additional features are integrated. Android emulator and native build testing remain part of the test plan and are not claimed as fully completed.
+
+### 4. Continuous Integration Testing
+
+LeaseGuard uses GitHub Actions to automatically execute frontend and backend checks.
+
+The workflow is located at:
+
+```text
+.github/workflows/ci.yml
+```
+
+**Backend Checks:**
+
+- Django configuration validation.
+- Database migration consistency.
+- Automated Django tests.
+
+**Frontend Checks:**
+
+- TypeScript type checking.
+- ESLint code quality validation.
+- Jest automated tests.
+
+These checks help identify errors before new code is merged into the main branch.
+
+Full native iOS and Android builds are not currently included in the GitHub Actions workflow.
+
+### 5. Running the Tests
+
+#### Frontend Tests
 
 From the `frontend` directory:
 
@@ -466,7 +718,7 @@ Run ESLint:
 npm run lint
 ```
 
-### Backend Tests
+#### Backend Tests
 
 From the repository root with the virtual environment activated:
 
@@ -486,20 +738,22 @@ Check for missing database migrations:
 python manage.py makemigrations --check --dry-run
 ```
 
-### Manual Testing
+### 6. Future Testing
 
-Manual verification should include:
+As development progresses, the testing strategy will expand to include:
 
-- Registration and validation.
-- Login with valid and invalid credentials.
-- Password reset requests.
-- Navigation between authentication screens.
-- Logout functionality.
-- iOS simulator compatibility.
-- Android emulator compatibility.
-- Frontend and backend API communication.
+- Property and unit management.
+- Tenant-property authorization.
+- Inspection scheduling.
+- Photo capture and uploads.
+- Maintenance request submission and tracking.
+- AI-assisted image comparison.
+- Notification delivery.
+- Complete end-to-end user workflows.
 
-Future testing will expand to property management, inspection workflows, maintenance requests, and AI-assisted damage detection.
+Security testing will also verify that landlords and tenants can only access property information they are authorized to view.
+
+The test plan will continue to evolve as LeaseGuard's features are implemented.
 
 ---
 
@@ -530,7 +784,7 @@ The workflow is defined in:
 The workflow runs automatically on:
 
 - Pull requests targeting `main`.
-- Pushes to `main`.
+- Pushes to `main` and the configured integration branch.
 - Manual workflow dispatch.
 
 This helps detect problems before code changes are merged into the main branch.
@@ -553,40 +807,45 @@ LeaseGuard is currently under active development.
 - [x] React Navigation authentication flow.
 - [x] Loading/splash screen.
 - [x] Login screen.
-- [x] Registration screen.
+- [x] Registration screen with tenant/landlord selection.
 - [x] Forgot password screen.
 - [x] Password reset confirmation screen.
 - [x] Django authentication endpoints.
+- [x] Tenant and landlord account role persistence.
+- [x] Role-specific frontend navigation.
 - [x] Session and CSRF handling.
 - [x] Password reset request processing.
 - [x] Shared frontend components and styling.
+- [x] Tenant dashboard prototype with sample data.
+- [x] Guided inspection prototype.
+- [x] Tenant maintenance and availability prototype screens.
 - [x] iOS scene lifecycle compatibility changes.
-- [x] Frontend authentication tests.
+- [x] Frontend authentication and navigation tests.
 - [x] Backend authentication tests.
 - [x] GitHub Actions CI workflow.
+- [x] Figma prototype with personas, context diagram, UI designs, and UX workflows.
 
 ### Planned / In Progress
 
-- [ ] Landlord and tenant role management.
 - [ ] Complete landlord dashboard.
-- [ ] Complete tenant dashboard.
+- [ ] Complete tenant dashboard with backend data.
 - [ ] Property and unit management APIs.
 - [ ] Property creation and editing.
 - [ ] Tenant assignment to units.
 - [ ] Inspection scheduling.
-- [ ] Guided camera inspection workflow.
+- [ ] Real camera-based inspection workflow.
 - [ ] Photo uploads and baseline storage.
 - [ ] AI-assisted image comparison.
 - [ ] Damage severity classification.
 - [ ] Landlord inspection review.
-- [ ] Maintenance request submission and tracking.
-- [ ] Property condition history.
+- [ ] Maintenance request submission and backend tracking.
+- [ ] Persistent property condition history.
 - [ ] Notifications.
 - [ ] Frontend integration with the remaining backend APIs.
 - [ ] End-to-end testing.
 - [ ] Production deployment.
 
-Some screens and service files are scaffolded but are not yet connected to functional application workflows.
+Some tenant screens currently demonstrate functionality using local sample data. These screens are not yet connected to persistent inspection, maintenance, or property management services.
 
 Development tasks and priorities are tracked through the project's GitHub board.
 
@@ -615,7 +874,8 @@ LeaseGuard/
 │   └── wsgi.py
 │
 ├── docs/
-│   └── AUTHENTICATION.md
+│   ├── AUTHENTICATION.md
+│   └── TENANT_INTEGRATION.md
 │
 ├── frontend/
 │   ├── android/
@@ -624,6 +884,8 @@ LeaseGuard/
 │   ├── src/
 │   │   ├── assets/
 │   │   ├── components/
+│   │   ├── context/
+│   │   ├── data/
 │   │   ├── navigation/
 │   │   ├── screens/
 │   │   │   ├── auth/
@@ -670,18 +932,6 @@ GitHub Actions provides automated verification for changes targeting the main br
 **[View the Project Board](https://github.com/users/jaskaranbhogal/projects/1/views/1)**
 
 **[View User Stories](USER_STORIES.md)**
-
----
-
-## Figma Prototype
-
-LeaseGuard's user interface was designed in Figma to establish a consistent visual identity and provide a reference for frontend development.
-
-The prototype covers the planned landlord and tenant experiences, including authentication, property management, inspections, maintenance requests, and condition tracking.
-
-The React Native frontend is being developed to follow these designs as closely as possible while maintaining platform compatibility and usability.
-
-**[View LeaseGuard Figma Prototype](https://www.figma.com/design/28N5do1M7uUQwJWH3uKGSb/LeaseGuard-%E2%80%93-Sprint-Prototype)**
 
 ---
 
