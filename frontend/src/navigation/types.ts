@@ -2,7 +2,6 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { ResetDelivery } from '../services/authService';
 
 export type AuthStackParamList = {
-  Loading: undefined;
   Login: undefined;
   Register: undefined;
   ForgotPassword: { email?: string } | undefined;
@@ -20,4 +19,25 @@ export type LandlordTabParamList = {
   HomeStack: NavigatorScreenParams<LandlordStackParamList> | undefined;
   History: undefined;
   Settings: undefined;
+};
+
+export type TenantTabParamList = {
+  Home: undefined;
+  Inspections: undefined;
+  History: undefined;
+  Settings: undefined;
+};
+
+export type TenantStackParamList = {
+  TenantTabs:
+    | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
+    | undefined;
+  GuidedInspection: undefined;
+  ReportMaintenance: undefined;
+  InspectionAvailability: undefined;
+  MaintenanceDetail: {
+    requestId: import('../types/maintenance').MaintenanceRequestId;
+  };
+  ReviewInspectionPhoto: { stepIndex: number };
+  InspectionSubmitted: undefined;
 };
