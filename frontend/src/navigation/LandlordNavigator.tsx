@@ -2,12 +2,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 
+import AccountScreen from '../components/AccountScreen';
 import AddPropertyScreen from '../screens/landlord/AddPropertyScreen';
 import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScreen';
 import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
 import LandlordDashboardScreen from '../screens/landlord/LandlordDashboardScreen';
 import ScheduleInspectionScreen from '../screens/landlord/ScheduleInspectionScreen';
-import SettingsScreen from '../screens/shared/SettingsScreen';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -34,6 +34,15 @@ function HomeStack() {
         component={AIInspectionReviewScreen}
       />
     </Stack.Navigator>
+  );
+}
+
+function SettingsScreen() {
+  return (
+    <AccountScreen
+      title="Account settings"
+      message="Landlord account. More settings are coming soon."
+    />
   );
 }
 
