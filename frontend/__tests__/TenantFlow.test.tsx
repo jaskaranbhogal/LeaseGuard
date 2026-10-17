@@ -15,6 +15,7 @@ import { Alert, AppState, Image, Text, TextInput } from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import RootNavigator from '../src/navigation/RootNavigator';
 import type { TenantStackParamList } from '../src/navigation/types';
+import LandlordDashboardScreen from '../src/screens/landlord/LandlordDashboardScreen';
 import TenantDashboardScreen from '../src/screens/tenant/TenantDashboardScreen';
 import GuidedInspectionScreen from '../src/screens/tenant/GuidedInspectionScreen';
 import ReviewInspectionPhotoScreen from '../src/screens/tenant/ReviewInspectionPhotoScreen';
@@ -113,14 +114,12 @@ it.each([tenant, landlord])(
   async user => {
     await mount(user);
     expect(navigation.getCurrentRoute()?.name).toBe(
-      user.role === 'tenant' ? 'Home' : 'LandlordHome',
+      user.role === 'tenant' ? 'Home' : 'Dashboard',
     );
     expect(app.root.findAllByType(LoginScreen)).toHaveLength(0);
     expect(navigation.canGoBack()).toBe(false);
     if (user.role === 'landlord') {
-      expect(JSON.stringify(app.toJSON())).toContain(
-        'Landlord dashboard coming soon',
-      );
+      expect(app.root.findAllByType(LandlordDashboardScreen)).toHaveLength(1);
     }
   },
 );
@@ -145,7 +144,8 @@ it('routes repeated logins, clears logout history, and does not leak demo progre
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
   expect(navigation.canGoBack()).toBe(false);
   await signIn(landlord);
-  expect(navigation.getCurrentRoute()?.name).toBe('LandlordHome');
+  expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
+  await press('Settings');
   await press('Log out');
   await signIn(tenant);
   expect(navigation.getCurrentRoute()?.name).toBe('Home');
@@ -161,8 +161,9 @@ it('shows logout failures and permits a retry', async () => {
   jest
     .mocked(auth.logout)
     .mockRejectedValueOnce(new ApiError('Unable to reach LeaseGuard.'));
+  await press('Settings');
   await press('Log out');
-  expect(navigation.getCurrentRoute()?.name).toBe('LandlordHome');
+  expect(navigation.getCurrentRoute()?.name).toBe('Settings');
   expect(JSON.stringify(app.toJSON())).toContain('Unable to reach LeaseGuard.');
   await press('Log out');
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
@@ -366,6 +367,7 @@ it('does not restore a session while logout is pending', async () => {
         resolve = accept;
       }),
   );
+  await press('Settings');
   await press('Log out');
   await act(async () =>
     listener.mock.calls[listener.mock.calls.length - 1][1]('active'),
