@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import ScreenContainer from '../../components/ScreenContainer';
+import type { LandlordStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -20,14 +22,7 @@ interface PropertySummary {
   tag?: string;
 }
 
-interface Props {
-  onBellPress?: () => void;
-  onReviewPress?: () => void;
-  onAddProperty?: () => void;
-  onPropertyPress?: (propertyId: string) => void;
-  onScheduleInspection?: () => void;
-  onManageUnits?: () => void;
-}
+type Props = NativeStackScreenProps<LandlordStackParamList, 'Dashboard'>;
 
 const landlordName = 'Marcus';
 const reviewCount = 2;
@@ -65,14 +60,7 @@ function greeting() {
   return hour < 17 ? 'Good afternoon' : 'Good evening';
 }
 
-export default function LandlordDashboardScreen({
-  onBellPress,
-  onReviewPress,
-  onAddProperty,
-  onPropertyPress,
-  onScheduleInspection,
-  onManageUnits,
-}: Props) {
+export default function LandlordDashboardScreen({ navigation }: Props) {
   const totalUnits = properties.reduce((sum, p) => sum + p.unitCount, 0);
   const findingLabel =
     highSeverityCount === 1
@@ -94,14 +82,16 @@ export default function LandlordDashboardScreen({
           accessibilityRole="button"
           accessibilityLabel="Notifications"
           hitSlop={12}
-          onPress={onBellPress}
         >
           <Text style={styles.bell}>🔔</Text>
         </Pressable>
       </View>
 
       {reviewCount > 0 && (
-        <Card onPress={onReviewPress} style={styles.banner}>
+        <Card
+          onPress={() => navigation.navigate('AIInspectionReview')}
+          style={styles.banner}
+        >
           <View style={styles.alertBadge}>
             <Text style={styles.alertMark}>!</Text>
           </View>
@@ -120,7 +110,7 @@ export default function LandlordDashboardScreen({
         <Text style={styles.sectionTitle}>Properties</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={onAddProperty}
+          onPress={() => navigation.navigate('AddProperty')}
           style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
         >
           <Text style={styles.addButtonText}>+ Add property</Text>
@@ -128,11 +118,7 @@ export default function LandlordDashboardScreen({
       </View>
 
       {properties.map(property => (
-        <Card
-          key={property.id}
-          onPress={() => onPropertyPress?.(property.id)}
-          style={styles.propertyCard}
-        >
+        <Card key={property.id} style={styles.propertyCard}>
           <View style={styles.propertyHeader}>
             <View style={styles.propertyTitle}>
               <Text style={styles.propertyName}>{property.name}</Text>
@@ -181,12 +167,12 @@ export default function LandlordDashboardScreen({
         <Button
           title="Schedule inspection"
           variant="reset"
-          onPress={() => onScheduleInspection?.()}
+          onPress={() => navigation.navigate('ScheduleInspection')}
         />
         <Button
           title="Manage unit details"
           variant="outline"
-          onPress={() => onManageUnits?.()}
+          onPress={() => undefined}
         />
       </View>
     </ScreenContainer>
