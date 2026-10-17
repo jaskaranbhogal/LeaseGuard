@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
 import React from 'react';
@@ -66,7 +67,7 @@ export default function UnitHistoryScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>{title}</Text>
+        <Header title={title} titleStyle={styles.title} />
         <DemoNotice />
 
         <Text style={styles.subtitle}>{subtitle}</Text>

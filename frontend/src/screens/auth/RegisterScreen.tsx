@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { useRef, useState, type ComponentRef } from 'react';
 import {
   Keyboard,
@@ -79,9 +80,10 @@ export default function RegisterScreen({ navigation }: Props) {
   return (
     <ScreenContainer style={styles.container}>
       <Text style={styles.brand}>LeaseGuard</Text>
-      <Text style={styles.title}>
-        {createdEmail ? 'Account created' : 'Create an account'}
-      </Text>
+      <Header
+        title={createdEmail ? 'Account created' : 'Create an account'}
+        titleStyle={styles.title}
+      />
       {createdEmail ? (
         <View style={styles.form}>
           <Text accessibilityRole="alert" style={styles.subtitle}>

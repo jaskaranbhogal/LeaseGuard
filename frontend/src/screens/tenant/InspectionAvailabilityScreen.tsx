@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
 import React, { useState } from 'react';
@@ -62,7 +63,10 @@ export default function InspectionAvailabilityScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>{inspectionAvailabilityMockData.title}</Text>
+        <Header
+          title={inspectionAvailabilityMockData.title}
+          titleStyle={styles.title}
+        />
         <DemoNotice />
 
         <Text style={styles.subtitle}>

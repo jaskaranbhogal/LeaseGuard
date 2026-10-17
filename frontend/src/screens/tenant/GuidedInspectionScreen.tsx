@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import React from 'react';
 import { useInspection } from '../../context/InspectionContext';
@@ -64,7 +65,10 @@ export default function GuidedInspectionScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <DemoNotice />
-        <Text style={styles.title}>{guidedInspectionMockData.title}</Text>
+        <Header
+          title={guidedInspectionMockData.title}
+          titleStyle={styles.title}
+        />
 
         <Text style={styles.subtitle}>
           Step {currentStepIndex + 1} of {totalSteps} • {step.area}

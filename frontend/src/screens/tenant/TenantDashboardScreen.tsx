@@ -1,22 +1,15 @@
+import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useInspection } from '../../context/InspectionContext';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import NotificationBell from '../../components/NotificationBell';
 
 import type { TenantTabParamList } from '../../navigation/types';
 import type { TenantStackParamList } from '../../navigation/types';
@@ -56,27 +49,15 @@ export default function TenantDashboardScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* Tenant information */}
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={styles.greeting}>
-                Hi, {user?.name || user?.email}
-              </Text>
-
-              <Text style={styles.property}>
-                {tenant.propertyAddress} • Unit {tenant.unitNumber}
-              </Text>
-            </View>
-
-            <NotificationBell
-              unreadCount={tenantMockData.notifications.unreadCount}
-              onPress={() =>
-                Alert.alert(
-                  'Notifications',
-                  'The notifications screen is coming soon.',
-                )
-              }
-            />
-          </View>
+          <Header
+            title={`Hi, ${user?.name || user?.email || ''}`}
+            subtitle={`${tenant.propertyAddress} • Unit ${tenant.unitNumber}`}
+            titleStyle={styles.greeting}
+            subtitleStyle={styles.property}
+            style={styles.header}
+            unreadCount={tenantMockData.notifications.unreadCount}
+            onNotificationsPress={() => navigation.navigate('Notifications')}
+          />
 
           <DemoNotice />
           {/* Upcoming inspection */}
@@ -226,17 +207,7 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-
-  headerText: {
-    flex: 1,
-  },
-
+  header: { marginBottom: 28 },
   greeting: {
     color: COLORS.text,
     fontSize: 25,

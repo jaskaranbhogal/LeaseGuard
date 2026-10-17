@@ -30,6 +30,7 @@ export type TenantTabParamList = {
 };
 
 export type TenantStackParamList = {
+  Notifications: undefined;
   TenantTabs:
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;

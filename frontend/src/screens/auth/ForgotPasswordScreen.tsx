@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { useState } from 'react';
 import { Keyboard, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -32,12 +33,13 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
   }
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Text style={styles.title}>Reset password</Text>
-        <Text style={styles.subtitle}>
-          We’ll email you a secure password-reset link.
-        </Text>
-      </View>
+      <Header
+        title="Reset password"
+        subtitle="We’ll email you a secure password-reset link."
+        style={styles.header}
+        titleStyle={styles.title}
+        subtitleStyle={styles.subtitle}
+      />
       <View style={styles.body}>
         <Input
           label="Email address"

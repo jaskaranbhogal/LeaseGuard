@@ -1,15 +1,16 @@
+import Header from '../../components/Header';
+import ScreenContainer from '../../components/ScreenContainer';
+import { colors } from '../../theme/colors';
 
 import React, { useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
   StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Notification = {
   id: string;
@@ -46,7 +47,7 @@ const initialEarlierNotifications: Notification[] = [
     title: 'Inspection due tomorrow',
     message: 'The routine inspection for Unit 2B is due tomorrow.',
     time: 'Yesterday',
-    color: '#1769B0',
+    color: colors.primary,
     unread: true,
   },
   {
@@ -70,15 +71,15 @@ export default function NotificationsScreen() {
   );
 
   const markAllAsRead = () => {
-    setTodayNotifications((notifications) =>
-      notifications.map((notification) => ({
+    setTodayNotifications(notifications =>
+      notifications.map(notification => ({
         ...notification,
         unread: false,
       })),
     );
 
-    setEarlierNotifications((notifications) =>
-      notifications.map((notification) => ({
+    setEarlierNotifications(notifications =>
+      notifications.map(notification => ({
         ...notification,
         unread: false,
       })),
@@ -86,142 +87,98 @@ export default function NotificationsScreen() {
   };
 
   const renderNotification = (notification: Notification) => (
-    <TouchableOpacity
+    <View
       key={notification.id}
+      testID={`notification-${notification.id}`}
+      accessible
+      accessibilityLabel={`${notification.title}. ${notification.message}. ${notification.time}`}
+      accessibilityValue={{ text: notification.unread ? 'Unread' : 'Read' }}
       style={styles.notificationCard}
-      activeOpacity={0.8}
     >
       <View style={styles.notificationHeader}>
         <View
-          style={[
-            styles.severityDot,
-            { backgroundColor: notification.color },
-          ]}
+          style={[styles.severityDot, { backgroundColor: notification.color }]}
         />
 
-        <Text style={styles.notificationTitle}>
-          {notification.title}
-        </Text>
+        <Text style={styles.notificationTitle}>{notification.title}</Text>
 
         {notification.unread && <View style={styles.unreadDot} />}
       </View>
 
-      <Text style={styles.notificationMessage}>
-        {notification.message}
-      </Text>
+      <Text style={styles.notificationMessage}>{notification.message}</Text>
 
-      <Text style={styles.notificationTime}>
-        {notification.time}
-      </Text>
-    </TouchableOpacity>
+      <Text style={styles.notificationTime}>{notification.time}</Text>
+    </View>
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <ScreenContainer style={styles.contentContainer}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <Header
+        title="Notifications"
+        onBack={() => navigation.goBack()}
+        style={styles.header}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.backArrow}>‹</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.markAllButton}
+          onPress={markAllAsRead}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Text style={styles.markAllText}>Mark all as read</Text>
+        </TouchableOpacity>
+      </Header>
 
-          <Text style={styles.headerTitle}>Notifications</Text>
+      <Text style={styles.demoNotice}>
+        Sample notifications for visual review. Read status is local to this
+        screen and resets when reopened; nothing is saved or synchronized with
+        Django.
+      </Text>
+      <Text style={styles.sectionTitle}>Today</Text>
 
-          <TouchableOpacity
-            style={styles.markAllButton}
-            onPress={markAllAsRead}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.markAllText}>Mark all as read</Text>
-          </TouchableOpacity>
-        </View>
+      <View>{todayNotifications.map(renderNotification)}</View>
 
-        <Text style={styles.sectionTitle}>Today</Text>
+      <Text style={[styles.sectionTitle, styles.earlierTitle]}>Earlier</Text>
 
-        <View>{todayNotifications.map(renderNotification)}</View>
-
-        <Text style={[styles.sectionTitle, styles.earlierTitle]}>
-          Earlier
-        </Text>
-
-        <View>{earlierNotifications.map(renderNotification)}</View>
-      </ScrollView>
-    </SafeAreaView>
+      <View>{earlierNotifications.map(renderNotification)}</View>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F4F8FC',
+  demoNotice: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.label,
+    marginBottom: 24,
   },
-
-  container: {
-    flex: 1,
-    backgroundColor: '#F4F8FC',
-  },
+  header: { marginBottom: 24 },
 
   contentContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 44,
-    marginBottom: 16,
-  },
-
-  backButton: {
-    width: 28,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-
-  backArrow: {
-    fontSize: 32,
-    lineHeight: 36,
-    fontWeight: '300',
-    color: '#172235',
-  },
-
-  headerTitle: {
-    flex: 1,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: '700',
-    color: '#172235',
-    marginLeft: 2,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 32,
   },
 
   markAllButton: {
-    paddingLeft: 4,
-    paddingVertical: 6,
+    alignSelf: 'flex-end',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
 
   markAllText: {
-    fontSize: 12,
+    fontSize: 14,
     lineHeight: 16,
     fontWeight: '600',
-    color: '#1769B0',
+    color: colors.primary,
   },
 
   sectionTitle: {
     fontSize: 18,
     lineHeight: 24,
     fontWeight: '600',
-    color: '#5B6B82',
+    color: colors.textSecondary,
     marginBottom: 12,
   },
 
@@ -230,14 +187,14 @@ const styles = StyleSheet.create({
   },
 
   notificationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#D9E2EC',
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: 20,
     paddingHorizontal: 16,
-    paddingTop: 14,
-    paddingBottom: 14,
-    marginBottom: 14,
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginBottom: 16,
     minHeight: 120,
   },
 
@@ -258,31 +215,31 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 22,
     fontWeight: '700',
-    color: '#172235',
+    color: colors.headerNavy,
   },
 
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#1769B0',
+    backgroundColor: colors.primary,
     marginLeft: 8,
   },
 
   notificationMessage: {
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 21,
     fontWeight: '400',
-    color: '#5B6B82',
+    color: colors.textSecondary,
     marginTop: 12,
     marginLeft: 20,
   },
 
   notificationTime: {
-    fontSize: 13,
+    fontSize: 14,
     lineHeight: 18,
     fontWeight: '400',
-    color: '#8290A3',
+    color: colors.textSecondary,
     marginTop: 16,
     marginLeft: 20,
   },

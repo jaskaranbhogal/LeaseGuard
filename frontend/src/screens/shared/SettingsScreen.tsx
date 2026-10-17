@@ -1,21 +1,14 @@
+import Button from '../../components/Button';
+import Header from '../../components/Header';
+import ScreenContainer from '../../components/ScreenContainer';
+import { colors } from '../../theme/colors';
 import React, { useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  Switch,
-  StatusBar,
-} from 'react-native';
+import { StyleSheet, Text, View, Switch, StatusBar } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthRequest } from '../../utils/useAuthRequest';
 
 export default function SettingsScreen() {
-  const navigation = useNavigation();
   const { signOut } = useAuth();
   const request = useAuthRequest();
 
@@ -24,203 +17,197 @@ export default function SettingsScreen() {
   const [severityAlerts, setSeverityAlerts] = useState(true);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <ScreenContainer style={styles.content}>
       <StatusBar barStyle="dark-content" />
+      <Header title="Settings" style={styles.header} />
 
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+      <Text style={styles.notice}>
+        Prototype settings. Notification preferences are local to this screen
+        and reset when the screen unmounts or the app restarts. They are not
+        saved or synchronized with Django.
+      </Text>
+      <Text style={styles.sectionTitle}>ACCOUNT</Text>
+
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Profile, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backArrow}>‹</Text>
-          </TouchableOpacity>
+        <Text style={styles.menuText}>Profile</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
 
-          <Text style={styles.title}>Settings</Text>
-        </View>
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Change Password, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text style={styles.menuText}>Change Password</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
 
-        <Text style={styles.sectionTitle}>ACCOUNT</Text>
+      <Text style={[styles.sectionTitle, styles.notificationSection]}>
+        NOTIFICATIONS
+      </Text>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>Profile</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+      <View style={styles.menuItem}>
+        <Text style={styles.menuText}>Inspection Reminders</Text>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>Change Password</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
+        <Switch
+          accessibilityLabel="Inspection Reminders"
+          value={inspectionReminders}
+          onValueChange={setInspectionReminders}
+          trackColor={{
+            false: '#D1D5DB',
+            true: colors.primary,
+          }}
+          thumbColor="#FFFFFF"
+          ios_backgroundColor="#D1D5DB"
+        />
+      </View>
 
-        <Text style={[styles.sectionTitle, styles.notificationSection]}>
-          NOTIFICATIONS
+      <View style={styles.menuItem}>
+        <Text style={styles.menuText}>Maintenance Updates</Text>
+
+        <Switch
+          accessibilityLabel="Maintenance Updates"
+          value={maintenanceUpdates}
+          onValueChange={setMaintenanceUpdates}
+          trackColor={{
+            false: '#D1D5DB',
+            true: colors.primary,
+          }}
+          thumbColor="#FFFFFF"
+          ios_backgroundColor="#D1D5DB"
+        />
+      </View>
+
+      <View style={styles.menuItem}>
+        <Text style={styles.menuText}>AI / Severity Alerts</Text>
+
+        <Switch
+          accessibilityLabel="AI / Severity Alerts"
+          value={severityAlerts}
+          onValueChange={setSeverityAlerts}
+          trackColor={{
+            false: '#D1D5DB',
+            true: colors.primary,
+          }}
+          thumbColor="#FFFFFF"
+          ios_backgroundColor="#D1D5DB"
+        />
+      </View>
+
+      <Text style={[styles.sectionTitle, styles.appearanceSection]}>
+        APPEARANCE
+      </Text>
+
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Change Theme, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text style={styles.menuText}>Change Theme</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
+
+      <Text style={[styles.sectionTitle, styles.supportSection]}>SUPPORT</Text>
+
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Help & Support, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text style={styles.menuText}>Help & Support</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
+
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Privacy & Security, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text style={styles.menuText}>Privacy & Security</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
+
+      {request.error ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {request.error}
         </Text>
-
-        <View style={styles.menuItem}>
-          <Text style={styles.menuText}>Inspection Reminders</Text>
-
-          <Switch
-            value={inspectionReminders}
-            onValueChange={setInspectionReminders}
-            trackColor={{
-              false: '#D1D5DB',
-              true: '#1769AA',
-            }}
-            thumbColor="#FFFFFF"
-            ios_backgroundColor="#D1D5DB"
-          />
-        </View>
-
-        <View style={styles.menuItem}>
-          <Text style={styles.menuText}>Maintenance Updates</Text>
-
-          <Switch
-            value={maintenanceUpdates}
-            onValueChange={setMaintenanceUpdates}
-            trackColor={{
-              false: '#D1D5DB',
-              true: '#1769AA',
-            }}
-            thumbColor="#FFFFFF"
-            ios_backgroundColor="#D1D5DB"
-          />
-        </View>
-
-        <View style={styles.menuItem}>
-          <Text style={styles.menuText}>AI / Severity Alerts</Text>
-
-          <Switch
-            value={severityAlerts}
-            onValueChange={setSeverityAlerts}
-            trackColor={{
-              false: '#D1D5DB',
-              true: '#1769AA',
-            }}
-            thumbColor="#FFFFFF"
-            ios_backgroundColor="#D1D5DB"
-          />
-        </View>
-
-        <Text style={[styles.sectionTitle, styles.appearanceSection]}>
-          APPEARANCE
-        </Text>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>Change Theme</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-
-        <Text style={[styles.sectionTitle, styles.supportSection]}>
-          SUPPORT
-        </Text>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>Help & Support</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <Text style={styles.menuText}>Privacy & Security</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-
-        {request.error ? (
-          <Text accessibilityRole="alert" style={styles.logoutText}>{request.error}</Text>
-        ) : null}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          disabled={request.loading}
-          onPress={() => request.run(signOut, () => {})}
-        >
-          <Text style={styles.logoutText}>Log Out</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+      ) : null}
+      <Button
+        title="Log out"
+        loading={request.loading}
+        variant="outline"
+        onPress={() => request.run(signOut, () => {})}
+        style={styles.logoutButton}
+      />
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F4F8FC',
+  notice: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.label,
+    marginBottom: 24,
   },
-
-  container: {
-    flex: 1,
-    backgroundColor: '#F4F8FC',
-  },
+  unavailable: { fontSize: 12, color: colors.textSecondary },
+  header: { marginBottom: 24 },
 
   content: {
-    paddingHorizontal: 46,
-    paddingTop: 22,
+    paddingHorizontal: 24,
+    paddingTop: 32,
     paddingBottom: 32,
   },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-
-  backButton: {
-    width: 34,
-    height: 44,
-    justifyContent: 'center',
-    marginRight: 20,
-  },
-
-  backArrow: {
-    fontSize: 43,
-    fontWeight: '300',
-    color: '#172235',
-    lineHeight: 43,
-  },
-
-  title: {
-    fontSize: 46,
-    fontWeight: '700',
-    color: '#172235',
-  },
-
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#607086',
+    color: colors.textSecondary,
     marginBottom: 16,
   },
 
   notificationSection: {
-    marginTop: 38,
+    marginTop: 24,
   },
 
   appearanceSection: {
-    marginTop: 38,
+    marginTop: 24,
   },
 
   supportSection: {
-    marginTop: 38,
+    marginTop: 24,
   },
 
   menuItem: {
-    minHeight: 86,
-    backgroundColor: '#FFFFFF',
+    minHeight: 64,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#D9E2EC',
-    borderRadius: 16,
+    borderColor: colors.border,
+    borderRadius: 20,
     marginBottom: 14,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
 
   menuText: {
-    fontSize: 23,
+    flex: 1,
+    flexShrink: 1,
+    fontSize: 17,
     fontWeight: '400',
-    color: '#253247',
+    color: colors.text,
   },
 
   chevron: {
@@ -231,19 +218,19 @@ const styles = StyleSheet.create({
   },
 
   logoutButton: {
-    height: 80,
-    borderRadius: 16,
+    minHeight: 56,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#F04444',
     backgroundColor: '#FFF5F5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 36, 
+    marginTop: 36,
   },
 
-  logoutText: {
-    fontSize: 24,
+  error: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#D92D2D',
+    color: colors.error,
   },
 });

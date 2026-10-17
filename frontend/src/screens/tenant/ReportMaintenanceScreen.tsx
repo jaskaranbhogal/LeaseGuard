@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import DemoNotice from '../../components/DemoNotice';
 import React, { useRef, useState } from 'react';
 import {
@@ -206,7 +207,10 @@ export default function ReportMaintenanceScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>{reportMaintenanceMockData.title}</Text>
+        <Header
+          title={reportMaintenanceMockData.title}
+          titleStyle={styles.title}
+        />
         <DemoNotice />
 
         <Text style={styles.subtitle}>
