@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   ScrollView,
@@ -115,7 +116,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-<StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
@@ -142,17 +143,13 @@ export default function NotificationsScreen() {
 
         <Text style={styles.sectionTitle}>Today</Text>
 
-        <View>
-          {todayNotifications.map(renderNotification)}
-        </View>
+        <View>{todayNotifications.map(renderNotification)}</View>
 
         <Text style={[styles.sectionTitle, styles.earlierTitle]}>
           Earlier
         </Text>
 
-        <View>
-          {earlierNotifications.map(renderNotification)}
-        </View>
+        <View>{earlierNotifications.map(renderNotification)}</View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -170,75 +167,75 @@ const styles = StyleSheet.create({
   },
 
   contentContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 64,
-    marginBottom: 28,
+    minHeight: 44,
+    marginBottom: 16,
   },
 
   backButton: {
-    width: 40,
-    height: 48,
+    width: 28,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
 
   backArrow: {
-    fontSize: 48,
-    lineHeight: 48,
+    fontSize: 32,
+    lineHeight: 36,
     fontWeight: '300',
     color: '#172235',
   },
 
   headerTitle: {
     flex: 1,
-    fontSize: 38,
-    lineHeight: 46,
+    fontSize: 26,
+    lineHeight: 32,
     fontWeight: '700',
     color: '#172235',
-    marginLeft: 4,
+    marginLeft: 2,
   },
 
   markAllButton: {
-    paddingLeft: 8,
-    paddingVertical: 8,
+    paddingLeft: 4,
+    paddingVertical: 6,
   },
 
   markAllText: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600',
     color: '#1769B0',
   },
 
   sectionTitle: {
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: '600',
     color: '#5B6B82',
-    marginBottom: 18,
+    marginBottom: 12,
   },
 
   earlierTitle: {
-    marginTop: 28,
+    marginTop: 18,
   },
 
   notificationCard: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#D9E2EC',
-    borderRadius: 20,
-    paddingHorizontal: 24,
-    paddingTop: 22,
-    paddingBottom: 22,
-    marginBottom: 24,
-    minHeight: 190,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    marginBottom: 14,
+    minHeight: 120,
   },
 
   notificationHeader: {
@@ -247,43 +244,43 @@ const styles = StyleSheet.create({
   },
 
   severityDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 16,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
   },
 
   notificationTitle: {
     flex: 1,
-    fontSize: 24,
-    lineHeight: 30,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: '700',
     color: '#172235',
   },
 
   unreadDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#1769B0',
-    marginLeft: 12,
+    marginLeft: 8,
   },
 
   notificationMessage: {
-    fontSize: 21,
-    lineHeight: 27,
+    fontSize: 15,
+    lineHeight: 21,
     fontWeight: '400',
     color: '#5B6B82',
-    marginTop: 20,
-    marginLeft: 32,
+    marginTop: 12,
+    marginLeft: 20,
   },
 
   notificationTime: {
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '400',
     color: '#8290A3',
-    marginTop: 34,
-    marginLeft: 32,
+    marginTop: 16,
+    marginLeft: 20,
   },
 });
