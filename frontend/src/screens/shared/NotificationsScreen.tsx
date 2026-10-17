@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   ScrollView,
   StyleSheet,
@@ -59,6 +60,7 @@ const initialEarlierNotifications: Notification[] = [
 ];
 
 export default function NotificationsScreen() {
+  const navigation = useNavigation();
   const [todayNotifications, setTodayNotifications] = useState(
     initialTodayNotifications,
   );
@@ -125,6 +127,7 @@ export default function NotificationsScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
+            onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
             <Text style={styles.backArrow}>‹</Text>

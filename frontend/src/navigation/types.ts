@@ -9,6 +9,7 @@ export type AuthStackParamList = {
 };
 
 export type LandlordStackParamList = {
+  Notifications: undefined;
   Dashboard: undefined;
   AddProperty: undefined;
   ScheduleInspection: undefined;

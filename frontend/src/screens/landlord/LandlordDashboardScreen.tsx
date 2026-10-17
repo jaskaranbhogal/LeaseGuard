@@ -81,6 +81,7 @@ export default function LandlordDashboardScreen({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Notifications"
+          onPress={() => navigation.navigate('Notifications')}
           hitSlop={12}
         >
           <Text style={styles.bell}>🔔</Text>

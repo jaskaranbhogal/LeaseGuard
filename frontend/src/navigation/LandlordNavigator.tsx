@@ -2,7 +2,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 
-import AccountScreen from '../components/AccountScreen';
+import SettingsScreen from '../screens/shared/SettingsScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import AddPropertyScreen from '../screens/landlord/AddPropertyScreen';
 import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScreen';
 import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
@@ -23,6 +24,7 @@ function HomeStack() {
       screenOptions={{
         headerShown: false,
       }}>
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Dashboard" component={LandlordDashboardScreen} />
       <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       <Stack.Screen
@@ -34,15 +36,6 @@ function HomeStack() {
         component={AIInspectionReviewScreen}
       />
     </Stack.Navigator>
-  );
-}
-
-function SettingsScreen() {
-  return (
-    <AccountScreen
-      title="Account settings"
-      message="Landlord account. More settings are coming soon."
-    />
   );
 }
 
