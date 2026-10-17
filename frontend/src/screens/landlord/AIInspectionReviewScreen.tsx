@@ -1,17 +1,24 @@
-import { StyleSheet, Text, View } from 'react-native';
+import DemoNotice from '../../components/DemoNotice';
+import Header from '../../components/Header';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import ScreenContainer from '../../components/ScreenContainer';
-import type { LandlordStackParamList } from '../../navigation/types';
+import type {
+  LandlordStackParamList,
+  LandlordTabParamList,
+} from '../../navigation/types';
 import UnitChip from '../../components/UnitChip';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
-type Props = NativeStackScreenProps<
-  LandlordStackParamList,
-  'AIInspectionReview'
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<LandlordStackParamList, 'AIInspectionReview'>,
+  BottomTabScreenProps<LandlordTabParamList, 'HomeStack'>
 >;
 
 const unitLabel = '18 Cedar Ave • Unit 1A';
@@ -24,23 +31,29 @@ const finding = 'Possible moisture / water staining detected.';
 export default function AIInspectionReviewScreen({ navigation }: Props) {
   return (
     <ScreenContainer style={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Inspection results</Text>
+      <Header
+        onBack={() => navigation.goBack()}
+        title="Inspection results"
+        style={styles.header}
+      >
         <UnitChip label={unitLabel} />
-      </View>
+      </Header>
 
+      <DemoNotice />
       <View style={styles.status}>
-        <Text style={styles.statusText}>AI comparison complete</Text>
+        <Text style={styles.statusText}>
+          Sample AI comparison — no analysis performed
+        </Text>
       </View>
 
       <Card style={styles.areaCard}>
         <Text style={styles.areaTitle}>{area}</Text>
         <View style={styles.photos}>
           <View style={[styles.photo, styles.photoBaseline]}>
-            <Text style={styles.photoLabel}>MOVE-IN{'\n'}BASELINE</Text>
+            <Text style={styles.photoLabel}>PLACEHOLDER{'\n'}BASELINE</Text>
           </View>
           <View style={[styles.photo, styles.photoCurrent]}>
-            <Text style={styles.photoLabel}>CURRENT{'\n'}INSPECTION</Text>
+            <Text style={styles.photoLabel}>PLACEHOLDER{'\n'}CURRENT</Text>
           </View>
         </View>
         <Text style={styles.observation}>{observation}</Text>
@@ -61,33 +74,49 @@ export default function AIInspectionReviewScreen({ navigation }: Props) {
         </View>
         <Text style={styles.finding}>{finding}</Text>
         <Text style={styles.advisory}>
-          AI summary is advisory. You make the final decision.
+          Example AI output only. These are sample findings, not an analysis of
+          your property.
         </Text>
       </Card>
 
       <View style={styles.decisions}>
         <Button
           title="Confirm damage"
-          onPress={() => navigation.goBack()}
+          onPress={() =>
+            Alert.alert(
+              'Damage confirmation preview',
+              'Demo only. No decision was saved or sent.',
+            )
+          }
           style={[styles.decision, styles.confirm]}
         />
         <Button
           title="Dismiss"
           variant="outline"
-          onPress={() => navigation.goBack()}
+          onPress={() =>
+            Alert.alert(
+              'Dismissal preview',
+              'Demo only. No decision was saved or sent.',
+            )
+          }
           style={styles.decision}
         />
         <Button
           title="Resolved"
           variant="outline"
-          onPress={() => navigation.goBack()}
+          onPress={() =>
+            Alert.alert(
+              'Resolution preview',
+              'Demo only. No decision was saved or sent.',
+            )
+          }
           style={styles.decision}
         />
       </View>
       <Button
         title="Open unit history"
         variant="outline"
-        onPress={() => undefined}
+        onPress={() => navigation.navigate('History')}
       />
     </ScreenContainer>
   );
@@ -161,7 +190,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   advisory: { fontSize: 16, lineHeight: 22, color: colors.textSecondary },
-  decisions: { flexDirection: 'row', gap: spacing.sm },
-  decision: { flex: 1, paddingHorizontal: 8 },
+  decisions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  decision: { flexGrow: 1, flexBasis: 100, paddingHorizontal: 8 },
   confirm: { backgroundColor: colors.error },
 });

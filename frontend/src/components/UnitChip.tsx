@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -8,6 +8,13 @@ interface Props {
 }
 
 export default function UnitChip({ label, onPress }: Props) {
+  if (!onPress) {
+    return (
+      <View style={styles.chip} accessible accessibilityLabel={label}>
+        <Text style={styles.label}>{label}</Text>
+      </View>
+    );
+  }
   return (
     <Pressable
       accessibilityRole="button"
@@ -36,6 +43,7 @@ const styles = StyleSheet.create({
   },
   chevron: { fontSize: 16, color: colors.text, marginTop: -4 },
   label: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: typography.medium,
     color: colors.text,

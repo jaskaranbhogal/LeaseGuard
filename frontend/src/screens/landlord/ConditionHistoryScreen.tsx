@@ -1,3 +1,5 @@
+import DemoNotice from '../../components/DemoNotice';
+import Header from '../../components/Header';
 import { StyleSheet, Text, View } from 'react-native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import Button from '../../components/Button';
@@ -32,11 +34,11 @@ const maintenance = {
 export default function ConditionHistoryScreen({ navigation }: Props) {
   return (
     <ScreenContainer style={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Condition history</Text>
+      <Header title="Condition history" style={styles.header}>
         <UnitChip label={unitLabel} />
-      </View>
+      </Header>
 
+      <DemoNotice />
       <Card style={styles.eventCard}>
         <View style={[styles.pill, styles.pillBaseline]}>
           <Text style={[styles.pillText, styles.pillTextBaseline]}>

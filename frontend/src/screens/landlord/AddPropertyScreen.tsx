@@ -1,5 +1,11 @@
+import DemoNotice from '../../components/DemoNotice';
+import {
+  bedroomCountError,
+  bathroomCountError,
+} from '../../utils/landlordValidation';
+import Header from '../../components/Header';
 import { useState } from 'react';
-import { Keyboard, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Keyboard, StyleSheet, Switch, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
@@ -13,10 +19,6 @@ import { emailError } from '../../utils/validation';
 
 type Props = NativeStackScreenProps<LandlordStackParamList, 'AddProperty'>;
 
-function countError(value: string, label: string) {
-  return /^\d+(\.5)?$/.test(value.trim()) ? undefined : `Enter ${label}.`;
-}
-
 export default function AddPropertyScreen({ navigation }: Props) {
   const [address, setAddress] = useState('');
   const [unit, setUnit] = useState('');
@@ -29,8 +31,8 @@ export default function AddPropertyScreen({ navigation }: Props) {
   const errors = {
     address: address.trim() ? undefined : 'Enter the property address.',
     unit: unit.trim() ? undefined : 'Enter a unit name or number.',
-    bedrooms: countError(bedrooms, 'the number of bedrooms'),
-    bathrooms: countError(bathrooms, 'the number of bathrooms'),
+    bedrooms: bedroomCountError(bedrooms),
+    bathrooms: bathroomCountError(bathrooms),
     tenantEmail: assignTenant ? emailError(tenantEmail) : undefined,
   };
   const hasErrors = Object.values(errors).some(Boolean);
@@ -41,18 +43,21 @@ export default function AddPropertyScreen({ navigation }: Props) {
       return;
     }
     Keyboard.dismiss();
-    navigation.goBack();
+    Alert.alert(
+      'Demo property preview',
+      'The form is valid. No property or unit was saved, and no tenant was assigned.',
+    );
   }
 
   return (
     <ScreenContainer style={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Add property</Text>
-        <Text style={styles.subtitle}>
-          Create the property, unit, and tenant link.
-        </Text>
-      </View>
+      <Header
+        title="Add property"
+        subtitle="Preview a property, unit, and tenant link."
+        style={styles.header}
+      />
 
+      <DemoNotice />
       <Input
         label="Property address"
         placeholder="Street, city, state"
@@ -80,7 +85,7 @@ export default function AddPropertyScreen({ navigation }: Props) {
             value={bedrooms}
             onChangeText={setBedrooms}
             error={submitted ? errors.bedrooms : undefined}
-            keyboardType="decimal-pad"
+            keyboardType="number-pad"
           />
         </View>
         <View style={styles.half}>
@@ -102,7 +107,7 @@ export default function AddPropertyScreen({ navigation }: Props) {
         <View style={styles.tenantText}>
           <Text style={styles.tenantTitle}>Assign tenant to this unit</Text>
           <Text style={styles.tenantDetail}>
-            Tenant will be prompted for future inspections.
+            Demo only. No invitation or inspection request will be sent.
           </Text>
         </View>
         <Switch
@@ -129,15 +134,19 @@ export default function AddPropertyScreen({ navigation }: Props) {
       )}
 
       <View style={styles.actions}>
-        <Button title="Save property & unit" variant="reset" onPress={submit} />
+        <Button
+          title="Preview demo property"
+          variant="reset"
+          onPress={submit}
+        />
         <Button
           title="Cancel"
           variant="outline"
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.popTo('Dashboard')}
         />
       </View>
       <Text style={styles.note}>
-        After saving, this unit appears on the landlord dashboard.
+        Demo preview only. Nothing is saved or assigned.
       </Text>
     </ScreenContainer>
   );

@@ -1,5 +1,11 @@
+import DemoNotice from '../../components/DemoNotice';
+import {
+  formatLocalDate,
+  inspectionDateError,
+} from '../../utils/landlordValidation';
+import Header from '../../components/Header';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -30,18 +36,10 @@ const typeOptions: { id: InspectionType; title: string; detail: string }[] = [
   { id: 'in-person', title: 'In person', detail: 'Request availability' },
 ];
 
-function formatDate(date: Date) {
-  return date.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 function defaultDueDate() {
   const date = new Date();
   date.setDate(date.getDate() + 7);
-  return formatDate(date);
+  return formatLocalDate(date);
 }
 
 export default function ScheduleInspectionScreen({ navigation }: Props) {
@@ -50,9 +48,7 @@ export default function ScheduleInspectionScreen({ navigation }: Props) {
   const [areas, setAreas] = useState(requiredAreas);
   const [submitted, setSubmitted] = useState(false);
 
-  const dueDateError = Number.isNaN(Date.parse(dueDate))
-    ? 'Enter a date like October 8, 2026.'
-    : undefined;
+  const dueDateError = inspectionDateError(dueDate);
   const areasError =
     type === 'remote' && areas.length === 0
       ? 'Pick at least one area.'
@@ -71,16 +67,19 @@ export default function ScheduleInspectionScreen({ navigation }: Props) {
     if (dueDateError || areasError) {
       return;
     }
-    navigation.goBack();
+    Alert.alert(
+      'Demo inspection preview',
+      'No inspection was scheduled, no availability request was sent, and no tenant was notified.',
+    );
   }
 
   return (
     <ScreenContainer style={styles.content}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Schedule inspection</Text>
+      <Header title="Schedule inspection" style={styles.header}>
         <UnitChip label={unitLabel} />
-      </View>
+      </Header>
 
+      <DemoNotice />
       <View style={styles.section}>
         <Text style={styles.label}>Inspection type</Text>
         <View style={styles.typeRow}>
@@ -107,11 +106,12 @@ export default function ScheduleInspectionScreen({ navigation }: Props) {
       </View>
 
       <Input
-        label="Due date"
+        label="Due date (YYYY-MM-DD)"
         value={dueDate}
         onChangeText={setDueDate}
         error={submitted ? dueDateError : undefined}
-        autoCapitalize="words"
+        autoCapitalize="none"
+        placeholder="YYYY-MM-DD"
       />
 
       {type === 'remote' && (
@@ -144,7 +144,7 @@ export default function ScheduleInspectionScreen({ navigation }: Props) {
 
       <View style={styles.actions}>
         <Button
-          title="Schedule & notify tenant"
+          title="Preview demo inspection"
           variant="reset"
           onPress={submit}
         />
@@ -155,7 +155,7 @@ export default function ScheduleInspectionScreen({ navigation }: Props) {
         />
       </View>
       <Text style={styles.note}>
-        The tenant receives a reminder that inspection photos are due.
+        Demo preview only. Nothing is scheduled or sent.
       </Text>
     </ScreenContainer>
   );

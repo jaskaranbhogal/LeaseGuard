@@ -1,3 +1,11 @@
+import { useAuth } from '../../context/AuthContext';
+import DemoNotice from '../../components/DemoNotice';
+import {
+  properties,
+  reviewCount,
+  highSeverityCount,
+} from '../../data/landlordMockData';
+import Header from '../../components/Header';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Button from '../../components/Button';
@@ -8,49 +16,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
-type PropertyStatus = 'review' | 'clear';
-
-interface PropertySummary {
-  id: string;
-  name: string;
-  location: string;
-  unitCount: number;
-  status: PropertyStatus;
-  statusLabel: string;
-  headline: string;
-  detail: string;
-  tag?: string;
-}
-
 type Props = NativeStackScreenProps<LandlordStackParamList, 'Dashboard'>;
-
-const landlordName = 'Marcus';
-const reviewCount = 2;
-const highSeverityCount = 1;
-
-const properties: PropertySummary[] = [
-  {
-    id: 'cedar-ave',
-    name: '18 Cedar Ave',
-    location: 'Farmingdale, NY',
-    unitCount: 2,
-    status: 'review',
-    statusLabel: '2 to review',
-    headline: 'Unit 1A • Alyssa Patel',
-    detail: 'Inspection submitted',
-    tag: 'HIGH',
-  },
-  {
-    id: 'maple-st',
-    name: '44 Maple St',
-    location: 'Hicksville, NY',
-    unitCount: 2,
-    status: 'clear',
-    statusLabel: 'All clear',
-    headline: 'Next inspection: Oct 15',
-    detail: 'No open maintenance requests',
-  },
-];
 
 function greeting() {
   const hour = new Date().getHours();
@@ -61,6 +27,8 @@ function greeting() {
 }
 
 export default function LandlordDashboardScreen({ navigation }: Props) {
+  const { user } = useAuth();
+  const landlordName = user?.name?.trim() || user?.email || 'Landlord';
   const totalUnits = properties.reduce((sum, p) => sum + p.unitCount, 0);
   const findingLabel =
     highSeverityCount === 1
@@ -69,25 +37,16 @@ export default function LandlordDashboardScreen({ navigation }: Props) {
 
   return (
     <ScreenContainer style={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.greeting}>
-            {greeting()}, {landlordName}
-          </Text>
-          <Text style={styles.subtitle}>
-            {totalUnits} units across {properties.length} properties
-          </Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-          onPress={() => navigation.navigate('Notifications')}
-          hitSlop={12}
-        >
-          <Text style={styles.bell}>🔔</Text>
-        </Pressable>
-      </View>
+      <Header
+        title={`${greeting()}, ${landlordName}`}
+        subtitle={`${totalUnits} units across ${properties.length} properties`}
+        titleStyle={styles.greeting}
+        subtitleStyle={styles.subtitle}
+        style={styles.header}
+        onNotificationsPress={() => navigation.navigate('Notifications')}
+      />
 
+      <DemoNotice />
       {reviewCount > 0 && (
         <Card
           onPress={() => navigation.navigate('AIInspectionReview')}
@@ -173,7 +132,8 @@ export default function LandlordDashboardScreen({ navigation }: Props) {
         <Button
           title="Manage unit details"
           variant="outline"
-          onPress={() => undefined}
+          disabled
+          onPress={() => {}}
         />
       </View>
     </ScreenContainer>
@@ -192,13 +152,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     gap: spacing.md,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  headerText: { flex: 1, paddingRight: spacing.md },
+  header: { marginBottom: spacing.sm },
   greeting: {
     fontSize: 26,
     fontWeight: typography.bold,
@@ -209,7 +163,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
-  bell: { fontSize: 24 },
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
