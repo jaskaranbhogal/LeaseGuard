@@ -5,9 +5,7 @@ import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { TenantTabParamList } from '../../navigation/types';
 import type { TenantStackParamList } from '../../navigation/types';
 import {
   unitHistoryMockData,
@@ -51,10 +49,8 @@ const BADGE_COLORS = {
 
 export default function UnitHistoryScreen() {
   const navigation =
-    useNavigation<BottomTabNavigationProp<TenantTabParamList>>();
+    useNavigation<NativeStackNavigationProp<TenantStackParamList, 'History'>>();
 
-  const stackNavigation =
-    navigation.getParent<NativeStackNavigationProp<TenantStackParamList>>();
   const { title, subtitle, entries, comparison } = unitHistoryMockData;
 
   function getStatusColor(type: HistoryEntryType) {
@@ -85,7 +81,7 @@ export default function UnitHistoryScreen() {
                 accessibilityRole={isMaintenance ? 'button' : undefined}
                 onPress={() => {
                   if (entry.type === 'maintenance') {
-                    stackNavigation?.navigate('MaintenanceDetail', {
+                    navigation.navigate('MaintenanceDetail', {
                       requestId: entry.requestId,
                     });
                   }
@@ -137,7 +133,7 @@ export default function UnitHistoryScreen() {
         <Pressable
           accessibilityRole="button"
           style={styles.backButton}
-          onPress={() => navigation.navigate('Home')}
+          onPress={() => navigation.popTo('TenantTabs', { screen: 'Home' })}
         >
           <Text style={styles.backButtonText}>Back to dashboard</Text>
         </Pressable>

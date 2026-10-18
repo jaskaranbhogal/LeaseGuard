@@ -143,13 +143,11 @@ it.each([landlord, tenant])(
     expect(bar.props.state.routes.map((r: { name: string }) => r.name)).toEqual(
       user.role === 'landlord'
         ? ['HomeStack', 'History', 'Settings']
-        : ['Home', 'Inspections', 'History', 'Settings'],
+        : ['Home', 'Inspections', 'Settings'],
     );
     expect(bar.props.state.index).toBe(0);
     await press('Settings');
-    expect(app.root.findByType(BottomNavigation).props.state.index).toBe(
-      user.role === 'landlord' ? 2 : 3,
-    );
+    expect(app.root.findByType(BottomNavigation).props.state.index).toBe(2);
     const settings = app.root.findByType(SettingsScreen);
     expect(settings.findByType(Header).props.onBack).toBeUndefined();
     expect(settings.findAllByType(BackButton)).toHaveLength(0);

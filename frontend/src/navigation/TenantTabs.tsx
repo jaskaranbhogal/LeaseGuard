@@ -8,7 +8,6 @@ import {
 
 import BottomNavigation from '../components/BottomNavigation';
 import TenantDashboardScreen from '../screens/tenant/TenantDashboardScreen';
-import UnitHistoryScreen from '../screens/tenant/UnitHistoryScreen';
 
 import type { TenantTabParamList, TenantStackParamList } from './types';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -69,8 +68,6 @@ export default function TenantTabs() {
       <Tab.Screen name="Home" component={TenantDashboardScreen} />
 
       <Tab.Screen name="Inspections" component={InspectionsScreen} />
-
-      <Tab.Screen name="History" component={UnitHistoryScreen} />
 
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>

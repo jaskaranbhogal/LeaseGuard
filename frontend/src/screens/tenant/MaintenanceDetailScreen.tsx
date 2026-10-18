@@ -52,7 +52,7 @@ export default function MaintenanceDetailScreen({ navigation, route }: Props) {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
-      navigation.replace('TenantTabs', { screen: 'History' });
+      navigation.replace('History');
     }
   }
   if (!request) {

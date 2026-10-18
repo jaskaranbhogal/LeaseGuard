@@ -243,7 +243,11 @@ it('selects maintenance IDs from dashboard/history with correct back behavior', 
     app.root.findByType(MaintenanceDetailScreen),
   );
   expect(navigation.getCurrentRoute()?.name).toBe('Home');
-  await press('History');
+  await press('View unit history', app.root.findByType(TenantDashboardScreen));
+  expect(navigation.getCurrentRoute()?.name).toBe('History');
+  expect(JSON.stringify(app.toJSON())).toContain(
+    '1 landlord-confirmed finding',
+  );
   await press('Bedroom window latch', app.root.findByType(UnitHistoryScreen));
   expect(navigation.getCurrentRoute()?.params).toEqual({
     requestId: 'maintenance-2',
@@ -259,6 +263,31 @@ it('selects maintenance IDs from dashboard/history with correct back behavior', 
     app.root.findByType(MaintenanceDetailScreen),
   );
   expect(navigation.getCurrentRoute()?.name).toBe('History');
+  await press('Back to dashboard', app.root.findByType(UnitHistoryScreen));
+  expect(navigation.getCurrentRoute()?.name).toBe('Home');
+  expect(navigation.canGoBack()).toBe(false);
+  await press('View unit history', app.root.findByType(TenantDashboardScreen));
+  await act(async () => navigation.goBack());
+  expect(navigation.getCurrentRoute()?.name).toBe('Home');
+});
+it('opens History when a maintenance detail has no previous route', async () => {
+  await mount();
+  await act(async () =>
+    navigation.reset({
+      index: 0,
+      routes: [
+        { name: 'MaintenanceDetail', params: { requestId: 'maintenance-1' } },
+      ],
+    }),
+  );
+  await press(
+    'Back to my requests',
+    app.root.findByType(MaintenanceDetailScreen),
+  );
+  expect(navigation.getCurrentRoute()?.name).toBe('History');
+  await press('Back to dashboard', app.root.findByType(UnitHistoryScreen));
+  expect(navigation.getCurrentRoute()?.name).toBe('Home');
+  expect(navigation.canGoBack()).toBe(false);
 });
 it.each(['unknown', undefined])(
   'handles invalid or missing maintenance IDs (%s)',
