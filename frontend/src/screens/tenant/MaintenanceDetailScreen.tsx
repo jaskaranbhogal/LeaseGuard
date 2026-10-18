@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
 import React, { useState } from 'react';
@@ -51,7 +52,7 @@ export default function MaintenanceDetailScreen({ navigation, route }: Props) {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
-      navigation.replace('TenantTabs', { screen: 'History' });
+      navigation.replace('History');
     }
   }
   if (!request) {
@@ -76,7 +77,7 @@ export default function MaintenanceDetailScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Maintenance request</Text>
+        <Header title="Maintenance request" titleStyle={styles.title} />
         <DemoNotice />
 
         <Text style={styles.subtitle}>{request.location}</Text>

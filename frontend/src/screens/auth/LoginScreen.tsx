@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { useRef, useState, type ComponentRef } from 'react';
 import {
   Keyboard,
@@ -51,7 +52,7 @@ export default function LoginScreen({ navigation }: Props) {
   return (
     <ScreenContainer style={styles.container}>
       <Text style={styles.brand}>LeaseGuard</Text>
-      <Text style={styles.title}>Welcome back</Text>
+      <Header title="Welcome back" titleStyle={styles.title} />
       <Text style={styles.subtitle}>Sign in to your account</Text>
       <View style={styles.form}>
         <Input

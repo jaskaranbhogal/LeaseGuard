@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text } from 'react-native';
+import Header from '../components/Header';
+import { StyleSheet } from 'react-native';
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
@@ -7,13 +8,12 @@ import {
 
 import BottomNavigation from '../components/BottomNavigation';
 import TenantDashboardScreen from '../screens/tenant/TenantDashboardScreen';
-import UnitHistoryScreen from '../screens/tenant/UnitHistoryScreen';
 
 import type { TenantTabParamList, TenantStackParamList } from './types';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import AccountScreen from '../components/AccountScreen';
+import SettingsScreen from '../screens/shared/SettingsScreen';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
 import DemoNotice from '../components/DemoNotice';
@@ -31,7 +31,7 @@ function InspectionsScreen({
   const inspection = useInspection();
   return (
     <ScreenContainer style={styles.container}>
-      <Text style={styles.title}>Inspections</Text>
+      <Header title="Inspections" titleStyle={styles.title} />
       <DemoNotice />
       <Button
         title={
@@ -53,15 +53,6 @@ function InspectionsScreen({
     </ScreenContainer>
   );
 }
-function SettingsScreen() {
-  return (
-    <AccountScreen
-      title="Account settings"
-      message="Tenant account. More settings are coming soon."
-    />
-  );
-}
-
 function TenantTabBar(props: BottomTabBarProps) {
   return <BottomNavigation {...props} role="tenant" />;
 }
@@ -77,8 +68,6 @@ export default function TenantTabs() {
       <Tab.Screen name="Home" component={TenantDashboardScreen} />
 
       <Tab.Screen name="Inspections" component={InspectionsScreen} />
-
-      <Tab.Screen name="History" component={UnitHistoryScreen} />
 
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>

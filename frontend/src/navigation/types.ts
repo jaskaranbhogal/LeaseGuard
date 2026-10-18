@@ -1,3 +1,4 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { ResetDelivery } from '../services/authService';
 
 export type AuthStackParamList = {
@@ -7,14 +8,29 @@ export type AuthStackParamList = {
   ResetEmailSent: { email: string; delivery: ResetDelivery };
 };
 
-export type TenantTabParamList = {
-  Home: undefined;
-  Inspections: undefined;
+export type LandlordStackParamList = {
+  Notifications: undefined;
+  Dashboard: undefined;
+  AddProperty: undefined;
+  ScheduleInspection: undefined;
+  AIInspectionReview: undefined;
+};
+
+export type LandlordTabParamList = {
+  HomeStack: NavigatorScreenParams<LandlordStackParamList> | undefined;
   History: undefined;
   Settings: undefined;
 };
 
+export type TenantTabParamList = {
+  Home: undefined;
+  Inspections: undefined;
+  Settings: undefined;
+};
+
 export type TenantStackParamList = {
+  History: undefined;
+  Notifications: undefined;
   TenantTabs:
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;
