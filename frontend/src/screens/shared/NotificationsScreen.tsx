@@ -118,7 +118,15 @@ export default function NotificationsScreen() {
         title="Notifications"
         onBack={() => navigation.goBack()}
         style={styles.header}
-      >
+      />
+
+      <Text style={styles.demoNotice}>
+        Sample notifications for visual review. Read status is local to this
+        screen and resets when reopened; nothing is saved or synchronized with
+        Django.
+      </Text>
+      <View style={styles.todayHeading}>
+        <Text style={[styles.sectionTitle, styles.todayTitle]}>Today</Text>
         <TouchableOpacity
           style={styles.markAllButton}
           onPress={markAllAsRead}
@@ -127,14 +135,7 @@ export default function NotificationsScreen() {
         >
           <Text style={styles.markAllText}>Mark all as read</Text>
         </TouchableOpacity>
-      </Header>
-
-      <Text style={styles.demoNotice}>
-        Sample notifications for visual review. Read status is local to this
-        screen and resets when reopened; nothing is saved or synchronized with
-        Django.
-      </Text>
-      <Text style={styles.sectionTitle}>Today</Text>
+      </View>
 
       <View>{todayNotifications.map(renderNotification)}</View>
 
@@ -159,6 +160,14 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 32,
   },
+
+  todayHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  todayTitle: { marginBottom: 0 },
 
   markAllButton: {
     alignSelf: 'flex-end',
