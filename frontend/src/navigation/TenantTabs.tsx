@@ -13,6 +13,7 @@ import type { TenantTabParamList, TenantStackParamList } from './types';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import SettingsScreen from '../screens/shared/SettingsScreen';
 import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
@@ -29,10 +30,13 @@ function InspectionsScreen({
   NativeStackScreenProps<TenantStackParamList>
 >) {
   const inspection = useInspection();
+
   return (
     <ScreenContainer style={styles.container}>
       <Header title="Inspections" titleStyle={styles.title} />
+
       <DemoNotice />
+
       <Button
         title={
           inspection.complete
@@ -43,9 +47,11 @@ function InspectionsScreen({
           if (inspection.complete) {
             inspection.restart();
           }
+
           navigation.navigate('GuidedInspection');
         }}
       />
+
       <Button
         title="Choose demo availability"
         onPress={() => navigation.navigate('InspectionAvailability')}
@@ -53,8 +59,21 @@ function InspectionsScreen({
     </ScreenContainer>
   );
 }
+
 function TenantTabBar(props: BottomTabBarProps) {
   return <BottomNavigation {...props} role="tenant" />;
+}
+
+function TenantSettingsScreen({
+  navigation,
+}: BottomTabScreenProps<TenantTabParamList, 'Settings'>) {
+  return (
+    <SettingsScreen
+      onPrivacySecurity={() => {
+        navigation.getParent()?.navigate('PrivacySecurity');
+      }}
+    />
+  );
 }
 
 export default function TenantTabs() {
@@ -69,7 +88,7 @@ export default function TenantTabs() {
 
       <Tab.Screen name="Inspections" component={InspectionsScreen} />
 
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Settings" component={TenantSettingsScreen} />
     </Tab.Navigator>
   );
 }
@@ -82,11 +101,13 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
+
   title: {
     fontSize: 24,
     fontWeight: '700',
     color: '#131824',
   },
+
   subtitle: {
     marginTop: 10,
     fontSize: 14,

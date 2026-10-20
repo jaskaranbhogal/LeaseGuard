@@ -3,12 +3,22 @@ import Header from '../../components/Header';
 import ScreenContainer from '../../components/ScreenContainer';
 import { colors } from '../../theme/colors';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Switch, StatusBar } from 'react-native';
-
+import {
+  StyleSheet,
+  Text,
+  View,
+  Switch,
+  StatusBar,
+  TouchableOpacity,
+} from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthRequest } from '../../utils/useAuthRequest';
-
-export default function SettingsScreen() {
+type SettingsScreenProps = {
+  onPrivacySecurity?: () => void;
+};
+export default function SettingsScreen({
+  onPrivacySecurity,
+}: SettingsScreenProps) {
   const { signOut } = useAuth();
   const request = useAuthRequest();
 
@@ -125,16 +135,15 @@ export default function SettingsScreen() {
         <Text style={styles.menuText}>Help & Support</Text>
         <Text style={styles.unavailable}>Unavailable</Text>
       </View>
-
-      <View
+      <TouchableOpacity
         style={styles.menuItem}
-        accessible
-        accessibilityLabel="Privacy & Security, unavailable in prototype"
-        accessibilityState={{ disabled: true }}
+        onPress={onPrivacySecurity}
+        accessibilityRole="button"
+        accessibilityLabel="Privacy & Security"
       >
         <Text style={styles.menuText}>Privacy & Security</Text>
-        <Text style={styles.unavailable}>Unavailable</Text>
-      </View>
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
 
       {request.error ? (
         <Text accessibilityRole="alert" style={styles.error}>
