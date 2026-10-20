@@ -1,19 +1,67 @@
+import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import AccountScreen from '../components/AccountScreen';
+import BottomNavigation from '../components/BottomNavigation';
 
-const Stack = createNativeStackNavigator<{ LandlordHome: undefined }>();
-function LandlordHome() {
+import SettingsScreen from '../screens/shared/SettingsScreen';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import AddPropertyScreen from '../screens/landlord/AddPropertyScreen';
+import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScreen';
+import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
+import LandlordDashboardScreen from '../screens/landlord/LandlordDashboardScreen';
+import ScheduleInspectionScreen from '../screens/landlord/ScheduleInspectionScreen';
+
+import type { LandlordStackParamList, LandlordTabParamList } from './types';
+
+const Tab = createBottomTabNavigator<LandlordTabParamList>();
+const Stack = createNativeStackNavigator<LandlordStackParamList>();
+
+function HomeStack() {
   return (
-    <AccountScreen
-      title="Landlord dashboard coming soon"
-      message="You are signed in as a landlord. Property management and landlord tools are still being built."
-    />
+    <Stack.Navigator
+      initialRouteName="Dashboard"
+      screenOptions={{
+        headerShown: false,
+      }}>
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Dashboard" component={LandlordDashboardScreen} />
+      <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
+      <Stack.Screen
+        name="ScheduleInspection"
+        component={ScheduleInspectionScreen}
+      />
+      <Stack.Screen
+        name="AIInspectionReview"
+        component={AIInspectionReviewScreen}
+      />
+    </Stack.Navigator>
   );
 }
+
+function LandlordTabBar(props: BottomTabBarProps) {
+  return <BottomNavigation {...props} role="landlord" />;
+}
+
+const homeOptions = { title: 'Home' };
+const historyOptions = { title: 'History' };
+const settingsOptions = { title: 'Settings' };
+
 export default function LandlordNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="LandlordHome" component={LandlordHome} />
-    </Stack.Navigator>
+    <Tab.Navigator
+      initialRouteName="HomeStack"
+      tabBar={LandlordTabBar}
+      screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="HomeStack" component={HomeStack} options={homeOptions} />
+      <Tab.Screen
+        name="History"
+        component={ConditionHistoryScreen}
+        options={historyOptions}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={settingsOptions}
+      />
+    </Tab.Navigator>
   );
 }

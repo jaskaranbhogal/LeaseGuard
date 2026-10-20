@@ -1,3 +1,4 @@
+import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import React from 'react';
 import { useInspection } from '../../context/InspectionContext';
@@ -69,7 +70,7 @@ export default function ReviewInspectionPhotoScreen({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>{data.title}</Text>
+        <Header title={data.title} titleStyle={styles.title} />
 
         <Text style={styles.subtitle}>
           {step.area} • Step {currentStepIndex + 1} of {totalSteps}

@@ -1,108 +1,68 @@
-
-import React, { useState } from 'react';
-import {
-  Alert,
-  StatusBar,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import Button from '../../components/Button';
+import Header from '../../components/Header';
 import ScreenContainer from '../../components/ScreenContainer';
+import { colors } from '../../theme/colors';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, Switch, StatusBar } from 'react-native';
+
 import { useAuth } from '../../context/AuthContext';
+import { useAuthRequest } from '../../utils/useAuthRequest';
 
-type PreviousTab = 'Home' | 'Inspections' | 'History';
-
-type SettingsScreenProps = {
-  previousTab: PreviousTab;
-  onBack: () => void;
-};
-
-export default function SettingsScreen({
-  previousTab,
-  onBack,
-}: SettingsScreenProps) {
+export default function SettingsScreen() {
   const { signOut } = useAuth();
+  const request = useAuthRequest();
+
   const [inspectionReminders, setInspectionReminders] = useState(true);
   const [maintenanceUpdates, setMaintenanceUpdates] = useState(true);
   const [severityAlerts, setSeverityAlerts] = useState(true);
-  const [loggingOut, setLoggingOut] = useState(false);
-
-  const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out of LeaseGuard?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: async () => {
-            if (loggingOut) {
-              return;
-            }
-
-            setLoggingOut(true);
-
-            try {
-              await signOut();
-            } catch {
-              Alert.alert(
-                'Logout Failed',
-                'Unable to log out right now. Please try again.',
-              );
-            } finally {
-              setLoggingOut(false);
-            }
-          },
-        },
-      ],
-    );
-  };
 
   return (
     <ScreenContainer style={styles.content}>
       <StatusBar barStyle="dark-content" />
+      <Header title="Settings" style={styles.header} />
 
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={onBack}
-          accessibilityRole="button"
-          accessibilityLabel={`Go back to ${previousTab}`}
-        >
-          <Text style={styles.backArrow}>‹</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Settings</Text>
-      </View>
-
+      <Text style={styles.notice}>
+        Prototype settings. Notification preferences are local to this screen
+        and reset when the screen unmounts or the app restarts. They are not
+        saved or synchronized with Django.
+      </Text>
       <Text style={styles.sectionTitle}>ACCOUNT</Text>
 
-      <TouchableOpacity style={styles.menuItem}>
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Profile, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
         <Text style={styles.menuText}>Profile</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
 
-      <TouchableOpacity style={styles.menuItem}>
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Change Password, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
         <Text style={styles.menuText}>Change Password</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
 
-      <Text style={[styles.sectionTitle, styles.sectionSpacing]}>
+      <Text style={[styles.sectionTitle, styles.notificationSection]}>
         NOTIFICATIONS
       </Text>
 
       <View style={styles.menuItem}>
         <Text style={styles.menuText}>Inspection Reminders</Text>
+
         <Switch
+          accessibilityLabel="Inspection Reminders"
           value={inspectionReminders}
           onValueChange={setInspectionReminders}
-          trackColor={{ false: '#D1D5DB', true: '#1769AA' }}
+          trackColor={{
+            false: '#D1D5DB',
+            true: colors.primary,
+          }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="#D1D5DB"
         />
@@ -110,10 +70,15 @@ export default function SettingsScreen({
 
       <View style={styles.menuItem}>
         <Text style={styles.menuText}>Maintenance Updates</Text>
+
         <Switch
+          accessibilityLabel="Maintenance Updates"
           value={maintenanceUpdates}
           onValueChange={setMaintenanceUpdates}
-          trackColor={{ false: '#D1D5DB', true: '#1769AA' }}
+          trackColor={{
+            false: '#D1D5DB',
+            true: colors.primary,
+          }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="#D1D5DB"
         />
@@ -121,132 +86,151 @@ export default function SettingsScreen({
 
       <View style={styles.menuItem}>
         <Text style={styles.menuText}>AI / Severity Alerts</Text>
+
         <Switch
+          accessibilityLabel="AI / Severity Alerts"
           value={severityAlerts}
           onValueChange={setSeverityAlerts}
-          trackColor={{ false: '#D1D5DB', true: '#1769AA' }}
+          trackColor={{
+            false: '#D1D5DB',
+            true: colors.primary,
+          }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="#D1D5DB"
         />
       </View>
 
-      <Text style={[styles.sectionTitle, styles.sectionSpacing]}>
+      <Text style={[styles.sectionTitle, styles.appearanceSection]}>
         APPEARANCE
       </Text>
 
-      <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}>Change Theme</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.sectionTitle, styles.sectionSpacing]}>
-        SUPPORT
-      </Text>
-
-      <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}>Help &amp; Support</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.menuItem}>
-        <Text style={styles.menuText}>Privacy &amp; Security</Text>
-        <Text style={styles.chevron}>›</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.logoutButton}
-        accessibilityRole="button"
-        onPress={handleLogout}
-        disabled={loggingOut}
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Change Theme, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
       >
-        <Text style={styles.logoutText}>
-          {loggingOut ? 'Logging Out...' : 'Log Out'}
+        <Text style={styles.menuText}>Change Theme</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
+
+      <Text style={[styles.sectionTitle, styles.supportSection]}>SUPPORT</Text>
+
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Help & Support, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text style={styles.menuText}>Help & Support</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
+
+      <View
+        style={styles.menuItem}
+        accessible
+        accessibilityLabel="Privacy & Security, unavailable in prototype"
+        accessibilityState={{ disabled: true }}
+      >
+        <Text style={styles.menuText}>Privacy & Security</Text>
+        <Text style={styles.unavailable}>Unavailable</Text>
+      </View>
+
+      {request.error ? (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {request.error}
         </Text>
-      </TouchableOpacity>
+      ) : null}
+      <Button
+        title="Log out"
+        loading={request.loading}
+        variant="outline"
+        onPress={() => request.run(signOut, () => {})}
+        style={styles.logoutButton}
+      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    alignSelf: 'stretch',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  backButton: {
-    width: 32,
-    height: 40,
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  backArrow: {
-    fontSize: 34,
-    fontWeight: '300',
-    color: '#172235',
-    lineHeight: 38,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#172235',
-  },
-  sectionTitle: {
+  notice: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#607086',
-    marginBottom: 12,
-    letterSpacing: 0.5,
+    lineHeight: 20,
+    color: colors.label,
+    marginBottom: 24,
   },
-  sectionSpacing: {
+  unavailable: { fontSize: 12, color: colors.textSecondary },
+  header: { marginBottom: 24 },
+
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 32,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+
+  notificationSection: {
     marginTop: 24,
   },
+
+  appearanceSection: {
+    marginTop: 24,
+  },
+
+  supportSection: {
+    marginTop: 24,
+  },
+
   menuItem: {
     minHeight: 64,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#D9E2EC',
-    borderRadius: 12,
-    marginBottom: 10,
+    borderColor: colors.border,
+    borderRadius: 20,
+    marginBottom: 14,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    gap: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
   },
+
   menuText: {
     flex: 1,
-    fontSize: 16,
+    flexShrink: 1,
+    fontSize: 17,
     fontWeight: '400',
-    color: '#253247',
+    color: colors.text,
   },
+
   chevron: {
-    fontSize: 28,
+    fontSize: 39,
     fontWeight: '300',
     color: '#7B8794',
-    lineHeight: 30,
+    lineHeight: 39,
   },
+
   logoutButton: {
     minHeight: 56,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#F04444',
     backgroundColor: '#FFF5F5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    padding: 12,
+    marginTop: 36,
   },
-  logoutText: {
-    fontSize: 16,
+
+  error: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#D92D2D',
+    color: colors.error,
   },
 });
-
