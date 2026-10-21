@@ -9,6 +9,7 @@ import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScre
 import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
 import LandlordDashboardScreen from '../screens/landlord/LandlordDashboardScreen';
 import ScheduleInspectionScreen from '../screens/landlord/ScheduleInspectionScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
 
 import type {
   LandlordSettingsStackParamList,
@@ -62,6 +63,11 @@ function SettingsStackScreen() {
       <SettingsStack.Screen
         name="PrivacySecurity"
         component={PrivacySecurityScreen}
+      />
+
+      <SettingsStack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
       />
     </SettingsStack.Navigator>
   );

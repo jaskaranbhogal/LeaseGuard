@@ -19,6 +19,7 @@ export type LandlordStackParamList = {
 export type LandlordSettingsStackParamList = {
   SettingsHome: undefined;
   PrivacySecurity: undefined;
+  PrivacyPolicy: undefined;
 };
 
 export type LandlordTabParamList = {
@@ -38,6 +39,7 @@ export type TenantStackParamList = {
   History: undefined;
   Notifications: undefined;
   PrivacySecurity: undefined;
+  PrivacyPolicy: undefined;
   TenantTabs:
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;

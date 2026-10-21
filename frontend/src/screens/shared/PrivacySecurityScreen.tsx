@@ -1,45 +1,63 @@
-import { useNavigation } from '@react-navigation/native';
-import React from 'react';
 import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
+  useNavigation,
+  type NavigationProp,
+  type ParamListBase,
+} from '@react-navigation/native';
+import {
+  Alert,
+  Linking,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 
+import Header from '../../components/Header';
+import ScreenContainer from '../../components/ScreenContainer';
+import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 
 export default function PrivacySecurityScreen() {
-  const navigation = useNavigation();
+  // Shared by both roles, so use the generic navigation object.
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+
+  // Landlord: SettingsHome -> PrivacySecurity (SettingsStack)
+  // Tenant: TenantTabs (Settings tab) -> PrivacySecurity (TenantStack)
+  // Both push this screen, so goBack() returns to the right place.
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  };
+
+  // 'PrivacyPolicy' is registered in both the landlord settings stack
+  // and the tenant stack.
+  const openPrivacyPolicy = () => navigation.navigate('PrivacyPolicy');
+
+  const openCameraSettings = () => {
+    Alert.alert(
+      'Camera permission',
+      'You can turn camera access on or off for LeaseGuard in your device settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      ],
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+    <ScreenContainer style={styles.container}>
+      <Header
+        title="Privacy & security"
+        onBack={handleBack}
+        style={styles.header}
+      />
 
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Text style={styles.backArrow}>‹</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.title}>Privacy &amp; security</Text>
-        </View>
-
+      <View>
         {/* Photos and videos */}
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Your photos and videos</Text>
-
           <Text style={styles.infoText}>
             Stored securely and visible only to the landlord and tenant of the
             unit they belong to.
@@ -48,114 +66,86 @@ export default function PrivacySecurityScreen() {
 
         {/* Privacy policy */}
         <TouchableOpacity
-  style={styles.menuItem}
-  accessibilityRole="button"
->
+          style={styles.menuItem}
+          onPress={openPrivacyPolicy}
+          accessibilityRole="button"
+          accessibilityLabel="Privacy policy"
+        >
           <Text style={styles.menuText}>Privacy policy</Text>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
 
-        {/* Consent */}
+        {/* Consent (status removed, not implemented yet) */}
         <View style={styles.menuItem}>
           <Text style={styles.menuText}>Consent and data handling</Text>
-
-          <View style={styles.acceptedBadge}>
-            <Text style={styles.acceptedText}>Accepted</Text>
-          </View>
         </View>
-{/* Camera permission */}
-<TouchableOpacity
-  style={styles.menuItem}
-  accessibilityRole="button"
->
-  <Text style={styles.menuText}>Camera permission</Text>
-  <Text style={styles.chevron}>›</Text>
-</TouchableOpacity>
+
+        {/* Camera permission */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={openCameraSettings}
+          accessibilityRole="button"
+          accessibilityLabel="Camera permission"
+        >
+          <Text style={styles.menuText}>Camera permission</Text>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
 
         {/* Disclaimer */}
         <Text style={styles.disclaimer}>
           AI comparisons are advisory. Landlords and tenants make the final
           decisions.
         </Text>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </ScreenContainer>
   );
 }
 
+// Sizes and spacing mirror SettingsScreen so the screens feel consistent.
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#F4F7FB',
-  },
-
-  screen: {
-    flex: 1,
-    backgroundColor: '#F4F7FB',
-  },
-
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 32,
+  container: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
   },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-
-  backButton: {
-    width: 30,
-    height: 40,
-    justifyContent: 'center',
-  },
-
-  backArrow: {
-    fontSize: 36,
-    lineHeight: 38,
-    fontWeight: '300',
-    color: '#172235',
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#172235',
+    marginBottom: spacing.lg,
   },
 
   infoCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#D9E2EC',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 12,
+    borderColor: colors.border,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: 14,
   },
 
   infoTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#172235',
-    marginBottom: 6,
+    fontSize: 17,
+    fontWeight: typography.semibold,
+    color: colors.text,
+    marginBottom: spacing.sm,
   },
 
   infoText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: '#65748B',
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.label,
   },
 
   menuItem: {
-    minHeight: 54,
-    backgroundColor: '#FFFFFF',
+    minHeight: 64,
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#D9E2EC',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginBottom: 12,
-
+    borderColor: colors.border,
+    borderRadius: 20,
+    marginBottom: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    gap: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -163,33 +153,23 @@ const styles = StyleSheet.create({
 
   menuText: {
     flex: 1,
-    fontSize: 14,
-    color: '#253247',
+    flexShrink: 1,
+    fontSize: 17,
+    fontWeight: typography.regular,
+    color: colors.text,
   },
 
   chevron: {
-    fontSize: 24,
+    fontSize: 39,
     fontWeight: '300',
-    color: '#64748B',
-  },
-
-  acceptedBadge: {
-    backgroundColor: '#DCF5E5',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-
-  acceptedText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#137A3D',
+    color: '#7B8794',
+    lineHeight: 39,
   },
 
   disclaimer: {
-    marginTop: 2,
-    fontSize: 12,
-    lineHeight: 17,
-    color: '#65748B',
+    marginTop: spacing.sm,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
   },
 });
