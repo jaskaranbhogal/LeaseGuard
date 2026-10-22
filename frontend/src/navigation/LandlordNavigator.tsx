@@ -10,6 +10,7 @@ import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
 import LandlordDashboardScreen from '../screens/landlord/LandlordDashboardScreen';
 import ScheduleInspectionScreen from '../screens/landlord/ScheduleInspectionScreen';
 import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
+import ProfileScreen from '../screens/shared/ProfileScreen';
 
 import type {
   LandlordSettingsStackParamList,
@@ -56,6 +57,7 @@ function SettingsStackScreen() {
             onPrivacySecurity={() =>
               navigation.navigate('PrivacySecurity')
             }
+            onProfile={() => navigation.navigate('Profile')}
           />
         )}
       </SettingsStack.Screen>
@@ -69,6 +71,8 @@ function SettingsStackScreen() {
         name="PrivacyPolicy"
         component={PrivacyPolicyScreen}
       />
+
+      <SettingsStack.Screen name="Profile" component={ProfileScreen} />
     </SettingsStack.Navigator>
   );
 }

@@ -2,6 +2,8 @@ import Button from '../../components/Button';
 import Header from '../../components/Header';
 import ScreenContainer from '../../components/ScreenContainer';
 import { colors } from '../../theme/colors';
+import { spacing } from '../../theme/spacing';
+import { typography } from '../../theme/typography';
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -13,11 +15,19 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthRequest } from '../../utils/useAuthRequest';
+// Colors that are not in colors.ts yet (same values as before).
+const SWITCH_OFF = '#D1D5DB';
+const CHEVRON = '#7B8794';
+const LOGOUT_BORDER = '#F04444';
+const LOGOUT_BACKGROUND = '#FFF5F5';
+
 type SettingsScreenProps = {
   onPrivacySecurity?: () => void;
+  onProfile?: () => void;
 };
 export default function SettingsScreen({
   onPrivacySecurity,
+  onProfile,
 }: SettingsScreenProps) {
   const { signOut } = useAuth();
   const request = useAuthRequest();
@@ -29,7 +39,7 @@ export default function SettingsScreen({
   return (
     <ScreenContainer style={styles.content}>
       <StatusBar barStyle="dark-content" />
-      <Header title="Settings" style={styles.header} />
+      <Header title="Settings" titleStyle={styles.title} style={styles.header} />
 
       <Text style={styles.notice}>
         Prototype settings. Notification preferences are local to this screen
@@ -38,25 +48,15 @@ export default function SettingsScreen({
       </Text>
       <Text style={styles.sectionTitle}>ACCOUNT</Text>
 
-      <View
+      <TouchableOpacity
         style={styles.menuItem}
-        accessible
-        accessibilityLabel="Profile, unavailable in prototype"
-        accessibilityState={{ disabled: true }}
+        onPress={onProfile}
+        accessibilityRole="button"
+        accessibilityLabel="Profile"
       >
         <Text style={styles.menuText}>Profile</Text>
-        <Text style={styles.unavailable}>Unavailable</Text>
-      </View>
-
-      <View
-        style={styles.menuItem}
-        accessible
-        accessibilityLabel="Change Password, unavailable in prototype"
-        accessibilityState={{ disabled: true }}
-      >
-        <Text style={styles.menuText}>Change Password</Text>
-        <Text style={styles.unavailable}>Unavailable</Text>
-      </View>
+        <Text style={styles.chevron}>›</Text>
+      </TouchableOpacity>
 
       <Text style={[styles.sectionTitle, styles.notificationSection]}>
         NOTIFICATIONS
@@ -70,11 +70,11 @@ export default function SettingsScreen({
           value={inspectionReminders}
           onValueChange={setInspectionReminders}
           trackColor={{
-            false: '#D1D5DB',
+            false: SWITCH_OFF,
             true: colors.primary,
           }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor="#D1D5DB"
+          thumbColor={colors.white}
+          ios_backgroundColor={SWITCH_OFF}
         />
       </View>
 
@@ -86,11 +86,11 @@ export default function SettingsScreen({
           value={maintenanceUpdates}
           onValueChange={setMaintenanceUpdates}
           trackColor={{
-            false: '#D1D5DB',
+            false: SWITCH_OFF,
             true: colors.primary,
           }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor="#D1D5DB"
+          thumbColor={colors.white}
+          ios_backgroundColor={SWITCH_OFF}
         />
       </View>
 
@@ -102,11 +102,11 @@ export default function SettingsScreen({
           value={severityAlerts}
           onValueChange={setSeverityAlerts}
           trackColor={{
-            false: '#D1D5DB',
+            false: SWITCH_OFF,
             true: colors.primary,
           }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor="#D1D5DB"
+          thumbColor={colors.white}
+          ios_backgroundColor={SWITCH_OFF}
         />
       </View>
 
@@ -162,39 +162,34 @@ export default function SettingsScreen({
 }
 
 const styles = StyleSheet.create({
+  content: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+
+  // 24px like Login, Register, Inspections, and Profile (Header defaults to 32).
+  title: { fontSize: 24 },
+
+  header: { marginBottom: spacing.lg },
+
   notice: {
     fontSize: 14,
     lineHeight: 20,
     color: colors.label,
-    marginBottom: 24,
-  },
-  unavailable: { fontSize: 12, color: colors.textSecondary },
-  header: { marginBottom: 24 },
-
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 32,
+    marginBottom: spacing.lg,
   },
 
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: typography.semibold,
     color: colors.textSecondary,
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
 
-  notificationSection: {
-    marginTop: 24,
-  },
-
-  appearanceSection: {
-    marginTop: 24,
-  },
-
-  supportSection: {
-    marginTop: 24,
-  },
+  notificationSection: { marginTop: spacing.lg },
+  appearanceSection: { marginTop: spacing.lg },
+  supportSection: { marginTop: spacing.lg },
 
   menuItem: {
     minHeight: 64,
@@ -203,7 +198,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 20,
     marginBottom: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.md,
     paddingVertical: 12,
     gap: 12,
     flexDirection: 'row',
@@ -215,14 +210,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexShrink: 1,
     fontSize: 17,
-    fontWeight: '400',
+    fontWeight: typography.regular,
     color: colors.text,
   },
+
+  unavailable: { fontSize: 12, color: colors.textSecondary },
 
   chevron: {
     fontSize: 39,
     fontWeight: '300',
-    color: '#7B8794',
+    color: CHEVRON,
     lineHeight: 39,
   },
 
@@ -230,8 +227,8 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#F04444',
-    backgroundColor: '#FFF5F5',
+    borderColor: LOGOUT_BORDER,
+    backgroundColor: LOGOUT_BACKGROUND,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 36,
@@ -239,7 +236,7 @@ const styles = StyleSheet.create({
 
   error: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: typography.semibold,
     color: colors.error,
   },
 });

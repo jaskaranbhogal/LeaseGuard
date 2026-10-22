@@ -103,7 +103,7 @@ const SECTIONS: Section[] = [
   },
   {
     title: '11. Contact us',
-    paragraphs: ['LeaseGuard', 'Email: LeaseGuard@gmail.com'],
+    paragraphs: ['[COMPANY / TEAM NAME]', 'Email: [CONTACT EMAIL]'],
   },
 ];
 
@@ -122,6 +122,7 @@ export default function PrivacyPolicyScreen() {
         title="Privacy policy"
         subtitle={`Last updated: ${LAST_UPDATED}`}
         onBack={handleBack}
+        titleStyle={styles.title}
         style={styles.header}
       />
 
@@ -155,8 +156,13 @@ export default function PrivacyPolicyScreen() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
+  },
+
+  // 24px like Settings, Profile, Login, and Register (Header defaults to 32).
+  title: {
+    fontSize: 24,
   },
 
   header: {

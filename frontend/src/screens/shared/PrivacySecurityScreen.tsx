@@ -51,6 +51,7 @@ export default function PrivacySecurityScreen() {
       <Header
         title="Privacy & security"
         onBack={handleBack}
+        titleStyle={styles.title}
         style={styles.header}
       />
 
@@ -105,8 +106,13 @@ export default function PrivacySecurityScreen() {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xl,
+  },
+
+  // 24px like Settings, Profile, Login, and Register (Header defaults to 32).
+  title: {
+    fontSize: 24,
   },
 
   header: {

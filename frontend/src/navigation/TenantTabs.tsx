@@ -1,116 +1,106 @@
-import React from 'react';
-import Header from '../components/Header';
-import { StyleSheet } from 'react-native';
-import {
-  createBottomTabNavigator,
-  type BottomTabBarProps,
-} from '@react-navigation/bottom-tabs';
-
+import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomNavigation from '../components/BottomNavigation';
-import TenantDashboardScreen from '../screens/tenant/TenantDashboardScreen';
-
-import type { TenantTabParamList, TenantStackParamList } from './types';
-import type { CompositeScreenProps } from '@react-navigation/native';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-
+import PrivacySecurityScreen from '../screens/shared/PrivacySecurityScreen';
 import SettingsScreen from '../screens/shared/SettingsScreen';
-import Button from '../components/Button';
-import ScreenContainer from '../components/ScreenContainer';
-import DemoNotice from '../components/DemoNotice';
-import { useInspection } from '../context/InspectionContext';
-import { colors } from '../theme/colors';
+import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import AddPropertyScreen from '../screens/landlord/AddPropertyScreen';
+import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScreen';
+import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
+import LandlordDashboardScreen from '../screens/landlord/LandlordDashboardScreen';
+import ScheduleInspectionScreen from '../screens/landlord/ScheduleInspectionScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
+import ProfileScreen from '../screens/shared/ProfileScreen';
 
-const Tab = createBottomTabNavigator<TenantTabParamList>();
+import type {
+  LandlordSettingsStackParamList,
+  LandlordStackParamList,
+  LandlordTabParamList,
+} from './types';
 
-function InspectionsScreen({
-  navigation,
-}: CompositeScreenProps<
-  BottomTabScreenProps<TenantTabParamList, 'Inspections'>,
-  NativeStackScreenProps<TenantStackParamList>
->) {
-  const inspection = useInspection();
-
+const Tab = createBottomTabNavigator<LandlordTabParamList>();
+const Stack = createNativeStackNavigator<LandlordStackParamList>();
+const SettingsStack =
+  createNativeStackNavigator<LandlordSettingsStackParamList>();
+function HomeStack() {
   return (
-    <ScreenContainer style={styles.container}>
-      <Header title="Inspections" titleStyle={styles.title} />
-
-      <DemoNotice />
-
-      <Button
-        title={
-          inspection.complete
-            ? 'Start another demo'
-            : 'Continue inspection demo'
-        }
-        onPress={() => {
-          if (inspection.complete) {
-            inspection.restart();
-          }
-
-          navigation.navigate('GuidedInspection');
-        }}
+    <Stack.Navigator
+      initialRouteName="Dashboard"
+      screenOptions={{
+        headerShown: false,
+      }}>
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Dashboard" component={LandlordDashboardScreen} />
+      <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
+      <Stack.Screen
+        name="ScheduleInspection"
+        component={ScheduleInspectionScreen}
       />
-
-      <Button
-        title="Choose demo availability"
-        onPress={() => navigation.navigate('InspectionAvailability')}
+      <Stack.Screen
+        name="AIInspectionReview"
+        component={AIInspectionReviewScreen}
       />
-    </ScreenContainer>
+    </Stack.Navigator>
   );
 }
-
-function TenantTabBar(props: BottomTabBarProps) {
-  return <BottomNavigation {...props} role="tenant" />;
-}
-
-function TenantSettingsScreen({
-  navigation,
-}: BottomTabScreenProps<TenantTabParamList, 'Settings'>) {
+function SettingsStackScreen() {
   return (
-    <SettingsScreen
-      onPrivacySecurity={() => {
-        navigation.getParent()?.navigate('PrivacySecurity');
-      }}
-    />
-  );
-}
-
-export default function TenantTabs() {
-  return (
-    <Tab.Navigator
-      tabBar={TenantTabBar}
+    <SettingsStack.Navigator
+      initialRouteName="SettingsHome"
       screenOptions={{
         headerShown: false,
       }}
     >
-      <Tab.Screen name="Home" component={TenantDashboardScreen} />
+      <SettingsStack.Screen name="SettingsHome">
+        {({ navigation }) => (
+          <SettingsScreen
+            onPrivacySecurity={() =>
+              navigation.navigate('PrivacySecurity')
+            }
+            onProfile={() => navigation.navigate('Profile')}
+          />
+        )}
+      </SettingsStack.Screen>
 
-      <Tab.Screen name="Inspections" component={InspectionsScreen} />
+      <SettingsStack.Screen
+        name="PrivacySecurity"
+        component={PrivacySecurityScreen}
+      />
 
-      <Tab.Screen name="Settings" component={TenantSettingsScreen} />
+      <SettingsStack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+      />
+
+      <SettingsStack.Screen name="Profile" component={ProfileScreen} />
+    </SettingsStack.Navigator>
+  );
+}
+function LandlordTabBar(props: BottomTabBarProps) {
+  return <BottomNavigation {...props} role="landlord" />;
+}
+
+const homeOptions = { title: 'Home' };
+const historyOptions = { title: 'History' };
+const settingsOptions = { title: 'Settings' };
+
+export default function LandlordNavigator() {
+  return (
+    <Tab.Navigator
+      initialRouteName="HomeStack"
+      tabBar={LandlordTabBar}
+      screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="HomeStack" component={HomeStack} options={homeOptions} />
+      <Tab.Screen
+        name="History"
+        component={ConditionHistoryScreen}
+        options={historyOptions}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsStackScreen}
+        options={settingsOptions}
+      />
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    padding: 24,
-    gap: 16,
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#131824',
-  },
-
-  subtitle: {
-    marginTop: 10,
-    fontSize: 14,
-    color: '#5E6B80',
-  },
-});
