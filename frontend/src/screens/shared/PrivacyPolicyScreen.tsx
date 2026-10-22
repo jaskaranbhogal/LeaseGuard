@@ -7,8 +7,6 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
-// DRAFT: not legal advice. Fill in every [BRACKETED] item, make sure each
-// statement matches what the app really does, and get it reviewed before release.
 const LAST_UPDATED = 'October 21, 2026';
 
 type Section = {
@@ -28,8 +26,7 @@ const SECTIONS: Section[] = [
       'Property and unit information: addresses, unit details, and the link between a landlord and the tenant of a unit.',
       'Photos and videos: images and videos you capture or upload during inspections or maintenance reports, with related notes, dates, and times.',
       'Inspection and maintenance data: schedules, availability you choose, maintenance requests, condition history, and AI inspection results.',
-      'Device and usage information: [device type, OS, app version, crash logs. Remove anything you do not collect.]',
-      'Notifications: if enabled, a device token so we can send you notifications. [Remove if not used.]',
+      'Notifications: if enabled, a device token so we can send you notifications.',
     ],
   },
   {
@@ -48,14 +45,13 @@ const SECTIONS: Section[] = [
     title: '3. AI-assisted comparisons',
     paragraphs: [
       'LeaseGuard uses AI to compare photos and flag possible changes in unit condition. These results are advisory only. Landlords and tenants make the final decisions.',
-      '[Describe whether photos are processed by a third-party AI provider and whether they are used to train models.]',
     ],
   },
   {
     title: '4. Who can see your information',
     bullets: [
       'Landlords and tenants: photos, videos, and inspection records are visible only to the landlord and tenant of the unit they belong to.',
-      'Service providers: we use trusted providers for hosting, storage, authentication, notifications, and AI processing: [LIST PROVIDERS]. They may only use your information to provide services to us.',
+      'Service providers: we use trusted providers for hosting, storage, authentication, notifications, and AI processing. They may only use your information to provide services to us.',
       'Legal reasons: we may disclose information if required by law, court order, or to protect rights, safety, or security.',
       'Business transfers: if LeaseGuard is involved in a merger or sale, your information may be transferred as part of that process.',
     ],
@@ -69,7 +65,7 @@ const SECTIONS: Section[] = [
   {
     title: '6. Data retention',
     paragraphs: [
-      'We keep your information while your account is active and as needed to provide the service. Inspection records may be kept for [RETENTION PERIOD] so both parties have a record of unit condition. When information is no longer needed, we delete or de-identify it.',
+      'We keep your information while your account is active and as needed to provide the service. Inspection records may be kept for 30 days so both parties have a record of unit condition. When information is no longer needed, we delete or de-identify it.',
     ],
   },
   {
@@ -100,10 +96,6 @@ const SECTIONS: Section[] = [
     paragraphs: [
       'We may update this policy from time to time. If we make significant changes, we will notify you in the app or by email and update the "Last updated" date.',
     ],
-  },
-  {
-    title: '11. Contact us',
-    paragraphs: ['[COMPANY / TEAM NAME]', 'Email: [CONTACT EMAIL]'],
   },
 ];
 
