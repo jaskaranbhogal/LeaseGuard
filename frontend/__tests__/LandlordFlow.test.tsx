@@ -329,7 +329,8 @@ it('keeps settings switches local, marks unsupported rows unavailable, and handl
     .mockRejectedValueOnce(new ApiError('Logout unavailable'));
   await press('Log out', settings);
   expect(json()).toContain('Logout unavailable');
-  expect(navigation.getCurrentRoute()?.name).toBe('Settings');
+  // Settings is a nested stack for landlords; its first screen is SettingsHome.
+  expect(navigation.getCurrentRoute()?.name).toBe('SettingsHome');
   let resolve!: () => void;
   jest.mocked(auth.logout).mockImplementationOnce(
     () =>
