@@ -163,7 +163,8 @@ it('shows logout failures and permits a retry', async () => {
     .mockRejectedValueOnce(new ApiError('Unable to reach LeaseGuard.'));
   await press('Settings');
   await press('Log out');
-  expect(navigation.getCurrentRoute()?.name).toBe('Settings');
+  // Landlord Settings is a nested stack; its first screen is SettingsHome.
+  expect(navigation.getCurrentRoute()?.name).toBe('SettingsHome');
   expect(JSON.stringify(app.toJSON())).toContain('Unable to reach LeaseGuard.');
   await press('Log out');
   expect(navigation.getCurrentRoute()?.name).toBe('Login');

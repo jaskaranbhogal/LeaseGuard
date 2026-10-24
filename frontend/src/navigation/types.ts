@@ -16,12 +16,20 @@ export type LandlordStackParamList = {
   AIInspectionReview: undefined;
 };
 
+export type LandlordSettingsStackParamList = {
+  SettingsHome: undefined;
+  PrivacySecurity: undefined;
+  PrivacyPolicy: undefined;
+  Profile: undefined;
+};
+
 export type LandlordTabParamList = {
   HomeStack: NavigatorScreenParams<LandlordStackParamList> | undefined;
   History: undefined;
-  Settings: undefined;
+  Settings:
+    | NavigatorScreenParams<LandlordSettingsStackParamList>
+    | undefined;
 };
-
 export type TenantTabParamList = {
   Home: undefined;
   Inspections: undefined;
@@ -31,6 +39,9 @@ export type TenantTabParamList = {
 export type TenantStackParamList = {
   History: undefined;
   Notifications: undefined;
+  PrivacySecurity: undefined;
+  PrivacyPolicy: undefined;
+  Profile: undefined;
   TenantTabs:
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;
