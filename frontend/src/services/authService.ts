@@ -4,7 +4,6 @@ import type { User, UserRole } from '../types/user';
 export type ResetDelivery = 'email' | 'console';
 
 export interface RegistrationDetails {
-  role: UserRole;
   name: string;
   email: string;
   password: string;
@@ -20,7 +19,7 @@ export async function register(
     { ...details, name: details.name.trim(), email: details.email.trim() },
     signal,
   );
-  if (!isUser(result.user) || result.user.role === null) {
+  if (!isUser(result.user)) {
     throw new ApiError(
       'The server did not confirm your account was created. Try signing in or resetting your password.',
     );

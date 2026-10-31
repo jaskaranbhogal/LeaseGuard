@@ -8,6 +8,7 @@ import { colors } from '../theme/colors';
 import AuthNavigator from './AuthNavigator';
 import TenantNavigator from './TenantNavigator';
 import LandlordNavigator from './LandlordNavigator';
+import ChooseYourRoleScreen from '../screens/auth/ChooseYourRoleScreen';
 
 export default function RootNavigator() {
   const { user, checking, sessionError, refreshSession, showLogin } = useAuth();
@@ -27,7 +28,9 @@ export default function RootNavigator() {
         }
       >
         {user ? (
-          user.role === 'tenant' ? (
+          user.role === null ? (
+            <ChooseYourRoleScreen key={user.id} />
+          ) : user.role === 'tenant' ? (
             <TenantNavigator key={user.id} />
           ) : user.role === 'landlord' ? (
             <LandlordNavigator key={user.id} />
