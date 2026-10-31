@@ -1,5 +1,6 @@
 import json
 import hashlib
+import hmac
 import secrets
 import time
 from functools import wraps
@@ -20,13 +21,13 @@ from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST
 from google.auth.exceptions import GoogleAuthError
 
-from .models import AccountProfile, GoogleIdentity, PasswordResetRequest
+from .models import AppleIdentity, AccountProfile, GoogleIdentity, PasswordResetRequest
 
 
 def user_data(user):
     role = AccountProfile.objects.filter(user=user).values_list('role', flat=True).first()
     return {'id': user.pk, 'email': user.email,
-            'name': user.get_full_name() or user.get_username(), 'role': role}
+            'name': user.get_full_name() or user.email or 'LeaseGuard user', 'role': role}
 
 
 @never_cache
@@ -273,6 +274,107 @@ def google_link(request):
         'subject': claims['sub'], 'email': claims['email'],
     })
     return JsonResponse({'detail': 'Google account linked.'})
+
+
+@never_cache
+@require_POST
+@csrf_protect
+def apple_nonce(request):
+    """Issue a short-lived, single-use nonce bound to this Django session."""
+    request.session['apple_signin_nonce'] = {
+        'value': secrets.token_urlsafe(32), 'issued_at': time.time(),
+    }
+    request.session.save()
+    return JsonResponse({'nonce': request.session['apple_signin_nonce']['value']})
+
+
+def verified_apple_claims(identity_token, expected_nonce):
+    """Validate Apple's signed identity token and its one-time session nonce."""
+    import jwt
+    from jwt import PyJWKClient
+
+    allowed = [value.strip() for value in
+               getattr(settings, 'APPLE_SIGN_IN_CLIENT_IDS', '').split(',') if value.strip()]
+    if not allowed:
+        raise ValueError('Apple Sign-In client IDs are not configured')
+    signing_key = PyJWKClient('https://appleid.apple.com/auth/keys').get_signing_key_from_jwt(identity_token)
+    claims = jwt.decode(
+        identity_token, signing_key.key, algorithms=['RS256'], audience=allowed,
+        issuer='https://appleid.apple.com',
+        options={'require': ['exp', 'iat', 'iss', 'aud', 'sub', 'nonce']},
+    )
+    expected_token_nonce = hashlib.sha256(expected_nonce.encode('utf-8')).hexdigest()
+    token_nonce = claims.get('nonce')
+    if not isinstance(token_nonce, str) or not hmac.compare_digest(token_nonce, expected_token_nonce):
+        raise ValueError('Invalid nonce')
+    subject = claims.get('sub')
+    if not isinstance(subject, str) or not subject or len(subject) > 255:
+        raise ValueError('Invalid subject')
+    email = claims.get('email')
+    if email:
+        if claims.get('email_verified') not in (True, 'true'):
+            raise ValueError('Email is not verified')
+        validate_email(email)
+    return claims
+
+
+def apple_payload(request):
+    from jwt.exceptions import PyJWTError
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError
+        identity_token = data.get('identityToken')
+        nonce_entry = request.session.pop('apple_signin_nonce', None)
+        nonce = nonce_entry.get('value') if isinstance(nonce_entry, dict) else None
+        issued_at = nonce_entry.get('issued_at', 0) if isinstance(nonce_entry, dict) else 0
+        if (not isinstance(identity_token, str) or len(identity_token) > 20000 or not nonce
+                or time.time() - issued_at > 300):
+            return None, None
+        request.session.save()
+        return verified_apple_claims(identity_token, nonce), data
+    except (ValueError, TypeError, KeyError, ValidationError, ImportError, PyJWTError, OSError):
+        return None, None
+
+
+@never_cache
+@require_POST
+@csrf_protect
+@rate_limit('apple-login', 10)
+@sensitive_post_parameters()
+def apple_sign_in(request):
+    claims, data = apple_payload(request)
+    if claims is None:
+        return JsonResponse({'detail': 'Apple sign-in could not be verified. Please try again.'}, status=401)
+    try:
+        identity = AppleIdentity.objects.select_related('user').get(subject=claims['sub'])
+        if not identity.user.is_active:
+            return JsonResponse({'detail': 'This account is inactive.'}, status=401)
+        login(request, identity.user)
+        return JsonResponse({'user': user_data(identity.user)})
+    except AppleIdentity.DoesNotExist:
+        pass
+
+    email = (claims.get('email') or '').strip().lower()
+    User = get_user_model()
+    if email and User.objects.filter(email__iexact=email).exists():
+        return JsonResponse({'detail': 'An account with this email already exists. Sign in with your LeaseGuard password. Apple accounts are never linked automatically.'}, status=409)
+    username = 'apple_' + hashlib.sha256(claims['sub'].encode('utf-8')).hexdigest()
+    # Apple's name is only returned once and is not an authentication claim; it
+    # is accepted as optional profile metadata, never for account matching.
+    name = data.get('name')
+    if not isinstance(name, str):
+        name = ''
+    name = name.strip()[:150]
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(username=username, email=email, first_name=name)
+            AccountProfile.objects.create(user=user, role=None)
+            AppleIdentity.objects.create(user=user, subject=claims['sub'], email=email)
+    except IntegrityError:
+        return JsonResponse({'detail': 'This Apple account could not be linked. Please try again.'}, status=409)
+    login(request, user)
+    return JsonResponse({'user': user_data(user)}, status=201)
 
 
 @never_cache

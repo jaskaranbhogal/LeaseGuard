@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .models import AccountProfile, GoogleIdentity, PasswordResetRequest
+from .models import AppleIdentity, AccountProfile, GoogleIdentity, PasswordResetRequest
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -174,6 +174,81 @@ class AuthenticationTests(TestCase):
                 verified_google_claims('signed-token', 'nonce-123')
             verify.assert_not_called()
 
+    def apple_nonce(self):
+        token = self.client.get('/api/auth/csrf/').json()['csrfToken']
+        response = self.client.post('/api/auth/apple/nonce/', '{}',
+                                    content_type='application/json', HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(response.status_code, 200)
+        return response.json()['nonce'], token
+
+    def test_apple_sign_in_creates_account_and_session_from_verified_subject(self):
+        nonce, csrf = self.apple_nonce()
+        claims = {'sub': 'apple-sub-123', 'email': 'private@privaterelay.appleid.com',
+                  'email_verified': True}
+        with patch('accounts.views.verified_apple_claims', return_value=claims) as verify:
+            response = self.client.post('/api/auth/apple/', json.dumps({
+                'identityToken': 'mocked-apple-token', 'name': 'Apple Resident',
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 201)
+        verify.assert_called_once_with('mocked-apple-token', nonce)
+        user = get_user_model().objects.get(email=claims['email'])
+        self.assertEqual(user.first_name, 'Apple Resident')
+        self.assertIsNone(response.json()['user']['role'])
+        self.assertEqual(AppleIdentity.objects.get(user=user).subject, claims['sub'])
+        self.assertEqual(self.client.get('/api/auth/session/').json()['user']['id'], user.pk)
+
+    def test_returning_apple_subject_signs_in_and_preserves_role(self):
+        AccountProfile.objects.create(user=self.user, role='tenant')
+        identity = AppleIdentity.objects.create(user=self.user, subject='apple-sub-returning',
+                                                email=self.user.email)
+        nonce, csrf = self.apple_nonce()
+        with patch('accounts.views.verified_apple_claims', return_value={
+            'sub': identity.subject, 'email': self.user.email, 'email_verified': True,
+        }):
+            response = self.client.post('/api/auth/apple/', json.dumps({
+                'identityToken': 'mocked',
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['user']['role'], 'tenant')
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    def test_apple_does_not_auto_link_matching_email_and_nonce_is_single_use(self):
+        nonce, csrf = self.apple_nonce()
+        claims = {'sub': 'unlinked-apple-sub', 'email': self.user.email,
+                  'email_verified': True}
+        with patch('accounts.views.verified_apple_claims', return_value=claims):
+            body = json.dumps({'identityToken': 'mocked'})
+            first = self.client.post('/api/auth/apple/', body, content_type='application/json',
+                                     HTTP_X_CSRFTOKEN=csrf)
+            replay = self.client.post('/api/auth/apple/', body, content_type='application/json',
+                                      HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(first.status_code, 409)
+        self.assertEqual(replay.status_code, 401)
+        self.assertFalse(AppleIdentity.objects.exists())
+
+    @override_settings(APPLE_SIGN_IN_CLIENT_IDS='org.reactjs.native.example.frontend')
+    def test_apple_token_verifier_checks_signature_claims_and_hashed_nonce(self):
+        from .views import verified_apple_claims
+        nonce = 'server-session-nonce'
+        token_nonce = __import__('hashlib').sha256(nonce.encode()).hexdigest()
+        claims = {'sub': 'apple-sub', 'aud': 'org.reactjs.native.example.frontend',
+                  'iss': 'https://appleid.apple.com', 'exp': 2000000000,
+                  'iat': 1800000000, 'nonce': token_nonce}
+        key = type('AppleKey', (), {'key': object()})()
+        with patch('jwt.PyJWKClient.get_signing_key_from_jwt', return_value=key) as jwks, \
+             patch('jwt.decode', return_value=claims) as decode:
+            self.assertEqual(verified_apple_claims('signed-token', nonce), claims)
+        jwks.assert_called_once_with('signed-token')
+        self.assertEqual(decode.call_args.kwargs['audience'], ['org.reactjs.native.example.frontend'])
+        self.assertEqual(decode.call_args.kwargs['issuer'], 'https://appleid.apple.com')
+        self.assertEqual(decode.call_args.kwargs['algorithms'], ['RS256'])
+        for changes in [{'nonce': 'wrong'}]:
+            with self.subTest(changes=changes), \
+                 patch('jwt.PyJWKClient.get_signing_key_from_jwt', return_value=key), \
+                 patch('jwt.decode', return_value={**claims, **changes}):
+                with self.assertRaises(ValueError):
+                    verified_apple_claims('signed-token', nonce)
+
     def test_role_selection_requires_session_and_is_one_time_but_idempotent(self):
         self.assertEqual(self.post('role', {'role': 'tenant'}).status_code, 401)
         self.client.force_login(self.user)
@@ -186,7 +261,6 @@ class AuthenticationTests(TestCase):
         self.assertEqual(repeat.status_code, 200)
         self.assertEqual(change.status_code, 409)
         self.assertEqual(self.client.get('/api/auth/session/').json()['user']['role'], 'tenant')
-
 
     def test_invalid_unknown_inactive_and_ambiguous_login(self):
         responses = [self.post('login', {'email': 'unknown@example.com', 'password': self.password}),

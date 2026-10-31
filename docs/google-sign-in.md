@@ -45,4 +45,12 @@ Automated tests mock Google's token-verification result and do not require Cloud
 
 ## Apple Sign-In
 
-The login page displays the Figma-style Apple button as **coming soon**. Apple OAuth and Apple credentials are intentionally not implemented in this change.
+The iOS login screen supports Sign in with Apple. The app requests a one-time nonce from Django, passes its SHA-256 hash to Apple's native sign-in flow, and sends the returned identity token to Django. Django verifies the signature, issuer, audience, expiry, and nonce before establishing the existing cookie session. Apple identities are linked by Apple's stable subject identifier; an existing account is never linked just because its email matches.
+
+To enable the live flow, turn on **Sign in with Apple** for the iOS App ID in the Apple Developer account, use a provisioning profile that includes the capability, and sign the app with the matching team. The Xcode target already includes the Sign in with Apple entitlement. Set the Django environment variable to the exact app bundle ID used to sign the app:
+
+```env
+APPLE_SIGN_IN_CLIENT_IDS=org.reactjs.native.example.frontend
+```
+
+For a production app, replace that sample bundle ID with the production bundle ID. Apple OAuth is iOS-only in this implementation; no Apple client secret is needed for this native flow.

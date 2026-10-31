@@ -29,6 +29,8 @@ urlpatterns = [
     path('api/auth/google/nonce/', views.google_nonce),
     path('api/auth/google/', views.google_sign_in),
     path('api/auth/google/link/', views.google_link),
+    path('api/auth/apple/nonce/', views.apple_nonce),
+    path('api/auth/apple/', views.apple_sign_in),
     path('api/auth/role/', views.choose_role),
     path('api/auth/password-reset/', views.password_reset),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),

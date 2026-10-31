@@ -1,7 +1,6 @@
 import Header from '../../components/Header';
 import { useRef, useState, type ComponentRef } from 'react';
 import {
-  Alert,
   Keyboard,
   Pressable,
   StyleSheet,
@@ -16,6 +15,7 @@ import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
 import { login } from '../../services/authService';
 import { signInWithGoogle } from '../../services/googleAuthService';
+import { signInWithApple } from '../../services/appleAuthService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -53,18 +53,20 @@ export default function LoginScreen({ navigation }: Props) {
   }
 
   function startGoogleSignIn() {
-    if (request.loading) return;
-    Alert.alert('Choose account type', 'Select how you’ll use LeaseGuard.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Tenant', onPress: () => beginGoogleSignIn('tenant') },
-      { text: 'Landlord', onPress: () => beginGoogleSignIn('landlord') },
-    ]);
+    request.run(
+      signal => signInWithGoogle(signal),
+      user => {
+        if (user) completeSignIn(user);
+      },
+    );
   }
 
-  function beginGoogleSignIn(role: 'tenant' | 'landlord') {
+  function startAppleSignIn() {
     request.run(
-      () => signInWithGoogle(role),
-      user => { if (user) completeSignIn(user); },
+      signal => signInWithApple(signal),
+      user => {
+        if (user) completeSignIn(user);
+      },
     );
   }
 
@@ -131,27 +133,43 @@ export default function LoginScreen({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Continue with Google"
-          accessibilityState={{ disabled: request.loading, busy: request.loading }}
+          accessibilityState={{
+            disabled: request.loading,
+            busy: request.loading,
+          }}
           disabled={request.loading}
           onPress={startGoogleSignIn}
           style={[styles.socialButton, styles.googleButton]}
         >
-          {request.loading ? <Text style={styles.googleLabel}>Connecting…</Text> : <>
-            <BrandIcon brand="google" />
-            <Text style={styles.googleLabel}>Sign in with Google</Text>
-          </>}
+          {request.loading ? (
+            <Text style={styles.googleLabel}>Connecting…</Text>
+          ) : (
+            <>
+              <BrandIcon brand="google" />
+              <Text style={styles.googleLabel}>Sign in with Google</Text>
+            </>
+          )}
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Sign in with Apple ID, coming soon"
-          accessibilityState={{ disabled: true }}
-          disabled
+          accessibilityLabel="Sign in with Apple ID"
+          accessibilityState={{
+            disabled: request.loading,
+            busy: request.loading,
+          }}
+          disabled={request.loading}
+          onPress={startAppleSignIn}
           style={[styles.socialButton, styles.appleButton]}
         >
-          <BrandIcon brand="apple" />
-          <Text style={styles.appleLabel}>Sign in with Apple ID</Text>
+          {request.loading ? (
+            <Text style={styles.appleLabel}>Connecting…</Text>
+          ) : (
+            <>
+              <BrandIcon brand="apple" />
+              <Text style={styles.appleLabel}>Sign in with Apple ID</Text>
+            </>
+          )}
         </Pressable>
-        <Text style={styles.comingSoon}>Apple Sign-In coming soon</Text>
         <Pressable
           accessibilityRole="link"
           accessibilityLabel="Register"
@@ -203,11 +221,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  googleButton: { backgroundColor: colors.white, borderWidth: 1, borderColor: '#DADCE0' },
+  googleButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#DADCE0',
+  },
   appleButton: { backgroundColor: '#000000' },
-  googleLabel: { flex: 1, color: '#3C4043', fontSize: 15, fontWeight: typography.semibold, textAlign: 'center' },
-  appleLabel: { flex: 1, color: colors.white, fontSize: 15, fontWeight: typography.semibold, textAlign: 'center' },
-  comingSoon: { color: colors.textSecondary, fontSize: 12, textAlign: 'center', marginTop: -spacing.sm },
+  googleLabel: {
+    flex: 1,
+    color: '#3C4043',
+    fontSize: 15,
+    fontWeight: typography.semibold,
+    textAlign: 'center',
+  },
+  appleLabel: {
+    flex: 1,
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: typography.semibold,
+    textAlign: 'center',
+  },
   register: { alignItems: 'center', minHeight: 48, justifyContent: 'center' },
   registerText: { color: colors.label, fontSize: 14, textAlign: 'center' },
   error: { color: colors.error, fontSize: 14, lineHeight: 20 },
