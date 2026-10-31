@@ -13,9 +13,10 @@ import LoginScreen from '../src/screens/auth/LoginScreen';
 import RegisterScreen from '../src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../src/screens/auth/ForgotPasswordScreen';
 import Button from '../src/components/Button';
-import * as auth from '../src/services/authService';
+import * as firebaseAuth from '../src/services/firebaseAuthService';
 
 jest.mock('../src/services/authService');
+jest.mock('../src/services/firebaseAuthService');
 
 let app: ReactTestRenderer;
 let navigation: ReturnType<
@@ -25,7 +26,11 @@ let navigation: ReturnType<
 beforeEach(async () => {
   jest.useFakeTimers();
   jest.clearAllMocks();
-  jest.mocked(auth.getSession).mockResolvedValue(null);
+  jest.mocked(firebaseAuth.currentFirebaseUser).mockReturnValue(null);
+  jest.mocked(firebaseAuth.subscribeToFirebaseAuth).mockImplementation(callback => {
+    callback(null);
+    return jest.fn();
+  });
   navigation = createNavigationContainerRef<AuthStackParamList>();
   await act(async () => {
     app = create(
@@ -73,52 +78,39 @@ it('opens Login first and keeps Register and Forgot Password navigation', async 
   expect(app.root.findByType(ForgotPasswordScreen)).toBeTruthy();
 });
 
-it('preserves login validation while keeping email authentication unavailable', async () => {
+it('preserves login validation and enables Firebase email sign-in', async () => {
   const button = loginScreen().findByType(Button);
-  expect(button.props.disabled).toBe(true);
+  expect(button.props.disabled).toBe(false);
   await act(async () => button.props.onPress());
   expect(JSON.stringify(app.toJSON())).toContain('Enter your email address.');
   expect(JSON.stringify(app.toJSON())).toContain('Enter your password.');
-  expect(JSON.stringify(app.toJSON())).toContain(
-    'Email and password sign-in will be available when Firebase is connected.',
-  );
-  expect(auth.getSession).toHaveBeenCalled();
   expect(app.root.findAllByType(LoginScreen)).toHaveLength(1);
 });
 
-it('keeps the Google button design visible but disabled until Firebase is connected', () => {
+it('enables the Google button and keeps Apple Sign-In out of the app', () => {
   const google = loginScreen().findByProps({
     accessibilityLabel: 'Continue with Google',
   });
-  expect(google.props.disabled).toBe(true);
-  expect(google.props.accessibilityState.disabled).toBe(true);
+  expect(google.props.disabled).toBe(false);
+  expect(google.props.accessibilityState.disabled).toBe(false);
   expect(JSON.stringify(app.toJSON())).toContain('Sign in with Google');
-  expect(JSON.stringify(app.toJSON())).toContain(
-    'Google sign-in will be available when Firebase is connected.',
-  );
   expect(JSON.stringify(app.toJSON())).not.toContain('Apple');
 });
 
-it('keeps registration fields and validation while disabling account creation', async () => {
+it('keeps registration fields and enables Firebase account creation', async () => {
   await act(async () => {
     loginScreen().findByProps({ accessibilityLabel: 'Register' }).props.onPress();
   });
   const register = app.root.findByType(RegisterScreen);
   expect(register.findAllByType(TextInput)).toHaveLength(4);
-  expect(register.findByType(Button).props.disabled).toBe(true);
-  expect(JSON.stringify(app.toJSON())).toContain(
-    'Account creation will be available when Firebase is connected.',
-  );
+  expect(register.findByType(Button).props.disabled).toBe(false);
 });
 
-it('keeps password reset navigation but does not claim to send a reset email', async () => {
+it('connects password reset to Firebase while preserving confirmation navigation', async () => {
   await act(async () => {
     loginScreen().findAllByProps({ accessibilityRole: 'link' })[0].props.onPress();
   });
   const reset = app.root.findByType(ForgotPasswordScreen);
-  expect(reset.findAllByType(Button)[0].props.disabled).toBe(true);
-  expect(JSON.stringify(app.toJSON())).toContain(
-    'Password reset will be available when Firebase is connected.',
-  );
+  expect(reset.findAllByType(Button)[0].props.disabled).toBe(false);
   expect(navigation.getCurrentRoute()?.name).toBe('ForgotPassword');
 });

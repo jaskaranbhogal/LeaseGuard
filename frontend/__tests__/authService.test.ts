@@ -3,9 +3,16 @@ import { request } from '../src/services/api';
 
 const fetchMock = jest.fn();
 const originalFetch = globalThis.fetch;
+const firebaseSdk = jest.requireMock('@react-native-firebase/auth');
+const firebaseAuth = firebaseSdk.getAuth();
 beforeEach(() => {
   globalThis.fetch = fetchMock;
   fetchMock.mockReset();
+  firebaseAuth.currentUser = {
+    emailVerified: true,
+    providerData: [],
+    getIdToken: jest.fn().mockResolvedValue('mock-id-token'),
+  };
 });
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -24,11 +31,14 @@ it('restores only a valid server session and treats only 401 as signed out', asy
     name: 'Tenant',
     role: 'tenant',
   };
+  fetchMock.mockResolvedValueOnce(response({ csrfToken: 'csrf' }));
   fetchMock.mockResolvedValueOnce(response({ user }));
   await expect(getSession()).resolves.toEqual(user);
   expect(fetchMock.mock.calls[0][1].credentials).toBe('include');
+  fetchMock.mockResolvedValueOnce(response({ csrfToken: 'csrf' }));
   fetchMock.mockResolvedValueOnce(response({ detail: 'Please sign in.' }, 401));
   await expect(getSession()).resolves.toBeNull();
+  fetchMock.mockResolvedValueOnce(response({ csrfToken: 'csrf' }));
   fetchMock.mockResolvedValueOnce(response({}, 503));
   await expect(getSession()).rejects.toThrow();
   fetchMock.mockRejectedValueOnce(new Error('offline'));

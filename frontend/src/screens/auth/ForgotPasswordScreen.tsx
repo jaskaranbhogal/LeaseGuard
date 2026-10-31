@@ -10,18 +10,30 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
+import { firebaseErrorMessage, sendPasswordReset } from '../../services/firebaseAuthService';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [submitted, setSubmitted] = useState(false);
-  function submit() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  async function submit() {
     setSubmitted(true);
     if (emailError(email)) {
       return;
     }
     Keyboard.dismiss();
-    Keyboard.dismiss();
+    setLoading(true);
+    setError('');
+    try {
+      await sendPasswordReset(email);
+      navigation.navigate('ResetEmailSent', { email: email.trim(), delivery: 'email' });
+    } catch (failure) {
+      setError(firebaseErrorMessage(failure));
+    } finally {
+      setLoading(false);
+    }
   }
   return (
     <ScreenContainer>
@@ -48,13 +60,12 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
           returnKeyType="send"
           onSubmitEditing={submit}
         />
-        <Text accessibilityRole="text" style={styles.error}>
-          Password reset will be available when Firebase is connected.
-        </Text>
+        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         <Button
           title="Send reset email"
           variant="reset"
-          disabled
+          disabled={loading}
+          loading={loading}
           onPress={submit}
           style={styles.send}
         />

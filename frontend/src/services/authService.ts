@@ -1,5 +1,6 @@
-import { ApiError, authPost, request } from './api';
+import { ApiError, authPost } from './api';
 import type { User, UserRole } from '../types/user';
+import { currentFirebaseUser } from './firebaseAuthService';
 
 export async function chooseRole(
   role: UserRole,
@@ -22,6 +23,37 @@ export async function logout(signal?: AbortSignal): Promise<void> {
   await authPost('/auth/logout/', {}, signal);
 }
 
+export async function synchronizeFirebaseUser(
+  idToken: string,
+  signal?: AbortSignal,
+): Promise<User> {
+  const result = await authPost<{ user: User }>(
+    '/auth/firebase/session/',
+    { idToken },
+    signal,
+  );
+  if (!isUser(result.user)) {
+    throw new ApiError('LeaseGuard could not load your account. Please try again.');
+  }
+  return result.user;
+}
+
+export async function linkLegacyAccount(
+  idToken: string,
+  legacyPassword: string,
+  signal?: AbortSignal,
+): Promise<User> {
+  const result = await authPost<{ user: User }>(
+    '/auth/firebase/link/',
+    { idToken, legacyPassword },
+    signal,
+  );
+  if (!isUser(result.user)) {
+    throw new ApiError('LeaseGuard could not link your account. Please try again.');
+  }
+  return result.user;
+}
+
 function isUser(value: unknown): value is User {
   if (!value || typeof value !== 'object') {
     return false;
@@ -37,14 +69,12 @@ function isUser(value: unknown): value is User {
 }
 
 export async function getSession(signal?: AbortSignal): Promise<User | null> {
+  const firebaseUser = currentFirebaseUser();
+  if (!firebaseUser || (!firebaseUser.emailVerified && firebaseUser.providerData.some(provider => provider.providerId === 'password'))) {
+    return null;
+  }
   try {
-    const result = await request<{ user: User }>('/auth/session/', { signal });
-    if (!isUser(result.user)) {
-      throw new ApiError(
-        'The server returned an invalid session. Please sign in again.',
-      );
-    }
-    return result.user;
+    return await synchronizeFirebaseUser(await firebaseUser.getIdToken(), signal);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return null;
