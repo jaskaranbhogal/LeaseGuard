@@ -17,7 +17,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import AccountProfile, PasswordResetRequest
+from .firebase_auth import FirebaseAuthenticationError, verify_firebase_id_token
+from .models import AccountProfile, FirebaseIdentity, PasswordResetRequest
 
 
 def user_data(user):
@@ -32,6 +33,112 @@ def session_status(request):
     if not request.user.is_authenticated:
         return JsonResponse({'detail': 'Please sign in.'}, status=401)
     return JsonResponse({'user': user_data(request.user)})
+
+
+def _firebase_identity(request):
+    try:
+        data = json.loads(request.body)
+    except (ValueError, UnicodeDecodeError):
+        raise ValidationError('Sign in again and retry.')
+    if not isinstance(data, dict):
+        raise ValidationError('Sign in again and retry.')
+    try:
+        decoded = verify_firebase_id_token(data.get('idToken'))
+    except FirebaseAuthenticationError:
+        raise ValidationError('Your sign-in could not be verified. Please try again.')
+    email = decoded.get('email')
+    if not isinstance(email, str) or not email.strip() or not decoded.get('email_verified'):
+        raise ValidationError('Verify your email address before continuing.')
+    decoded['email'] = email.strip().lower()
+    return data, decoded
+
+
+def _sign_in_django_session(request, user):
+    login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return JsonResponse({'user': user_data(user)})
+
+
+@never_cache
+@require_POST
+@csrf_protect
+@sensitive_post_parameters('idToken')
+def firebase_session(request):
+    """Verify the Firebase identity, then retain the app's existing Django session."""
+    try:
+        _, decoded = _firebase_identity(request)
+    except ValidationError as error:
+        detail = error.messages[0]
+        status = 503 if not settings.FIREBASE_PROJECT_ID else 401
+        return JsonResponse({'detail': detail}, status=status)
+
+    uid = decoded['uid']
+    identity = FirebaseIdentity.objects.select_related('user').filter(uid=uid).first()
+    if identity:
+        if identity.email.casefold() != decoded['email'].casefold():
+            return JsonResponse({'detail': 'The Firebase account email changed. Contact support.'}, status=409)
+        if not identity.user.is_active:
+            return JsonResponse({'detail': 'This account is unavailable.'}, status=403)
+        return _sign_in_django_session(request, identity.user)
+
+    User = get_user_model()
+    matches = list(User.objects.filter(email__iexact=decoded['email'])[:2])
+    if matches:
+        return JsonResponse({
+            'detail': 'An existing LeaseGuard account uses this email. Link it with your previous LeaseGuard password.',
+            'code': 'account_link_required',
+        }, status=409)
+
+    username = 'firebase_' + hashlib.sha256(uid.encode('utf-8')).hexdigest()
+    display_name = decoded.get('name')
+    display_name = display_name.strip()[:150] if isinstance(display_name, str) else ''
+    user = User(username=username, email=decoded['email'], first_name=display_name)
+    user.set_unusable_password()
+    try:
+        with transaction.atomic():
+            user.save()
+            AccountProfile.objects.create(user=user, role=None)
+            FirebaseIdentity.objects.create(user=user, uid=uid, email=decoded['email'])
+    except IntegrityError:
+        # A concurrent request may have created this UID. Resolve it without
+        # silently linking by email or returning an arbitrary account.
+        identity = FirebaseIdentity.objects.select_related('user').filter(uid=uid).first()
+        if identity:
+            return _sign_in_django_session(request, identity.user)
+        return JsonResponse({'detail': 'An account already uses this email. Sign in or link that account.'}, status=409)
+    response = _sign_in_django_session(request, user)
+    response.status_code = 201
+    return response
+
+
+@never_cache
+@require_POST
+@csrf_protect
+@sensitive_post_parameters('legacyPassword', 'idToken')
+def link_legacy_account(request):
+    """Explicitly link a verified Firebase identity to its existing Django account."""
+    try:
+        data, decoded = _firebase_identity(request)
+    except ValidationError as error:
+        status = 503 if not settings.FIREBASE_PROJECT_ID else 401
+        return JsonResponse({'detail': error.messages[0]}, status=status)
+    password = data.get('legacyPassword')
+    if not isinstance(password, str) or not password or len(password) > 4096:
+        return JsonResponse({'detail': 'Enter the password for your existing LeaseGuard account.'}, status=400)
+    User = get_user_model()
+    users = list(User.objects.filter(email__iexact=decoded['email'])[:2])
+    if len(users) != 1:
+        return JsonResponse({'detail': 'We could not safely identify one existing account. Contact support.'}, status=409)
+    user = authenticate(request, username=users[0].get_username(), password=password)
+    if user is None:
+        return JsonResponse({'detail': 'The existing LeaseGuard password is incorrect.'}, status=401)
+    if FirebaseIdentity.objects.filter(uid=decoded['uid']).exists():
+        return JsonResponse({'detail': 'This Firebase account is already linked.'}, status=409)
+    try:
+        with transaction.atomic():
+            FirebaseIdentity.objects.create(user=user, uid=decoded['uid'], email=decoded['email'])
+    except IntegrityError:
+        return JsonResponse({'detail': 'This Firebase account or LeaseGuard account is already linked.'}, status=409)
+    return _sign_in_django_session(request, user)
 
 
 def rate_limit(scope, limit):

@@ -23,6 +23,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/csrf/', views.csrf_token),
     path('api/auth/session/', views.session_status),
+    path('api/auth/firebase/session/', views.firebase_session),
+    path('api/auth/firebase/link/', views.link_legacy_account),
     path('api/auth/login/', views.sign_in),
     path('api/auth/register/', views.register),
     path('api/auth/logout/', views.sign_out),

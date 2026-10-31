@@ -137,6 +137,12 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Firebase Authentication verifies client ID tokens before Django issues its
+# existing HttpOnly session cookie. Supply credentials through Application
+# Default Credentials or a private service-account file path; never commit it.
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'leaseguard-9141a')
+FIREBASE_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+
 
 # Development uses console output only; SMTP must be explicitly configured.
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend')

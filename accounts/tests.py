@@ -11,7 +11,8 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .models import AccountProfile, PasswordResetRequest
+from .firebase_auth import FirebaseAuthenticationError, verify_firebase_id_token
+from .models import AccountProfile, FirebaseIdentity, PasswordResetRequest
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -307,3 +308,106 @@ class SessionTests(TestCase):
         token = client.get('/api/auth/csrf/').json()['csrfToken']
         self.assertEqual(client.post('/api/auth/logout/', HTTP_X_CSRFTOKEN=token).status_code, 200)
         self.assertEqual(client.get('/api/auth/session/').status_code, 401)
+
+
+class FirebaseSessionTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.claims = {
+            'uid': 'firebase-user-123',
+            'email': 'firebase@example.com',
+            'email_verified': True,
+            'name': 'Firebase Resident',
+            'aud': 'leaseguard-9141a',
+            'iss': 'https://securetoken.google.com/leaseguard-9141a',
+        }
+
+    def post(self, endpoint, data):
+        return self.client.post(
+            f'/api/auth/firebase/{endpoint}/', json.dumps(data),
+            content_type='application/json',
+        )
+
+    @patch('accounts.views.verify_firebase_id_token')
+    def test_new_verified_firebase_user_gets_one_pending_profile_and_session(self, verify):
+        verify.return_value = self.claims
+        response = self.post('session', {'idToken': 'mock-token'})
+        self.assertEqual(response.status_code, 201)
+        user = get_user_model().objects.get(pk=response.json()['user']['id'])
+        self.assertEqual(user.email, 'firebase@example.com')
+        self.assertEqual(user.get_full_name(), 'Firebase Resident')
+        self.assertFalse(user.has_usable_password())
+        self.assertIsNone(user.account_profile.role)
+        self.assertEqual(user.firebase_identity.uid, self.claims['uid'])
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 200)
+        verify.assert_called_once_with('mock-token')
+
+    @patch('accounts.views.verify_firebase_id_token')
+    def test_returning_firebase_user_keeps_existing_role_and_record(self, verify):
+        verify.return_value = self.claims
+        user = get_user_model().objects.create_user(
+            username='firebase_user', email='firebase@example.com')
+        AccountProfile.objects.create(user=user, role='tenant')
+        FirebaseIdentity.objects.create(user=user, uid=self.claims['uid'], email=user.email)
+        response = self.post('session', {'idToken': 'mock-token'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['user']['id'], user.pk)
+        self.assertEqual(response.json()['user']['role'], 'tenant')
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    @patch('accounts.views.verify_firebase_id_token')
+    def test_existing_email_is_not_automatically_linked(self, verify):
+        verify.return_value = self.claims
+        user = get_user_model().objects.create_user(
+            username='legacy', email='firebase@example.com', password='Original-Passphrase-957!')
+        AccountProfile.objects.create(user=user, role='landlord')
+        response = self.post('session', {'idToken': 'mock-token'})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()['code'], 'account_link_required')
+        self.assertFalse(FirebaseIdentity.objects.exists())
+        self.assertEqual(get_user_model().objects.count(), 1)
+        self.assertEqual(user.account_profile.role, 'landlord')
+
+    @patch('accounts.views.verify_firebase_id_token')
+    def test_legacy_account_link_requires_existing_password_and_preserves_role(self, verify):
+        verify.return_value = self.claims
+        user = get_user_model().objects.create_user(
+            username='legacy', email='firebase@example.com', password='Original-Passphrase-957!')
+        AccountProfile.objects.create(user=user, role='tenant')
+        bad = self.post('link', {'idToken': 'mock-token', 'legacyPassword': 'wrong'})
+        self.assertEqual(bad.status_code, 401)
+        linked = self.post('link', {
+            'idToken': 'mock-token', 'legacyPassword': 'Original-Passphrase-957!',
+        })
+        self.assertEqual(linked.status_code, 200)
+        self.assertEqual(linked.json()['user']['id'], user.pk)
+        self.assertEqual(user.account_profile.role, 'tenant')
+        self.assertEqual(FirebaseIdentity.objects.get().user, user)
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    def test_missing_or_invalid_token_is_rejected(self):
+        response = self.post('session', {})
+        self.assertEqual(response.status_code, 401)
+        with patch('accounts.views.verify_firebase_id_token', side_effect=FirebaseAuthenticationError):
+            response = self.post('session', {'idToken': 'expired-or-invalid'})
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(get_user_model().objects.exists())
+
+    def test_unverified_email_is_rejected(self):
+        claims = {**self.claims, 'email_verified': False}
+        with patch('accounts.views.verify_firebase_id_token', return_value=claims):
+            response = self.post('session', {'idToken': 'unverified'})
+        self.assertEqual(response.status_code, 401)
+        self.assertFalse(get_user_model().objects.exists())
+
+    @patch('accounts.firebase_auth.auth.verify_id_token')
+    @patch('accounts.firebase_auth._firebase_app')
+    @override_settings(FIREBASE_PROJECT_ID='leaseguard-9141a')
+    def test_token_for_another_project_is_rejected(self, app, verify):
+        verify.return_value = {
+            **self.claims,
+            'aud': 'other-firebase-project',
+            'iss': 'https://securetoken.google.com/other-firebase-project',
+        }
+        with self.assertRaises(FirebaseAuthenticationError):
+            verify_firebase_id_token('signed-token')

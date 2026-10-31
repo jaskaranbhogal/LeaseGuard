@@ -41,3 +41,12 @@ class AppleIdentity(models.Model):
     subject = models.CharField(max_length=255, unique=True)
     email = models.EmailField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class FirebaseIdentity(models.Model):
+    """A Firebase Authentication UID linked to one LeaseGuard user."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                related_name='firebase_identity')
+    uid = models.CharField(max_length=128, unique=True)
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
