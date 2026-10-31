@@ -1,9 +1,11 @@
 import json
 import hashlib
+import secrets
 from functools import wraps
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
@@ -17,7 +19,7 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import AccountProfile, PasswordResetRequest
+from .models import AccountProfile, GoogleIdentity, PasswordResetRequest
 
 
 def user_data(user):
@@ -159,6 +161,113 @@ def sign_in(request):
 def sign_out(request):
     logout(request)
     return JsonResponse({'detail': 'Signed out.'})
+
+
+@never_cache
+@require_POST
+@csrf_protect
+def google_nonce(request):
+    """Issue a short-lived, session-bound nonce for one Google sign-in attempt."""
+    request.session['google_oauth_nonce'] = secrets.token_urlsafe(32)
+    request.session.set_expiry(300)
+    request.session.save()
+    return JsonResponse({'nonce': request.session['google_oauth_nonce']})
+
+
+def verified_google_claims(id_token, expected_nonce):
+    """Validate a Google OIDC ID token with Google's maintained verifier."""
+    from google.auth.transport.requests import Request
+    from google.oauth2 import id_token as google_id_token
+
+    allowed = [value.strip() for value in
+               getattr(settings, 'GOOGLE_OAUTH_CLIENT_IDS', '').split(',') if value.strip()]
+    if not allowed:
+        raise ValueError('Google OAuth client IDs are not configured')
+    claims = google_id_token.verify_oauth2_token(id_token, Request(), audience=None)
+    audiences = claims.get('aud')
+    audiences = audiences if isinstance(audiences, list) else [audiences]
+    if not set(audiences).intersection(allowed):
+        raise ValueError('Invalid audience')
+    if claims.get('nonce') != expected_nonce:
+        raise ValueError('Invalid nonce')
+    if claims.get('iss') not in ('accounts.google.com', 'https://accounts.google.com'):
+        raise ValueError('Invalid issuer')
+    if not claims.get('sub') or len(claims['sub']) > 255:
+        raise ValueError('Invalid subject')
+    if claims.get('email_verified') is not True:
+        raise ValueError('Email is not verified')
+    validate_email(claims.get('email', ''))
+    return claims
+
+
+def google_payload(request):
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError
+        id_token = data.get('idToken')
+        nonce = request.session.pop('google_oauth_nonce', None)
+        role = data.get('role')
+        if (not isinstance(id_token, str) or len(id_token) > 10000 or not nonce
+                or (role not in AccountProfile.Role.values and not request.user.is_authenticated)):
+            return None, None
+        request.session.save()
+        return verified_google_claims(id_token, nonce), role
+    except (ValueError, TypeError, KeyError, ValidationError, ImportError):
+        return None, None
+
+
+@never_cache
+@require_POST
+@csrf_protect
+@rate_limit('google-login', 10)
+@sensitive_post_parameters()
+def google_sign_in(request):
+    claims, role = google_payload(request)
+    if claims is None:
+        return JsonResponse({'detail': 'Google sign-in could not be verified. Please try again.'}, status=401)
+    try:
+        identity = GoogleIdentity.objects.select_related('user').get(subject=claims['sub'])
+        if not identity.user.is_active:
+            return JsonResponse({'detail': 'This account is inactive.'}, status=401)
+        login(request, identity.user)
+        return JsonResponse({'user': user_data(identity.user)})
+    except GoogleIdentity.DoesNotExist:
+        pass
+
+    User = get_user_model()
+    email = claims['email'].strip().lower()
+    if User.objects.filter(email__iexact=email).exists():
+        return JsonResponse({'detail': 'An account with this email already exists. Sign in with your LeaseGuard password. Google accounts are never linked automatically.'}, status=409)
+    username = 'google_' + hashlib.sha256(claims['sub'].encode('utf-8')).hexdigest()
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(username=username, email=email,
+                                           first_name=(claims.get('name') or email).strip()[:150])
+            AccountProfile.objects.create(user=user, role=role)
+            GoogleIdentity.objects.create(user=user, subject=claims['sub'], email=email)
+    except IntegrityError:
+        return JsonResponse({'detail': 'This Google account could not be linked. Sign in and try linking it from account settings.'}, status=409)
+    login(request, user)
+    return JsonResponse({'user': user_data(user)}, status=201)
+
+
+@never_cache
+@require_POST
+@csrf_protect
+@login_required
+def google_link(request):
+    claims, _ = google_payload(request)
+    if claims is None:
+        return JsonResponse({'detail': 'Google sign-in could not be verified. Please try again.'}, status=401)
+    if GoogleIdentity.objects.filter(subject=claims['sub']).exclude(user=request.user).exists():
+        return JsonResponse({'detail': 'This Google account is already linked to another LeaseGuard account.'}, status=409)
+    if claims['email'].casefold() != request.user.email.casefold():
+        return JsonResponse({'detail': 'Sign in with the Google account that matches this LeaseGuard account.'}, status=409)
+    GoogleIdentity.objects.update_or_create(user=request.user, defaults={
+        'subject': claims['sub'], 'email': claims['email'],
+    })
+    return JsonResponse({'detail': 'Google account linked.'})
 
 
 @never_cache

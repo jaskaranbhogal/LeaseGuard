@@ -22,3 +22,12 @@ class PasswordResetRequest(models.Model):
     email = models.EmailField()
     created_at = models.DateTimeField(auto_now_add=True)
     attempts = models.PositiveSmallIntegerField(default=0)
+
+
+class GoogleIdentity(models.Model):
+    """A verified Google OpenID Connect subject linked to one LeaseGuard user."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                related_name='google_identity')
+    subject = models.CharField(max_length=255, unique=True)
+    email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
