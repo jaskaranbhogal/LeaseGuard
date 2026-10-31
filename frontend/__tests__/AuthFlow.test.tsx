@@ -5,24 +5,18 @@ import {
   createNavigationContainerRef,
 } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Alert, Image, TextInput } from 'react-native';
+import { Image, TextInput } from 'react-native';
 import RootNavigator from '../src/navigation/RootNavigator';
 import { AuthProvider } from '../src/context/AuthContext';
 import type { AuthStackParamList } from '../src/navigation/types';
 import LoginScreen from '../src/screens/auth/LoginScreen';
 import RegisterScreen from '../src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../src/screens/auth/ForgotPasswordScreen';
-import ResetEmailSentScreen from '../src/screens/auth/ResetEmailSentScreen';
 import Button from '../src/components/Button';
 import * as auth from '../src/services/authService';
-import { ApiError } from '../src/services/api';
-import * as googleAuth from '../src/services/googleAuthService';
 
 jest.mock('../src/services/authService');
-jest.mock('../src/services/googleAuthService');
-const login = jest.mocked(auth.login);
-const reset = jest.mocked(auth.requestPasswordReset);
-const googleSignIn = jest.mocked(googleAuth.signInWithGoogle);
+
 let app: ReactTestRenderer;
 let navigation: ReturnType<
   typeof createNavigationContainerRef<AuthStackParamList>
@@ -51,369 +45,80 @@ beforeEach(async () => {
     jest.advanceTimersByTime(1500);
   });
 });
+
 afterEach(async () => {
-  await act(async () => {
-    app.unmount();
-  });
+  await act(async () => app.unmount());
   jest.useRealTimers();
 });
-function screen() {
+
+function loginScreen() {
   return app.root.findByType(LoginScreen);
 }
-async function typeLogin(email: string, password: string) {
-  await act(async () => {
-    const fields = screen().findAllByType(TextInput);
-    fields[0].props.onChangeText(email);
-    fields[1].props.onChangeText(password);
-  });
-}
-async function forgot() {
-  await act(async () => {
-    screen().findAllByProps({ accessibilityRole: 'link' })[0].props.onPress();
-  });
-}
 
-it('removes Loading from history and links to the existing Register route', async () => {
-  expect(navigation.getRootState()!.routes.map(r => r.name)).toEqual(['Login']);
-  await act(async () => {
-    screen()
-      .findAllByProps({ accessibilityLabel: 'Register' })[0]
-      .props.onPress();
-  });
-  expect(navigation.getCurrentRoute()?.name).toBe('Register');
-});
-it('validates login without a request and uses secure password entry', async () => {
-  await act(async () => {
-    screen().findByType(Button).props.onPress();
-  });
-  expect(login).not.toHaveBeenCalled();
-  expect(JSON.stringify(app.toJSON())).toContain('Enter your email address.');
-  expect(JSON.stringify(app.toJSON())).toContain('Enter your password.');
-  expect(screen().findAllByType(TextInput)[1].props.secureTextEntry).toBe(true);
-});
-it('passes credentials to the service and never treats a rejection as success', async () => {
-  login.mockRejectedValue(new ApiError('Email or password is incorrect.'));
-  await typeLogin('resident@example.com', 'incorrect');
-  await act(async () => {
-    screen().findByType(Button).props.onPress();
-  });
-  expect(login).toHaveBeenCalledWith(
-    'resident@example.com',
-    'incorrect',
-    expect.any(AbortSignal),
-  );
-  expect(JSON.stringify(app.toJSON())).toContain(
-    'Email or password is incorrect.',
-  );
-  expect(JSON.stringify(app.toJSON())).not.toContain('Signed in as');
-});
-it('starts Google sign-in with the selected role and enters the existing session flow', async () => {
-  googleSignIn.mockResolvedValue({
-    id: 22,
-    email: 'google-tenant@example.com',
-    name: 'Google Tenant',
-    role: 'tenant',
-  });
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  await act(async () => {
-    screen().findByProps({ accessibilityLabel: 'Continue with Google' }).props.onPress();
-  });
-  const options = alert.mock.calls[0][2]!;
-  await act(async () => {
-    options.find(option => option.text === 'Tenant')!.onPress!();
-  });
-  expect(googleSignIn).toHaveBeenCalledWith('tenant');
-  expect(app.root.findAllByType(LoginScreen)).toHaveLength(0);
-  expect(JSON.stringify(app.toJSON())).toContain('Hi, Google Tenant');
-  alert.mockRestore();
-});
-it('shows the Figma-matched Apple button as unavailable without starting OAuth', async () => {
-  const apple = screen().findByProps({
-    accessibilityLabel: 'Sign in with Apple ID, coming soon',
-  });
-  expect(apple.props.accessibilityState.disabled).toBe(true);
-  expect(JSON.stringify(app.toJSON())).toContain('Apple Sign-In coming soon');
-  expect(googleSignIn).not.toHaveBeenCalled();
-});
-it('acknowledges a legacy account without granting access to a role dashboard', async () => {
-  login.mockResolvedValue({
-    id: 1,
-    email: 'resident@example.com',
-    name: 'Resident',
-    role: null,
-  });
-  await typeLogin('resident@example.com', 'test-fixture-only');
-  await act(async () => {
-    screen().findByType(Button).props.onPress();
-  });
-  expect(JSON.stringify(app.toJSON())).toContain('Signed in as');
-  expect(app.root.findAllByType(LoginScreen)).toHaveLength(0);
-  expect(JSON.stringify(app.toJSON())).toContain('Account type not assigned');
-  expect(JSON.stringify(app.toJSON())).not.toContain('Start inspection');
-});
-it('validates reset input and preserves request failures on the form', async () => {
-  await forgot();
-  const form = app.root.findByType(ForgotPasswordScreen);
-  await act(async () => {
-    form.findAllByType(Button)[0].props.onPress();
-  });
-  expect(reset).not.toHaveBeenCalled();
-  await act(async () => {
-    form.findByType(TextInput).props.onChangeText('person@example.com');
-  });
-  reset.mockRejectedValue(new ApiError('Unable to reach LeaseGuard.'));
-  await act(async () => {
-    form.findAllByType(Button)[0].props.onPress();
-  });
-  expect(navigation.getCurrentRoute()?.name).toBe('ForgotPassword');
-  expect(JSON.stringify(app.toJSON())).toContain('Unable to reach LeaseGuard.');
-});
-it('blocks duplicate requests, confirms acceptance, and clears reset history', async () => {
-  await typeLogin('person@example.com', '');
-  await forgot();
-  const form = app.root.findByType(ForgotPasswordScreen);
-  expect(form.findByType(TextInput).props.value).toBe('person@example.com');
-  let accept!: (value: auth.ResetDelivery) => void;
-  reset.mockImplementation(
-    () =>
-      new Promise(resolve => {
-        accept = resolve;
-      }),
-  );
-  await act(async () => {
-    form.findAllByType(Button)[0].props.onPress();
-    form.findAllByType(Button)[0].props.onPress();
-  });
-  expect(reset).toHaveBeenCalledTimes(1);
-  expect(form.findAllByType(Button)[0].props.loading).toBe(true);
-  expect(navigation.getCurrentRoute()?.name).toBe('ForgotPassword');
-  await act(async () => {
-    accept('console');
-  });
-  expect(navigation.getCurrentRoute()?.params).toEqual({
-    email: 'person@example.com',
-    delivery: 'console',
-  });
-  expect(JSON.stringify(app.toJSON())).toContain('No email was sent.');
-  await act(async () => {
-    app.root
-      .findByType(ResetEmailSentScreen)
-      .findByType(Button)
-      .props.onPress();
-  });
-  expect(navigation.getRootState()!.routes.map(r => r.name)).toEqual(['Login']);
-});
-it('returns from Forgot Password directly to Login', async () => {
-  await forgot();
-  await act(async () => {
-    app.root
-      .findByType(ForgotPasswordScreen)
-      .findAllByType(Button)[1]
-      .props.onPress();
-  });
-  expect(navigation.getRootState()!.routes.map(r => r.name)).toEqual(['Login']);
-});
-it('cancels requests when leaving the reset form', async () => {
-  await forgot();
-  const form = app.root.findByType(ForgotPasswordScreen);
-  await act(async () => {
-    form.findByType(TextInput).props.onChangeText('person@example.com');
-  });
-  let accept!: (value: auth.ResetDelivery) => void;
-  reset.mockImplementation(
-    () =>
-      new Promise(resolve => {
-        accept = resolve;
-      }),
-  );
-  await act(async () => {
-    form.findAllByType(Button)[0].props.onPress();
-  });
-  const signal = reset.mock.calls[0][1];
-  await act(async () => {
-    navigation.goBack();
-  });
-  expect(signal?.aborted).toBe(true);
-  await act(async () => {
-    accept('email');
-  });
-  expect(navigation.getCurrentRoute()?.name).toBe('Login');
-});
-
-async function registrationForm() {
-  await act(async () => {
-    navigation.navigate('Register');
-  });
-  return app.root.findByType(RegisterScreen);
-}
-async function fillRegistration(
-  form: ReturnType<typeof screen>,
-  confirmation = 'Fresh-Passphrase-583!',
-) {
-  await act(async () => {
-    form.findAllByProps({ accessibilityLabel: 'Tenant' })[0].props.onPress();
-    const fields = form.findAllByType(TextInput);
-    [
-      'New Resident',
-      'new@example.com',
-      'Fresh-Passphrase-583!',
-      confirmation,
-    ].forEach((value, index) => fields[index].props.onChangeText(value));
-  });
-}
-it('validates registration fields and confirmation before sending credentials', async () => {
-  const form = await registrationForm();
-  await act(async () => {
-    form.findByType(Button).props.onPress();
-  });
-  expect(auth.register).not.toHaveBeenCalled();
-  expect(JSON.stringify(app.toJSON())).toContain('Enter your full name');
-  await fillRegistration(form, 'mismatch');
-  await act(async () => {
-    form.findByType(Button).props.onPress();
-  });
-  expect(auth.register).not.toHaveBeenCalled();
-  expect(JSON.stringify(app.toJSON())).toContain('Passwords do not match.');
-  expect(
-    form
-      .findAllByType(TextInput)
-      .slice(2)
-      .every(field => field.props.secureTextEntry),
-  ).toBe(true);
-});
-it('keeps failed registrations editable and allows retry', async () => {
-  const form = await registrationForm();
-  await fillRegistration(form);
-  jest
-    .mocked(auth.register)
-    .mockRejectedValue(
-      new ApiError('An account with this email already exists.'),
-    );
-  await act(async () => {
-    form.findByType(Button).props.onPress();
-  });
-  expect(JSON.stringify(app.toJSON())).toContain(
-    'An account with this email already exists.',
-  );
-  expect(form.findAllByType(TextInput)).toHaveLength(4);
-  expect(form.findByType(Button).props.loading).toBe(false);
-});
-it('blocks duplicate registration and confirms creation before returning to sign in', async () => {
-  const form = await registrationForm();
-  await fillRegistration(form);
-  let accept!: (value: Awaited<ReturnType<typeof auth.register>>) => void;
-  jest.mocked(auth.register).mockImplementation(
-    () =>
-      new Promise(resolve => {
-        accept = resolve;
-      }),
-  );
-  await act(async () => {
-    form.findByType(Button).props.onPress();
-    form.findByType(Button).props.onPress();
-  });
-  expect(auth.register).toHaveBeenCalledTimes(1);
-  expect(
-    form.findAllByType(TextInput).every(field => !field.props.editable),
-  ).toBe(true);
-  expect(auth.register).toHaveBeenCalledWith(
-    {
-      role: 'tenant',
-      name: 'New Resident',
-      email: 'new@example.com',
-      password: 'Fresh-Passphrase-583!',
-      confirmPassword: 'Fresh-Passphrase-583!',
-    },
-    expect.any(AbortSignal),
-  );
-  await act(async () => {
-    accept({
-      id: 10,
-      name: 'New Resident',
-      email: 'new@example.com',
-      role: 'tenant',
-    });
-  });
-  expect(JSON.stringify(app.toJSON())).toContain('Account created');
-  expect(form.findAllByType(TextInput)).toHaveLength(0);
-  await act(async () => {
-    form.findByType(Button).props.onPress();
-  });
+it('opens Login first and keeps Register and Forgot Password navigation', async () => {
   expect(navigation.getRootState()!.routes.map(route => route.name)).toEqual([
     'Login',
   ]);
-});
-it('cancels registration on leaving the screen', async () => {
-  const form = await registrationForm();
-  await fillRegistration(form);
-  let accept!: (value: Awaited<ReturnType<typeof auth.register>>) => void;
-  jest.mocked(auth.register).mockImplementation(
-    () =>
-      new Promise(resolve => {
-        accept = resolve;
-      }),
-  );
   await act(async () => {
-    form.findByType(Button).props.onPress();
+    loginScreen().findByProps({ accessibilityLabel: 'Register' }).props.onPress();
   });
-  const signal = jest.mocked(auth.register).mock.calls[0][1];
+  expect(navigation.getCurrentRoute()?.name).toBe('Register');
+  expect(app.root.findByType(RegisterScreen)).toBeTruthy();
   await act(async () => {
-    navigation.goBack();
+    app.root.findByType(RegisterScreen)
+      .findByProps({ accessibilityLabel: 'Sign in' }).props.onPress();
+    loginScreen().findAllByProps({ accessibilityRole: 'link' })[0].props.onPress();
   });
-  expect(signal?.aborted).toBe(true);
-  await act(async () => {
-    accept({
-      id: 10,
-      name: 'New Resident',
-      email: 'new@example.com',
-      role: 'tenant',
-    });
-  });
-  expect(navigation.getCurrentRoute()?.name).toBe('Login');
+  expect(navigation.getCurrentRoute()?.name).toBe('ForgotPassword');
+  expect(app.root.findByType(ForgotPasswordScreen)).toBeTruthy();
 });
 
-it('requires an explicit role even when every registration field is valid', async () => {
-  const form = await registrationForm();
-  await act(async () => {
-    const fields = form.findAllByType(TextInput);
-    [
-      'New Resident',
-      'new@example.com',
-      'Fresh-Passphrase-583!',
-      'Fresh-Passphrase-583!',
-    ].forEach((value, index) => fields[index].props.onChangeText(value));
-  });
-  await act(async () => form.findByType(Button).props.onPress());
-  expect(auth.register).not.toHaveBeenCalled();
-  expect(JSON.stringify(app.toJSON())).toContain('Select Tenant or Landlord.');
+it('preserves login validation while keeping email authentication unavailable', async () => {
+  const button = loginScreen().findByType(Button);
+  expect(button.props.disabled).toBe(true);
+  await act(async () => button.props.onPress());
+  expect(JSON.stringify(app.toJSON())).toContain('Enter your email address.');
+  expect(JSON.stringify(app.toJSON())).toContain('Enter your password.');
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Email and password sign-in will be available when Firebase is connected.',
+  );
+  expect(auth.getSession).toHaveBeenCalled();
+  expect(app.root.findAllByType(LoginScreen)).toHaveLength(1);
 });
-it.each(['tenant', 'landlord'] as const)(
-  'sends the selected %s role and preserves registration success',
-  async role => {
-    const form = await registrationForm();
-    await fillRegistration(form);
-    await act(async () =>
-      form
-        .findAllByProps({
-          accessibilityLabel: role === 'tenant' ? 'Tenant' : 'Landlord',
-        })[0]
-        .props.onPress(),
-    );
-    jest
-      .mocked(auth.register)
-      .mockResolvedValueOnce({
-        id: 20,
-        name: 'New Resident',
-        email: 'new@example.com',
-        role,
-      });
-    await act(async () => form.findByType(Button).props.onPress());
-    expect(auth.register).toHaveBeenCalledWith(
-      expect.objectContaining({ role }),
-      expect.any(AbortSignal),
-    );
-    expect(JSON.stringify(app.toJSON())).toContain('Account created');
-    expect(auth.login).not.toHaveBeenCalled();
-    expect(navigation.getCurrentRoute()?.name).toBe('Register');
-  },
-);
+
+it('keeps the Google button design visible but disabled until Firebase is connected', () => {
+  const google = loginScreen().findByProps({
+    accessibilityLabel: 'Continue with Google',
+  });
+  expect(google.props.disabled).toBe(true);
+  expect(google.props.accessibilityState.disabled).toBe(true);
+  expect(JSON.stringify(app.toJSON())).toContain('Sign in with Google');
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Google sign-in will be available when Firebase is connected.',
+  );
+  expect(JSON.stringify(app.toJSON())).not.toContain('Apple');
+});
+
+it('keeps registration fields and validation while disabling account creation', async () => {
+  await act(async () => {
+    loginScreen().findByProps({ accessibilityLabel: 'Register' }).props.onPress();
+  });
+  const register = app.root.findByType(RegisterScreen);
+  expect(register.findAllByType(TextInput)).toHaveLength(4);
+  expect(register.findByType(Button).props.disabled).toBe(true);
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Account creation will be available when Firebase is connected.',
+  );
+});
+
+it('keeps password reset navigation but does not claim to send a reset email', async () => {
+  await act(async () => {
+    loginScreen().findAllByProps({ accessibilityRole: 'link' })[0].props.onPress();
+  });
+  const reset = app.root.findByType(ForgotPasswordScreen);
+  expect(reset.findAllByType(Button)[0].props.disabled).toBe(true);
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Password reset will be available when Firebase is connected.',
+  );
+  expect(navigation.getCurrentRoute()?.name).toBe('ForgotPassword');
+});

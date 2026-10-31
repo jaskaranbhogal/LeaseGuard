@@ -13,13 +13,10 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
-import { register } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
-import { useAuthRequest } from '../../utils/useAuthRequest';
-import { useAuth } from '../../context/AuthContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 export default function RegisterScreen({ navigation }: Props) {
@@ -28,11 +25,9 @@ export default function RegisterScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const { completeSignIn } = useAuth();
   const emailInput = useRef<ComponentRef<typeof TextInput>>(null);
   const passwordInput = useRef<ComponentRef<typeof TextInput>>(null);
   const confirmInput = useRef<ComponentRef<typeof TextInput>>(null);
-  const request = useAuthRequest();
   const invalidName =
     !name.trim() || name.trim().length > 150
       ? 'Enter your full name (up to 150 characters).'
@@ -56,14 +51,6 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
     Keyboard.dismiss();
-    request.run(
-      signal => register({ name, email, password, confirmPassword }, signal),
-      user => {
-        setPassword('');
-        setConfirmPassword('');
-        completeSignIn(user);
-      },
-    );
   }
   function signIn() {
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
@@ -81,13 +68,12 @@ export default function RegisterScreen({ navigation }: Props) {
           value={name}
           onChangeText={value => {
             setName(value);
-            request.clearError();
           }}
           error={submitted ? invalidName : undefined}
           autoCapitalize="words"
           autoComplete="name"
           textContentType="name"
-          editable={!request.loading}
+          editable
           returnKeyType="next"
           onSubmitEditing={() => emailInput.current?.focus()}
         />
@@ -98,13 +84,12 @@ export default function RegisterScreen({ navigation }: Props) {
           value={email}
           onChangeText={value => {
             setEmail(value);
-            request.clearError();
           }}
           error={submitted ? invalidEmail : undefined}
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
-          editable={!request.loading}
+          editable
           returnKeyType="next"
           onSubmitEditing={() => passwordInput.current?.focus()}
         />
@@ -115,13 +100,12 @@ export default function RegisterScreen({ navigation }: Props) {
           value={password}
           onChangeText={value => {
             setPassword(value);
-            request.clearError();
           }}
           error={submitted ? invalidPassword : undefined}
           secureTextEntry
           autoComplete="new-password"
           textContentType="newPassword"
-          editable={!request.loading}
+          editable
           returnKeyType="next"
           onSubmitEditing={() => confirmInput.current?.focus()}
         />
@@ -136,30 +120,26 @@ export default function RegisterScreen({ navigation }: Props) {
           value={confirmPassword}
           onChangeText={value => {
             setConfirmPassword(value);
-            request.clearError();
           }}
           error={submitted ? invalidConfirmation : undefined}
           secureTextEntry
           autoComplete="new-password"
           textContentType="newPassword"
-          editable={!request.loading}
+          editable
           returnKeyType="go"
           onSubmitEditing={submit}
         />
-        {request.error ? (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {request.error}
-          </Text>
-        ) : null}
+        <Text accessibilityRole="text" style={styles.notice}>
+          Account creation will be available when Firebase is connected.
+        </Text>
         <Button
           title="Create account"
-          loading={request.loading}
+          disabled
           onPress={submit}
         />
         <Pressable
           accessibilityRole="link"
           accessibilityLabel="Sign in"
-          disabled={request.loading}
           style={styles.signIn}
           onPress={signIn}
         >
@@ -190,7 +170,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: colors.textSecondary, lineHeight: 21 },
   form: { marginTop: spacing.xl, gap: spacing.md },
   hint: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  error: { color: colors.error, fontSize: 14, lineHeight: 20 },
+  notice: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center' },
   signIn: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   link: { color: colors.primary, fontSize: 14, textAlign: 'center' },
 });

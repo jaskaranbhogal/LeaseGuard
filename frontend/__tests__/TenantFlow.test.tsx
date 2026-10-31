@@ -25,7 +25,6 @@ import InspectionAvailabilityScreen from '../src/screens/tenant/InspectionAvaila
 import ReportMaintenanceScreen from '../src/screens/tenant/ReportMaintenanceScreen';
 import UnitHistoryScreen from '../src/screens/tenant/UnitHistoryScreen';
 import LoginScreen from '../src/screens/auth/LoginScreen';
-import Button from '../src/components/Button';
 import * as auth from '../src/services/authService';
 import { ApiError } from '../src/services/api';
 import type { User } from '../src/types/user';
@@ -101,13 +100,8 @@ async function press(label: string, within?: ReactTestInstance) {
   });
 }
 async function signIn(user: User) {
-  jest.mocked(auth.login).mockResolvedValueOnce(user);
-  const screen = app.root.findByType(LoginScreen);
-  await act(async () => {
-    screen.findAllByType(TextInput)[0].props.onChangeText(user.email);
-    screen.findAllByType(TextInput)[1].props.onChangeText('fixture-password');
-  });
-  await act(async () => screen.findByType(Button).props.onPress());
+  await act(async () => app.unmount());
+  await mount(user);
 }
 it.each([tenant, landlord])(
   'routes a restored $role session to its dashboard',

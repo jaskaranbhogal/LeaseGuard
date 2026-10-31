@@ -6,30 +6,22 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
-import { requestPasswordReset } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
-import { useAuthRequest } from '../../utils/useAuthRequest';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [submitted, setSubmitted] = useState(false);
-  const request = useAuthRequest();
   function submit() {
     setSubmitted(true);
     if (emailError(email)) {
       return;
     }
     Keyboard.dismiss();
-    const address = email.trim();
-    request.run(
-      signal => requestPasswordReset(address, signal),
-      delivery =>
-        navigation.replace('ResetEmailSent', { email: address, delivery }),
-    );
+    Keyboard.dismiss();
   }
   return (
     <ScreenContainer>
@@ -47,32 +39,28 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
           value={email}
           onChangeText={value => {
             setEmail(value);
-            request.clearError();
           }}
           error={submitted ? emailError(email) : undefined}
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
-          editable={!request.loading}
+          editable
           returnKeyType="send"
           onSubmitEditing={submit}
         />
-        {request.error ? (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {request.error}
-          </Text>
-        ) : null}
+        <Text accessibilityRole="text" style={styles.error}>
+          Password reset will be available when Firebase is connected.
+        </Text>
         <Button
           title="Send reset email"
           variant="reset"
-          loading={request.loading}
+          disabled
           onPress={submit}
           style={styles.send}
         />
         <Button
           title="Back to sign in"
           variant="outline"
-          disabled={request.loading}
           onPress={() =>
             navigation.reset({ index: 0, routes: [{ name: 'Login' }] })
           }

@@ -23,7 +23,6 @@ import BackButton from '../src/components/BackButton';
 import NotificationBell from '../src/components/NotificationBell';
 import BottomNavigation from '../src/components/BottomNavigation';
 import UnitChip from '../src/components/UnitChip';
-import LoginScreen from '../src/screens/auth/LoginScreen';
 import LandlordDashboardScreen from '../src/screens/landlord/LandlordDashboardScreen';
 import AddPropertyScreen from '../src/screens/landlord/AddPropertyScreen';
 import ScheduleInspectionScreen from '../src/screens/landlord/ScheduleInspectionScreen';
@@ -112,12 +111,8 @@ async function fill(scope: ReactTestInstance, values: Record<string, string>) {
   });
 }
 
-it('logs a landlord in, shows the authenticated name, and labels sample records', async () => {
-  await mount(null);
-  jest.mocked(auth.login).mockResolvedValueOnce(landlord);
-  const login = app.root.findByType(LoginScreen);
-  await fill(login, { Email: landlord.email, Password: 'fixture-password' });
-  await act(async () => login.findByType(Button).props.onPress());
+it('restores a landlord session, shows the account name, and labels sample records', async () => {
+  await mount(landlord);
   expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
   expect(json()).toContain('Alex Owner');
   expect(json()).not.toContain('Marcus');

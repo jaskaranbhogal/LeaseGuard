@@ -150,12 +150,6 @@ EMAIL_TIMEOUT = 10
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL') or 'LeaseGuard <noreply@localhost>'
 PASSWORD_RESET_BASE_URL = os.environ.get('PASSWORD_RESET_BASE_URL', 'http://localhost:8000' if DEBUG else '')
 PASSWORD_RESET_TIMEOUT = 3600
-# Comma-separated Google OAuth client IDs (Web, Android, and iOS) accepted by
-# the backend verifier. Keep this configuration server-side.
-GOOGLE_OAUTH_CLIENT_IDS = os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', '')
-# Comma-separated iOS bundle IDs / Apple Services IDs accepted by Apple's
-# identity-token verifier. For the current iOS target, use its bundle ID.
-APPLE_SIGN_IN_CLIENT_IDS = os.environ.get('APPLE_SIGN_IN_CLIENT_IDS', '')
 try:
     _reset_origin = urlsplit(PASSWORD_RESET_BASE_URL)
     _reset_origin_valid = (

@@ -1,5 +1,6 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { ResetDelivery } from '../services/authService';
+
+type ResetDelivery = 'email' | 'console';
 
 export type AuthStackParamList = {
   Login: undefined;
