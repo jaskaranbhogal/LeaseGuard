@@ -85,7 +85,7 @@ android {
         versionCode 1
         versionName "1.0"
         // Must match googleAndroidRedirectScheme in src/services/api.config.json.
-        manifestPlaceholders = [appAuthRedirectScheme: "com.googleusercontent.apps"]
+        manifestPlaceholders = [appAuthRedirectScheme: "com.googleusercontent.apps.placeholder"]
     }
     signingConfigs {
         debug {

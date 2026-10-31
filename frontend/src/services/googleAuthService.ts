@@ -21,14 +21,14 @@ export async function signInWithGoogle(role: UserRole): Promise<User | null> {
   if (!nonce) {
     throw new ApiError('Unable to start Google Sign-In. Please try again.');
   }
-  let result;
+  let result: Awaited<ReturnType<typeof authorize>>;
   try {
     result = await authorize({
-    issuer: GOOGLE_ISSUER,
-    clientId,
-    redirectUrl: `${redirectScheme}:/oauth2redirect/google`,
-    scopes: ['openid', 'email', 'profile'],
-    additionalParameters: { nonce },
+      issuer: GOOGLE_ISSUER,
+      clientId,
+      redirectUrl: `${redirectScheme}:/oauth2redirect/google`,
+      scopes: ['openid', 'email', 'profile'],
+      additionalParameters: { nonce },
     });
   } catch (error) {
     if ((error as { code?: string })?.code === 'user_canceled_authorization') {
