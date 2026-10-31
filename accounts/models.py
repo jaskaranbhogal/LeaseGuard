@@ -10,11 +10,12 @@ class AccountProfile(models.Model):
     # Account type only: property membership/ownership needs separate authorization.
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                                 related_name='account_profile')
-    role = models.CharField(max_length=8, choices=Role.choices)
+    role = models.CharField(max_length=8, choices=Role.choices, null=True, blank=True)
 
     class Meta:
         constraints = [models.CheckConstraint(
-            check=models.Q(role__in=['tenant', 'landlord']), name='valid_account_role')]
+            check=models.Q(role__in=['tenant', 'landlord']) | models.Q(role__isnull=True),
+            name='valid_account_role')]
 
 
 class PasswordResetRequest(models.Model):
@@ -30,4 +31,13 @@ class GoogleIdentity(models.Model):
                                 related_name='google_identity')
     subject = models.CharField(max_length=255, unique=True)
     email = models.EmailField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class AppleIdentity(models.Model):
+    """A verified Apple OpenID Connect subject linked to one LeaseGuard user."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                related_name='apple_identity')
+    subject = models.CharField(max_length=255, unique=True)
+    email = models.EmailField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

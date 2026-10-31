@@ -53,9 +53,24 @@ class AuthenticationTests(TestCase):
         verify.assert_called_once_with('mocked-id-token', nonce)
         user = get_user_model().objects.get(email='new@example.com')
         self.assertEqual(response.json()['user']['id'], user.pk)
-        self.assertEqual(response.json()['user']['role'], 'tenant')
+        self.assertIsNone(response.json()['user']['role'])
         self.assertEqual(GoogleIdentity.objects.get(user=user).subject, 'google-sub-123')
+        self.assertFalse(AccountProfile.objects.filter(user=user).exists())
         self.assertEqual(self.client.get('/api/auth/session/').json()['user']['id'], user.pk)
+
+    def test_returning_google_user_keeps_saved_role_without_role_prompt(self):
+        AccountProfile.objects.create(user=self.user, role='landlord')
+        identity = GoogleIdentity.objects.create(user=self.user, subject='google-sub-landlord',
+                                                 email=self.user.email)
+        nonce, csrf = self.google_nonce()
+        with patch('accounts.views.verified_google_claims', return_value={
+            'sub': identity.subject, 'email': self.user.email, 'email_verified': True,
+        }):
+            response = self.client.post('/api/auth/google/', json.dumps({
+                'idToken': 'mocked', 'nonce': nonce,
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['user']['role'], 'landlord')
 
     def test_returning_google_subject_signs_into_existing_account(self):
         identity = GoogleIdentity.objects.create(user=self.user, subject='google-sub-returning',
@@ -286,7 +301,7 @@ class RegistrationTests(TestCase):
         self.assertNotEqual(user.password, self.data['password'])
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
-        self.assertNotIn('_auth_user_id', self.client.session)
+        self.assertEqual(int(self.client.session['_auth_user_id']), user.pk)
         response = self.client.post('/api/auth/login/', json.dumps({
             'email': user.email, 'password': self.data['password']}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
@@ -348,14 +363,19 @@ class RegistrationTests(TestCase):
                 self.client.post('/api/auth/logout/')
                 self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
 
-    def test_missing_and_invalid_roles_are_rejected(self):
+    def test_missing_role_creates_pending_account_and_invalid_roles_are_rejected(self):
         missing = {key: value for key, value in self.data.items() if key != 'role'}
-        for data in [missing] + [{**self.data, 'role': role}
-                                for role in [None, '', 'admin', 'Tenant', [], {}, 1]]:
+        response = self.post(missing)
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(response.json()['user']['role'])
+        self.assertTrue(self.client.get('/api/auth/session/').json()['user'])
+        get_user_model().objects.all().delete()
+        cache.clear()
+        for data in [{**self.data, 'role': role}
+                     for role in ['', 'admin', 'Tenant', [], {}, 1]]:
             with self.subTest(data=data):
                 cache.clear()
                 self.assertEqual(self.post(data).status_code, 400)
-        self.assertFalse(get_user_model().objects.exists())
         self.assertFalse(AccountProfile.objects.exists())
 
     def test_profile_failure_rolls_back_user_creation(self):

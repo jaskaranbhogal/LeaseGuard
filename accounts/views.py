@@ -122,9 +122,11 @@ def register(request):
     try:
         with transaction.atomic():
             user.save()
-            AccountProfile.objects.create(user=user, role=role)
+            if role:
+                AccountProfile.objects.create(user=user, role=role)
     except IntegrityError:
         return JsonResponse(duplicate, status=409)
+    login(request, user)
     return JsonResponse({'user': user_data(user)}, status=201)
 
 
@@ -211,15 +213,13 @@ def google_payload(request):
         nonce_entry = request.session.pop('google_oauth_nonce', None)
         nonce = nonce_entry.get('value') if isinstance(nonce_entry, dict) else None
         issued_at = nonce_entry.get('issued_at', 0) if isinstance(nonce_entry, dict) else 0
-        role = data.get('role')
         if (not isinstance(id_token, str) or len(id_token) > 10000 or not nonce
-                or time.time() - issued_at > 300
-                or (role not in AccountProfile.Role.values and not request.user.is_authenticated)):
-            return None, None
+                or time.time() - issued_at > 300):
+            return None
         request.session.save()
-        return verified_google_claims(id_token, nonce), role
+        return verified_google_claims(id_token, nonce)
     except (GoogleAuthError, ValueError, TypeError, KeyError, ValidationError, ImportError):
-        return None, None
+        return None
 
 
 @never_cache
@@ -228,7 +228,7 @@ def google_payload(request):
 @rate_limit('google-login', 10)
 @sensitive_post_parameters()
 def google_sign_in(request):
-    claims, role = google_payload(request)
+    claims = google_payload(request)
     if claims is None:
         return JsonResponse({'detail': 'Google sign-in could not be verified. Please try again.'}, status=401)
     try:
@@ -249,7 +249,6 @@ def google_sign_in(request):
         with transaction.atomic():
             user = User.objects.create_user(username=username, email=email,
                                            first_name=(claims.get('name') or email).strip()[:150])
-            AccountProfile.objects.create(user=user, role=role)
             GoogleIdentity.objects.create(user=user, subject=claims['sub'], email=email)
     except IntegrityError:
         return JsonResponse({'detail': 'This Google account could not be linked. Sign in and try linking it from account settings.'}, status=409)
@@ -263,7 +262,7 @@ def google_sign_in(request):
 def google_link(request):
     if not request.user.is_authenticated:
         return JsonResponse({'detail': 'Please sign in before linking Google.'}, status=401)
-    claims, _ = google_payload(request)
+    claims = google_payload(request)
     if claims is None:
         return JsonResponse({'detail': 'Google sign-in could not be verified. Please try again.'}, status=401)
     if GoogleIdentity.objects.filter(subject=claims['sub']).exclude(user=request.user).exists():
