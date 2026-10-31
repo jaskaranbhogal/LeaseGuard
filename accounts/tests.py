@@ -174,6 +174,20 @@ class AuthenticationTests(TestCase):
                 verified_google_claims('signed-token', 'nonce-123')
             verify.assert_not_called()
 
+    def test_role_selection_requires_session_and_is_one_time_but_idempotent(self):
+        self.assertEqual(self.post('role', {'role': 'tenant'}).status_code, 401)
+        self.client.force_login(self.user)
+        for role in [None, '', 'admin', 'Tenant', [], {}]:
+            self.assertEqual(self.post('role', {'role': role}).status_code, 400)
+        first = self.post('role', {'role': 'tenant'})
+        repeat = self.post('role', {'role': 'tenant'})
+        change = self.post('role', {'role': 'landlord'})
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(repeat.status_code, 200)
+        self.assertEqual(change.status_code, 409)
+        self.assertEqual(self.client.get('/api/auth/session/').json()['user']['role'], 'tenant')
+
+
     def test_invalid_unknown_inactive_and_ambiguous_login(self):
         responses = [self.post('login', {'email': 'unknown@example.com', 'password': self.password}),
                      self.post('login', {'email': self.user.email, 'password': 'wrong'})]

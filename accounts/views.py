@@ -102,7 +102,7 @@ def register(request):
     if password != data.get('confirmPassword'):
         return JsonResponse({'detail': 'Passwords do not match.'}, status=400)
     role = data.get('role')
-    if role not in AccountProfile.Role.values:
+    if role is not None and role not in AccountProfile.Role.values:
         return JsonResponse({'detail': 'Select Tenant or Landlord.'}, status=400)
     User = get_user_model()
     email = email.lower()
@@ -273,6 +273,28 @@ def google_link(request):
         'subject': claims['sub'], 'email': claims['email'],
     })
     return JsonResponse({'detail': 'Google account linked.'})
+
+
+@never_cache
+@require_POST
+@csrf_protect
+def choose_role(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'Please sign in before choosing an account type.'}, status=401)
+    try:
+        data = json.loads(request.body)
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({'detail': 'Choose Tenant or Landlord.'}, status=400)
+    role = data.get('role') if isinstance(data, dict) else None
+    if role not in AccountProfile.Role.values:
+        return JsonResponse({'detail': 'Choose Tenant or Landlord.'}, status=400)
+    profile, _ = AccountProfile.objects.get_or_create(user=request.user, defaults={'role': None})
+    if profile.role and profile.role != role:
+        return JsonResponse({'detail': 'Your account type has already been set.'}, status=409)
+    if profile.role is None:
+        profile.role = role
+        profile.save(update_fields=['role'])
+    return JsonResponse({'user': user_data(request.user)})
 
 
 @never_cache

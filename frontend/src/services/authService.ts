@@ -28,6 +28,23 @@ export async function register(
   return result.user;
 }
 
+export async function chooseRole(
+  role: UserRole,
+  signal?: AbortSignal,
+): Promise<User> {
+  const result = await authPost<{ user: User }>(
+    '/auth/role/',
+    { role },
+    signal,
+  );
+  if (!isUser(result.user) || result.user.role !== role) {
+    throw new ApiError(
+      'LeaseGuard could not save your account type. Please try again.',
+    );
+  }
+  return result.user;
+}
+
 export async function login(
   email: string,
   password: string,
