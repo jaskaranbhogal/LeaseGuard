@@ -5,7 +5,7 @@ import {
   createNavigationContainerRef,
 } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Image, TextInput } from 'react-native';
+import { Alert, Image, TextInput } from 'react-native';
 import RootNavigator from '../src/navigation/RootNavigator';
 import { AuthProvider } from '../src/context/AuthContext';
 import type { AuthStackParamList } from '../src/navigation/types';
@@ -16,10 +16,13 @@ import ResetEmailSentScreen from '../src/screens/auth/ResetEmailSentScreen';
 import Button from '../src/components/Button';
 import * as auth from '../src/services/authService';
 import { ApiError } from '../src/services/api';
+import * as googleAuth from '../src/services/googleAuthService';
 
 jest.mock('../src/services/authService');
+jest.mock('../src/services/googleAuthService');
 const login = jest.mocked(auth.login);
 const reset = jest.mocked(auth.requestPasswordReset);
+const googleSignIn = jest.mocked(googleAuth.signInWithGoogle);
 let app: ReactTestRenderer;
 let navigation: ReturnType<
   typeof createNavigationContainerRef<AuthStackParamList>
@@ -103,6 +106,34 @@ it('passes credentials to the service and never treats a rejection as success', 
     'Email or password is incorrect.',
   );
   expect(JSON.stringify(app.toJSON())).not.toContain('Signed in as');
+});
+it('starts Google sign-in with the selected role and enters the existing session flow', async () => {
+  googleSignIn.mockResolvedValue({
+    id: 22,
+    email: 'google-tenant@example.com',
+    name: 'Google Tenant',
+    role: 'tenant',
+  });
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  await act(async () => {
+    screen().findByProps({ accessibilityLabel: 'Continue with Google' }).props.onPress();
+  });
+  const options = alert.mock.calls[0][2]!;
+  await act(async () => {
+    options.find(option => option.text === 'Tenant')!.onPress!();
+  });
+  expect(googleSignIn).toHaveBeenCalledWith('tenant');
+  expect(app.root.findAllByType(LoginScreen)).toHaveLength(0);
+  expect(JSON.stringify(app.toJSON())).toContain('Hi, Google Tenant');
+  alert.mockRestore();
+});
+it('shows the Figma-matched Apple button as unavailable without starting OAuth', async () => {
+  const apple = screen().findByProps({
+    accessibilityLabel: 'Sign in with Apple ID, coming soon',
+  });
+  expect(apple.props.accessibilityState.disabled).toBe(true);
+  expect(JSON.stringify(app.toJSON())).toContain('Apple Sign-In coming soon');
+  expect(googleSignIn).not.toHaveBeenCalled();
 });
 it('acknowledges a legacy account without granting access to a role dashboard', async () => {
   login.mockResolvedValue({

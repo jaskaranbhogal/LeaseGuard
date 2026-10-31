@@ -7,3 +7,6 @@ jest.mock('react-native-image-picker', () => ({
   launchCamera: jest.fn(),
   launchImageLibrary: jest.fn(),
 }));
+
+// Native OAuth UI is outside Jest; feature tests mock the service response.
+jest.mock('react-native-app-auth', () => ({ authorize: jest.fn() }));

@@ -11,7 +11,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .models import AccountProfile, PasswordResetRequest
+from .models import AccountProfile, GoogleIdentity, PasswordResetRequest
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -33,6 +33,131 @@ class AuthenticationTests(TestCase):
         self.assertEqual(int(self.client.session['_auth_user_id']), self.user.pk)
         self.assertEqual(self.post('logout', {}).status_code, 200)
         self.assertNotIn('_auth_user_id', self.client.session)
+
+    def google_nonce(self):
+        token = self.client.get('/api/auth/csrf/').json()['csrfToken']
+        response = self.client.post('/api/auth/google/nonce/', '{}',
+                                    content_type='application/json', HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(response.status_code, 200)
+        return response.json()['nonce'], token
+
+    def test_google_sign_in_creates_account_and_session_from_verified_subject(self):
+        nonce, csrf = self.google_nonce()
+        claims = {'sub': 'google-sub-123', 'email': 'new@example.com',
+                  'email_verified': True, 'name': 'New Resident'}
+        with patch('accounts.views.verified_google_claims', return_value=claims) as verify:
+            response = self.client.post('/api/auth/google/', json.dumps({
+                'idToken': 'mocked-id-token', 'nonce': nonce, 'role': 'tenant',
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 201)
+        verify.assert_called_once_with('mocked-id-token', nonce)
+        user = get_user_model().objects.get(email='new@example.com')
+        self.assertEqual(response.json()['user']['id'], user.pk)
+        self.assertEqual(response.json()['user']['role'], 'tenant')
+        self.assertEqual(GoogleIdentity.objects.get(user=user).subject, 'google-sub-123')
+        self.assertEqual(self.client.get('/api/auth/session/').json()['user']['id'], user.pk)
+
+    def test_returning_google_subject_signs_into_existing_account(self):
+        identity = GoogleIdentity.objects.create(user=self.user, subject='google-sub-returning',
+                                                 email=self.user.email)
+        nonce, csrf = self.google_nonce()
+        with patch('accounts.views.verified_google_claims', return_value={
+            'sub': identity.subject, 'email': self.user.email, 'email_verified': True,
+        }):
+            response = self.client.post('/api/auth/google/', json.dumps({
+                'idToken': 'mocked', 'nonce': nonce, 'role': 'tenant',
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['user']['email'], self.user.email)
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    def test_inactive_google_account_cannot_start_a_session(self):
+        identity = GoogleIdentity.objects.create(user=self.user, subject='inactive-google-sub',
+                                                 email=self.user.email)
+        identity.user.is_active = False
+        identity.user.save()
+        nonce, csrf = self.google_nonce()
+        with patch('accounts.views.verified_google_claims', return_value={
+            'sub': identity.subject, 'email': self.user.email, 'email_verified': True,
+        }):
+            response = self.client.post('/api/auth/google/', json.dumps({
+                'idToken': 'mocked', 'nonce': nonce, 'role': 'tenant',
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 401)
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_google_does_not_auto_link_matching_email_and_nonce_is_single_use(self):
+        nonce, csrf = self.google_nonce()
+        claims = {'sub': 'unlinked-google-sub', 'email': self.user.email,
+                  'email_verified': True, 'name': 'Resident'}
+        with patch('accounts.views.verified_google_claims', return_value=claims):
+            body = json.dumps({'idToken': 'mocked', 'nonce': nonce, 'role': 'tenant'})
+            first = self.client.post('/api/auth/google/', body, content_type='application/json',
+                                     HTTP_X_CSRFTOKEN=csrf)
+            replay = self.client.post('/api/auth/google/', body, content_type='application/json',
+                                      HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(first.status_code, 409)
+        self.assertEqual(replay.status_code, 401)
+        self.assertFalse(GoogleIdentity.objects.exists())
+
+    def test_google_rejects_invalid_provider_response_and_nonce_without_creating_user(self):
+        nonce, csrf = self.google_nonce()
+        with patch('accounts.views.verified_google_claims', side_effect=ValueError('invalid')):
+            response = self.client.post('/api/auth/google/', json.dumps({
+                'idToken': 'mocked', 'nonce': nonce, 'role': 'tenant',
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(get_user_model().objects.count(), 1)
+
+    def test_google_identity_linking_requires_authenticated_matching_account(self):
+        existing = get_user_model().objects.create_user(
+            username='other', email='other@example.com', password='Another-Passphrase-789!')
+        self.client.force_login(self.user)
+        nonce, csrf = self.google_nonce()
+        claims = {'sub': 'google-sub-123', 'email': self.user.email,
+                  'email_verified': True}
+        with patch('accounts.views.verified_google_claims', return_value=claims):
+            response = self.client.post('/api/auth/google/link/', json.dumps({
+                'idToken': 'mocked', 'nonce': nonce,
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(GoogleIdentity.objects.get(subject='google-sub-123').user, self.user)
+        self.client.force_login(existing)
+        nonce, csrf = self.google_nonce()
+        with patch('accounts.views.verified_google_claims', return_value=claims):
+            response = self.client.post('/api/auth/google/link/', json.dumps({
+                'idToken': 'mocked', 'nonce': nonce,
+            }), content_type='application/json', HTTP_X_CSRFTOKEN=csrf)
+        self.assertEqual(response.status_code, 409)
+
+    @override_settings(GOOGLE_OAUTH_CLIENT_IDS='web-client,ios-client')
+    def test_google_verifier_enforces_allowed_audience_nonce_issuer_and_verified_email(self):
+        from .views import verified_google_claims
+        good = {'aud': 'ios-client', 'nonce': 'nonce-123',
+                'iss': 'https://accounts.google.com', 'sub': 'stable-google-sub',
+                'email': 'resident@example.com', 'email_verified': True}
+        with patch('google.oauth2.id_token.verify_oauth2_token', return_value=good) as verify:
+            self.assertEqual(verified_google_claims('signed-token', 'nonce-123'), good)
+            verify.assert_called_once()
+        for changes in [
+            {'aud': 'attacker-client'},
+            {'nonce': 'wrong-nonce'},
+            {'iss': 'https://attacker.example'},
+            {'email_verified': False},
+        ]:
+            with self.subTest(changes=changes), patch(
+                    'google.oauth2.id_token.verify_oauth2_token',
+                    return_value={**good, **changes}):
+                with self.assertRaises(ValueError):
+                    verified_google_claims('signed-token', 'nonce-123')
+
+    @override_settings(GOOGLE_OAUTH_CLIENT_IDS='')
+    def test_google_verifier_fails_without_configured_audiences(self):
+        from .views import verified_google_claims
+        with patch('google.oauth2.id_token.verify_oauth2_token') as verify:
+            with self.assertRaises(ValueError):
+                verified_google_claims('signed-token', 'nonce-123')
+            verify.assert_not_called()
 
     def test_invalid_unknown_inactive_and_ambiguous_login(self):
         responses = [self.post('login', {'email': 'unknown@example.com', 'password': self.password}),

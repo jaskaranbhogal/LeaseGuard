@@ -1,11 +1,11 @@
 import json
 import hashlib
 import secrets
+import time
 from functools import wraps
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
@@ -18,6 +18,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_GET, require_POST
+from google.auth.exceptions import GoogleAuthError
 
 from .models import AccountProfile, GoogleIdentity, PasswordResetRequest
 
@@ -168,10 +169,11 @@ def sign_out(request):
 @csrf_protect
 def google_nonce(request):
     """Issue a short-lived, session-bound nonce for one Google sign-in attempt."""
-    request.session['google_oauth_nonce'] = secrets.token_urlsafe(32)
-    request.session.set_expiry(300)
+    request.session['google_oauth_nonce'] = {
+        'value': secrets.token_urlsafe(32), 'issued_at': time.time(),
+    }
     request.session.save()
-    return JsonResponse({'nonce': request.session['google_oauth_nonce']})
+    return JsonResponse({'nonce': request.session['google_oauth_nonce']['value']})
 
 
 def verified_google_claims(id_token, expected_nonce):
@@ -206,14 +208,17 @@ def google_payload(request):
         if not isinstance(data, dict):
             raise ValueError
         id_token = data.get('idToken')
-        nonce = request.session.pop('google_oauth_nonce', None)
+        nonce_entry = request.session.pop('google_oauth_nonce', None)
+        nonce = nonce_entry.get('value') if isinstance(nonce_entry, dict) else None
+        issued_at = nonce_entry.get('issued_at', 0) if isinstance(nonce_entry, dict) else 0
         role = data.get('role')
         if (not isinstance(id_token, str) or len(id_token) > 10000 or not nonce
+                or time.time() - issued_at > 300
                 or (role not in AccountProfile.Role.values and not request.user.is_authenticated)):
             return None, None
         request.session.save()
         return verified_google_claims(id_token, nonce), role
-    except (ValueError, TypeError, KeyError, ValidationError, ImportError):
+    except (GoogleAuthError, ValueError, TypeError, KeyError, ValidationError, ImportError):
         return None, None
 
 
@@ -255,8 +260,9 @@ def google_sign_in(request):
 @never_cache
 @require_POST
 @csrf_protect
-@login_required
 def google_link(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'detail': 'Please sign in before linking Google.'}, status=401)
     claims, _ = google_payload(request)
     if claims is None:
         return JsonResponse({'detail': 'Google sign-in could not be verified. Please try again.'}, status=401)
