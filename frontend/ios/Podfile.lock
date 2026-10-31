@@ -1884,7 +1884,6 @@ DEPENDENCIES:
   - SocketRocket (from `build/rndeps-facades/SocketRocket`)
   - Yoga (from `build/rncore-facades/Yoga`)
 
-SPEC REPOS:
 EXTERNAL SOURCES:
   boost:
     :path: build/rndeps-facades/boost
