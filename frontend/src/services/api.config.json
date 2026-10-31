@@ -1,4 +1,8 @@
 {
   "developmentBaseUrl": "",
-  "productionBaseUrl": ""
+  "productionBaseUrl": "",
+  "googleAndroidClientId": "",
+  "googleIosClientId": "",
+  "googleAndroidRedirectScheme": "",
+  "googleIosRedirectScheme": ""
 }
