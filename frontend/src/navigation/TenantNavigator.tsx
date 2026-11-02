@@ -1,7 +1,9 @@
 import UnitHistoryScreen from '../screens/tenant/UnitHistoryScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
+import PrivacySecurityScreen from '../screens/shared/PrivacySecurityScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
+import ProfileScreen from '../screens/shared/ProfileScreen';
 import TenantTabs from './TenantTabs';
 
 import GuidedInspectionScreen from '../screens/tenant/GuidedInspectionScreen';
@@ -34,6 +36,21 @@ export default function TenantNavigator() {
         <Stack.Screen
           name="Notifications"
           component={NotificationsScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PrivacySecurity"
+          component={PrivacySecurityScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="PrivacyPolicy"
+          component={PrivacyPolicyScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
           options={{ headerShown: false }}
         />
         <Stack.Screen

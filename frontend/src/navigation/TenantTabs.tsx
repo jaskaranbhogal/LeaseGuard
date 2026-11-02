@@ -53,6 +53,19 @@ function InspectionsScreen({
     </ScreenContainer>
   );
 }
+function TenantSettingsScreen({
+  navigation,
+}: CompositeScreenProps<
+  BottomTabScreenProps<TenantTabParamList, 'Settings'>,
+  NativeStackScreenProps<TenantStackParamList>
+>) {
+  return (
+    <SettingsScreen
+      onPrivacySecurity={() => navigation.navigate('PrivacySecurity')}
+      onProfile={() => navigation.navigate('Profile')}
+    />
+  );
+}
 function TenantTabBar(props: BottomTabBarProps) {
   return <BottomNavigation {...props} role="tenant" />;
 }
@@ -69,7 +82,7 @@ export default function TenantTabs() {
 
       <Tab.Screen name="Inspections" component={InspectionsScreen} />
 
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      <Tab.Screen name="Settings" component={TenantSettingsScreen} />
     </Tab.Navigator>
   );
 }

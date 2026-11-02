@@ -1,7 +1,7 @@
 import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomNavigation from '../components/BottomNavigation';
-
+import PrivacySecurityScreen from '../screens/shared/PrivacySecurityScreen';
 import SettingsScreen from '../screens/shared/SettingsScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import AddPropertyScreen from '../screens/landlord/AddPropertyScreen';
@@ -9,12 +9,19 @@ import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScre
 import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
 import LandlordDashboardScreen from '../screens/landlord/LandlordDashboardScreen';
 import ScheduleInspectionScreen from '../screens/landlord/ScheduleInspectionScreen';
+import PrivacyPolicyScreen from '../screens/shared/PrivacyPolicyScreen';
+import ProfileScreen from '../screens/shared/ProfileScreen';
 
-import type { LandlordStackParamList, LandlordTabParamList } from './types';
+import type {
+  LandlordSettingsStackParamList,
+  LandlordStackParamList,
+  LandlordTabParamList,
+} from './types';
 
 const Tab = createBottomTabNavigator<LandlordTabParamList>();
 const Stack = createNativeStackNavigator<LandlordStackParamList>();
-
+const SettingsStack =
+  createNativeStackNavigator<LandlordSettingsStackParamList>();
 function HomeStack() {
   return (
     <Stack.Navigator
@@ -36,7 +43,39 @@ function HomeStack() {
     </Stack.Navigator>
   );
 }
+function SettingsStackScreen() {
+  return (
+    <SettingsStack.Navigator
+      initialRouteName="SettingsHome"
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <SettingsStack.Screen name="SettingsHome">
+        {({ navigation }) => (
+          <SettingsScreen
+            onPrivacySecurity={() =>
+              navigation.navigate('PrivacySecurity')
+            }
+            onProfile={() => navigation.navigate('Profile')}
+          />
+        )}
+      </SettingsStack.Screen>
 
+      <SettingsStack.Screen
+        name="PrivacySecurity"
+        component={PrivacySecurityScreen}
+      />
+
+      <SettingsStack.Screen
+        name="PrivacyPolicy"
+        component={PrivacyPolicyScreen}
+      />
+
+      <SettingsStack.Screen name="Profile" component={ProfileScreen} />
+    </SettingsStack.Navigator>
+  );
+}
 function LandlordTabBar(props: BottomTabBarProps) {
   return <BottomNavigation {...props} role="landlord" />;
 }
@@ -59,7 +98,7 @@ export default function LandlordNavigator() {
       />
       <Tab.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={SettingsStackScreen}
         options={settingsOptions}
       />
     </Tab.Navigator>
