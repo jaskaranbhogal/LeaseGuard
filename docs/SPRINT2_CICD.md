@@ -23,7 +23,7 @@ The existing [`mobile-build.yml`](../.github/workflows/mobile-build.yml) still p
 
 ## MongoDB test configuration
 
-The **Django Checks** and **Test** jobs each start a fresh MongoDB 8.0 container configured as a single-node replica set. Each job sets `MONGODB_URI` to that local container and `MONGODB_DB_NAME` to `leaseguard_ci`; Django's test runner uses its separate `test_leaseguard_ci` database. This supports transaction-based registration tests and prevents CI from accessing a shared Atlas cluster. No Atlas credentials are needed in GitHub Actions.
+The **Django Checks** and **Test** jobs run on Ubuntu 22.04 and each start a fresh MongoDB 8.0 container configured as a single-node replica set. MongoDB stops at startup on Linux kernels 6.19 through 7.0.13; Ubuntu 22.04 keeps these jobs on a compatible hosted-runner kernel. Each job sets `MONGODB_URI` to that local container and `MONGODB_DB_NAME` to `leaseguard_ci`; Django's test runner uses its separate `test_leaseguard_ci` database. This supports transaction-based registration tests and prevents CI from accessing a shared Atlas cluster. No Atlas credentials are needed in GitHub Actions.
 
 The Django migration branch is available in PR #63. Until it is merged, `main` still uses its SQLite configuration; after integration, the same checks and test job exercise the MongoDB backend. Keep the Android/iOS build checks and existing protected status check names while migrating.
 

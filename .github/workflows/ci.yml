@@ -79,7 +79,8 @@ jobs:
   django:
     name: Django Checks
     needs: dependencies
-    runs-on: ubuntu-latest
+    # MongoDB refuses to start on Linux kernels 6.19 through 7.0.13.
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     env:
       DJANGO_DEBUG: "true"
@@ -187,7 +188,8 @@ jobs:
   test:
     name: Test
     needs: [django, react-native]
-    runs-on: ubuntu-latest
+    # Keep the test runner on the compatible Ubuntu 22.04 kernel as well.
+    runs-on: ubuntu-22.04
     timeout-minutes: 20
     env:
       DJANGO_DEBUG: "true"
