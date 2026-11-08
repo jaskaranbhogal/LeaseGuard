@@ -13,6 +13,14 @@ db.sqlite3
 
 # Environment variables
 .env
+.env.*
+!.env.example
+
+# Local database credentials and private keys
+/secrets/
+**/credentials.json
+*.pem
+*.key
 
 # macOS
 .DS_Store
