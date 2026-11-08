@@ -104,17 +104,29 @@ jobs:
 
       - name: Start isolated MongoDB replica set
         run: |
-          docker run --detach --rm --name leaseguard-mongodb \
+          docker run --detach --name leaseguard-mongodb \
             --publish 27017:27017 mongo:8.0 \
             mongod --replSet leaseguard-ci --bind_ip_all
 
+          mongo_ready=false
           for attempt in $(seq 1 30); do
             if docker exec leaseguard-mongodb mongosh --quiet \
               --eval 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1; then
+              mongo_ready=true
               break
+            fi
+            if [ "$(docker inspect --format='{{.State.Running}}' leaseguard-mongodb 2>/dev/null || true)" != "true" ]; then
+              docker logs leaseguard-mongodb
+              exit 1
             fi
             sleep 2
           done
+
+          if [ "$mongo_ready" != "true" ]; then
+            echo "MongoDB did not become ready." >&2
+            docker logs leaseguard-mongodb
+            exit 1
+          fi
 
           docker exec leaseguard-mongodb mongosh --quiet --eval \
             'rs.initiate({_id: "leaseguard-ci", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
@@ -137,6 +149,10 @@ jobs:
 
       - name: Check database migration files
         run: python manage.py makemigrations --check --dry-run
+
+      - name: Remove MongoDB container
+        if: always()
+        run: docker rm --force leaseguard-mongodb || true
 
   react-native:
     name: React Native Checks
@@ -203,17 +219,29 @@ jobs:
 
       - name: Start isolated MongoDB replica set
         run: |
-          docker run --detach --rm --name leaseguard-mongodb \
+          docker run --detach --name leaseguard-mongodb \
             --publish 27017:27017 mongo:8.0 \
             mongod --replSet leaseguard-ci --bind_ip_all
 
+          mongo_ready=false
           for attempt in $(seq 1 30); do
             if docker exec leaseguard-mongodb mongosh --quiet \
               --eval 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1; then
+              mongo_ready=true
               break
+            fi
+            if [ "$(docker inspect --format='{{.State.Running}}' leaseguard-mongodb 2>/dev/null || true)" != "true" ]; then
+              docker logs leaseguard-mongodb
+              exit 1
             fi
             sleep 2
           done
+
+          if [ "$mongo_ready" != "true" ]; then
+            echo "MongoDB did not become ready." >&2
+            docker logs leaseguard-mongodb
+            exit 1
+          fi
 
           docker exec leaseguard-mongodb mongosh --quiet --eval \
             'rs.initiate({_id: "leaseguard-ci", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
@@ -241,6 +269,10 @@ jobs:
       - name: Run Jest tests
         working-directory: frontend
         run: npm test -- --ci --runInBand
+
+      - name: Remove MongoDB container
+        if: always()
+        run: docker rm --force leaseguard-mongodb || true
 
   deploy:
     name: Deploy
