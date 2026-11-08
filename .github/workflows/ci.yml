@@ -1,26 +1,92 @@
+name: LeaseGuard CI/CD
 
-name: LeaseGuard CI
-
+# Exercise the pipeline on every push and on pull requests to main.
 on:
+  push:
   pull_request:
     branches: [main]
-  push:
-    branches: [main, merge/tenantflow-jaskaran]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: leaseguard-ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  django:
-    name: Django Checks
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Report runtime versions
+        run: |
+          python --version
+          node --version
+          npm --version
+
+  dependencies:
+    name: Dependencies
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
+      - name: Set up Python and cache pip
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Set up Node and cache npm
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Install React Native dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # GitHub jobs use isolated runners. The check/test jobs use cached
+      # downloads but must still install their own dependencies.
+
+  django:
+    name: Django Checks
+    needs: dependencies
+    # MongoDB refuses to start on Linux kernels 6.19 through 7.0.13.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
     env:
       DJANGO_DEBUG: "true"
-      DJANGO_SECRET_KEY: "ci-only-test-key-not-for-production-use-123456789"
-
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_TEST_SECRET_KEY }}
+      MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=leaseguard-ci
+      MONGODB_DB_NAME: leaseguard_ci
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -37,38 +103,80 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Start isolated MongoDB replica set
+        run: |
+          docker run --detach --name leaseguard-mongodb \
+            --publish 27017:27017 mongo:8.0 \
+            mongod --replSet leaseguard-ci --bind_ip_all
+
+          mongo_ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec leaseguard-mongodb mongosh --quiet \
+              --eval 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1; then
+              mongo_ready=true
+              break
+            fi
+            if [ "$(docker inspect --format='{{.State.Running}}' leaseguard-mongodb 2>/dev/null || true)" != "true" ]; then
+              docker logs leaseguard-mongodb
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [ "$mongo_ready" != "true" ]; then
+            echo "MongoDB did not become ready." >&2
+            docker logs leaseguard-mongodb
+            exit 1
+          fi
+
+          docker exec leaseguard-mongodb mongosh --quiet --eval \
+            'rs.initiate({_id: "leaseguard-ci", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
+
+          for attempt in $(seq 1 30); do
+            state=$(docker exec leaseguard-mongodb mongosh --quiet \
+              --eval 'rs.status().myState' 2>/dev/null || true)
+            if [ "$state" = "1" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "MongoDB replica set did not elect a primary." >&2
+          docker logs leaseguard-mongodb
+          exit 1
+
       - name: Check Django configuration
         run: python manage.py check
 
-      - name: Check database migrations
+      - name: Check database migration files
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Run Django tests
-        run: python manage.py test
+      - name: Remove MongoDB container
+        if: always()
+        run: docker rm --force leaseguard-mongodb || true
 
   react-native:
     name: React Native Checks
+    needs: dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     defaults:
       run:
         working-directory: frontend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - name: Set up Node.js
+      - name: Set up Node
         uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install frontend dependencies
+      - name: Install React Native dependencies
         run: npm ci
 
       - name: Check TypeScript
@@ -77,5 +185,184 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+  test:
+    name: Test
+    needs: [django, react-native]
+    # Keep the test runner on the compatible Ubuntu 22.04 kernel as well.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_TEST_SECRET_KEY }}
+      MONGODB_URI: mongodb://127.0.0.1:27017/?replicaSet=leaseguard-ci
+      MONGODB_DB_NAME: leaseguard_ci
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Start isolated MongoDB replica set
+        run: |
+          docker run --detach --name leaseguard-mongodb \
+            --publish 27017:27017 mongo:8.0 \
+            mongod --replSet leaseguard-ci --bind_ip_all
+
+          mongo_ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec leaseguard-mongodb mongosh --quiet \
+              --eval 'db.adminCommand({ping: 1}).ok' >/dev/null 2>&1; then
+              mongo_ready=true
+              break
+            fi
+            if [ "$(docker inspect --format='{{.State.Running}}' leaseguard-mongodb 2>/dev/null || true)" != "true" ]; then
+              docker logs leaseguard-mongodb
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [ "$mongo_ready" != "true" ]; then
+            echo "MongoDB did not become ready." >&2
+            docker logs leaseguard-mongodb
+            exit 1
+          fi
+
+          docker exec leaseguard-mongodb mongosh --quiet --eval \
+            'rs.initiate({_id: "leaseguard-ci", members: [{_id: 0, host: "127.0.0.1:27017"}]})'
+
+          for attempt in $(seq 1 30); do
+            state=$(docker exec leaseguard-mongodb mongosh --quiet \
+              --eval 'rs.status().myState' 2>/dev/null || true)
+            if [ "$state" = "1" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "MongoDB replica set did not elect a primary." >&2
+          docker logs leaseguard-mongodb
+          exit 1
+
+      - name: Run Django authentication and backend tests
+        run: python manage.py test
+
+      - name: Install React Native dependencies
+        working-directory: frontend
+        run: npm ci
+
       - name: Run Jest tests
+        working-directory: frontend
         run: npm test -- --ci --runInBand
+
+      - name: Remove MongoDB container
+        if: always()
+        run: docker rm --force leaseguard-mongodb || true
+
+  deploy:
+    name: Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+      RENDER_HEALTHCHECK_URL: ${{ vars.RENDER_HEALTHCHECK_URL }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Package a backend release candidate
+        run: |
+          tar -czf "$RUNNER_TEMP/leaseguard-backend.tar.gz" \
+            manage.py requirements.txt backend accounts
+          echo "Backend release candidate packaged from commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload deployment candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: leaseguard-backend-${{ github.sha }}
+          path: ${{ runner.temp }}/leaseguard-backend.tar.gz
+          retention-days: 7
+
+      - name: Explain placeholder deployment
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main' || env.RENDER_DEPLOY_HOOK_URL == ''
+        run: |
+          echo "::notice::DEPLOYMENT NOT LIVE: packaged a release artifact only. Render credentials are not configured or this is not a main-branch push."
+          echo "### Deployment status: artifact only (NOT a live deployment)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Configure Render and GitHub Actions secrets, then merge a tested PR to main for a real deployment." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy tested main commit to Render and verify it
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.RENDER_DEPLOY_HOOK_URL != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$RENDER_API_KEY" || -z "$RENDER_SERVICE_ID" || -z "$RENDER_HEALTHCHECK_URL" ]]; then
+            echo "::error::Render deployment configured incompletely: set RENDER_API_KEY secret and RENDER_SERVICE_ID and RENDER_HEALTHCHECK_URL variables."
+            exit 1
+          fi
+
+          # Pin the deployment to the commit that passed the Test job.
+          url="$RENDER_DEPLOY_HOOK_URL"
+          if [[ "$url" == *\?* ]]; then
+            url="$url&ref=$GITHUB_SHA"
+          else
+            url="$url?ref=$GITHUB_SHA"
+          fi
+
+          response=$(curl --fail --silent --show-error -X POST "$url")
+          deploy_id=$(printf '%s' "$response" | jq -r '.deploy.id // empty')
+          if [[ -z "$deploy_id" ]]; then
+            echo "::error::Render did not return a deploy ID; the deployment is not verified (it may be queued)."
+            exit 1
+          fi
+
+          for attempt in $(seq 1 40); do
+            result=$(curl --fail --silent --show-error \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$deploy_id")
+            status=$(printf '%s' "$result" | jq -r '.status // empty')
+            commit=$(printf '%s' "$result" | jq -r '.commit.id // empty')
+            echo "Render deployment status: $status (attempt $attempt)"
+            if [[ "$status" == "live" ]]; then
+              if [[ "$commit" != "$GITHUB_SHA" ]]; then
+                echo "::error::Deployed commit does not match the tested GitHub commit."
+                exit 1
+              fi
+              curl --fail --silent --show-error \
+                --retry 5 --retry-delay 5 --retry-connrefused \
+                "$RENDER_HEALTHCHECK_URL" >/dev/null
+              echo "### Deployment status: LIVE" >> "$GITHUB_STEP_SUMMARY"
+              echo "Verified Render deploy $deploy_id for commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            case "$status" in
+              build_failed|update_failed|pre_deploy_failed|deactivated|canceled)
+                echo "::error::Render deployment failed: $status"
+                exit 1
+                ;;
+            esac
+            sleep 15
+          done
+          echo "::error::Timed out waiting for Render deployment to become live."
+          exit 1
