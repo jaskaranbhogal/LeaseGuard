@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -12,9 +13,12 @@ class AccountProfile(models.Model):
                                 related_name='account_profile')
     role = models.CharField(max_length=8, choices=Role.choices)
 
-    class Meta:
-        constraints = [models.CheckConstraint(
-            check=models.Q(role__in=['tenant', 'landlord']), name='valid_account_role')]
+    def save(self, *args, **kwargs):
+        # MongoDB doesn't support Django CheckConstraint, so validate roles in
+        # the model's normal save path as well as in the registration endpoint.
+        if self.role not in self.Role.values:
+            raise ValidationError({'role': 'Select Tenant or Landlord.'})
+        return super().save(*args, **kwargs)
 
 
 class PasswordResetRequest(models.Model):

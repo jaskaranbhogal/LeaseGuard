@@ -1,5 +1,8 @@
 asgiref==3.11.1
-Django==4.2.30
+Django==5.2.19
+django-mongodb-backend==5.2.4
 djangorestframework==3.16.1
+dnspython==2.9.2
+pymongo==4.19.0
 sqlparse==0.5.5
 typing_extensions==4.16.0

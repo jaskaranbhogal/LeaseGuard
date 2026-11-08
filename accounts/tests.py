@@ -4,6 +4,7 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 
+from bson import ObjectId
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
@@ -30,7 +31,7 @@ class AuthenticationTests(TestCase):
     def test_real_login_and_logout(self):
         response = self.post('login', {'email': ' RESIDENT@example.com ', 'password': self.password})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(int(self.client.session['_auth_user_id']), self.user.pk)
+        self.assertEqual(self.client.session['_auth_user_id'], str(self.user.pk))
         self.assertEqual(self.post('logout', {}).status_code, 200)
         self.assertNotIn('_auth_user_id', self.client.session)
 
@@ -154,7 +155,10 @@ class RegistrationTests(TestCase):
     def test_registration_creates_hashed_account_that_can_sign_in(self):
         response = self.post()
         self.assertEqual(response.status_code, 201)
+        self.assertIsInstance(response.json()['user']['id'], str)
+        self.assertRegex(response.json()['user']['id'], r'^[0-9a-f]{24}$')
         user = get_user_model().objects.get(pk=response.json()['user']['id'])
+        self.assertIsInstance(user.pk, ObjectId)
         self.assertEqual(user.email, 'new@example.com')
         self.assertEqual(user.get_full_name(), 'New Resident')
         self.assertTrue(user.check_password(self.data['password']))
@@ -239,11 +243,20 @@ class RegistrationTests(TestCase):
             self.assertEqual(self.post().status_code, 409)
         self.assertFalse(get_user_model().objects.exists())
 
-    def test_database_rejects_invalid_role(self):
-        from django.db import IntegrityError, transaction
-        self.post()
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            AccountProfile.objects.update(role='admin')
+    def test_model_rejects_invalid_role_on_save(self):
+        from django.core.exceptions import ValidationError
+        user = get_user_model().objects.create_user(username='role-validation')
+        profile = AccountProfile(user=user, role='admin')
+        with self.assertRaises(ValidationError):
+            profile.save()
+        self.assertFalse(AccountProfile.objects.filter(user=user).exists())
+
+    def test_one_profile_per_user_is_unique(self):
+        from django.db import IntegrityError
+        user = get_user_model().objects.create_user(username='one-profile')
+        AccountProfile.objects.create(user=user, role=AccountProfile.Role.TENANT)
+        with self.assertRaises(IntegrityError):
+            AccountProfile.objects.create(user=user, role=AccountProfile.Role.LANDLORD)
 
 
 class SessionTests(TestCase):
