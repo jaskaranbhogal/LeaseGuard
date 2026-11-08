@@ -10,7 +10,7 @@ Workflow: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
 | --- | --- | --- |
 | **Setup** | Checks out the repository and configures Python 3.12 and Node.js 22. | Implemented |
 | **Dependencies** | Installs the backend and frontend dependencies and populates package caches. | Implemented |
-| **Test** | After the existing **Django Checks** and **React Native Checks** succeed, runs Django's test suite and frontend Jest. | Implemented using the current SQLite code on main |
+| **Test** | After the existing **Django Checks** and **React Native Checks** succeed, runs Django's test suite against an isolated MongoDB replica set and frontend Jest. | Implemented; uses a disposable local database, not Atlas |
 | **Deploy** | Packages a versioned backend release candidate and uploads a GitHub Actions artifact. On a tested `main` push, can additionally trigger and verify a Render deployment once configured. | **Artifact-only; not a live deployment** until Render is configured |
 
 The workflow runs on every branch push, pull requests to `main`, and manually. Only a successful `main` push can trigger the live Render deployment. Do not add real Atlas credentials to a PR workflow; untrusted PR code must not receive production secrets.
@@ -21,16 +21,11 @@ The existing [`mobile-build.yml`](../.github/workflows/mobile-build.yml) still p
 
 **Important:** Each job has a separate GitHub Actions runner. Dependencies are installed again in the check and test jobs using the package caches. A successful **Deploy** job that says “artifact only” means a release candidate was packaged, **not** that the live mobile app or Django API has been deployed. Never use that job alone as proof of a completed production deployment.
 
-## After Dev's MongoDB migration is merged
+## MongoDB test configuration
 
-Dev's unpushed MongoDB changes are not part of this branch. Until they merge, this workflow runs the existing Django tests on SQLite.
+The **Django Checks** and **Test** jobs each start a fresh MongoDB 8.0 container configured as a single-node replica set. Each job sets `MONGODB_URI` to that local container and `MONGODB_DB_NAME` to `leaseguard_ci`; Django's test runner uses its separate `test_leaseguard_ci` database. This supports transaction-based registration tests and prevents CI from accessing a shared Atlas cluster. No Atlas credentials are needed in GitHub Actions.
 
-1. Rebase this workflow branch or incorporate it into the MongoDB integration branch after that migration is available.
-2. Update the Django check and Test jobs to use MongoDB's official Django backend configuration.
-3. Run an isolated MongoDB instance configured as a replica set for integration tests, or an isolated disposable Atlas database configured appropriately. Do **not** run destructive tests on a shared or production database.
-4. Run `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py test` against the MongoDB configuration.
-5. Validate authentication, role selection, sessions, password resets, and ObjectId serialization with the existing React Native frontend.
-6. Keep the Android/iOS build checks and existing protected status check names while migrating.
+The Django migration branch is available in PR #63. Until it is merged, `main` still uses its SQLite configuration; after integration, the same checks and test job exercise the MongoDB backend. Keep the Android/iOS build checks and existing protected status check names while migrating.
 
 ## Activating a real Render deployment
 

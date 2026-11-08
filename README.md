@@ -771,7 +771,7 @@ LeaseGuard's [GitHub Actions CI/CD workflow](.github/workflows/ci.yml) has the f
 
 **Current deployment status:** The Deploy stage is an explicitly labeled **artifact-only placeholder**, not evidence of a live Django deployment. Render credentials, a hosted backend, and real deployment verification are still outstanding. The mobile application continues to run in Xcode or Android development environments.
 
-The current `main` backend still uses SQLite. Dev's upcoming MongoDB migration will replace this database configuration. Once that branch is available, CI backend testing must be moved to an isolated MongoDB replica-set environment before declaring MongoDB compatibility.
+The Django Checks and Test jobs start an isolated MongoDB 8.0 replica set and use a disposable CI database. They never connect to the team's Atlas database. This supports the MongoDB migration in PR #63; until that migration is merged, `main` continues to use its existing SQLite configuration.
 
 The separate [mobile build workflow](.github/workflows/mobile-build.yml) validates Android and iOS debug builds. The `main` branch is protected with pull-request approval and required status checks. Add `Test` as a required check after its first successful run.
 
