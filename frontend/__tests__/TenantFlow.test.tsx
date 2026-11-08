@@ -33,13 +33,13 @@ import type { MaintenanceRequestId } from '../src/types/maintenance';
 
 jest.mock('../src/services/authService');
 const tenant: User = {
-  id: 1,
+  id: '000000000000000000000001',
   name: 'Test Tenant',
   email: 'tenant@example.com',
   role: 'tenant',
 };
 const landlord: User = {
-  id: 2,
+  id: '000000000000000000000002',
   name: 'Test Landlord',
   email: 'landlord@example.com',
   role: 'landlord',

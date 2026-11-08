@@ -31,14 +31,16 @@ it('uses a CSRF handshake and cookie-backed session for login', async () => {
   fetchMock.mockResolvedValueOnce(
     response({
       user: {
-        id: 8,
+        id: '000000000000000000000008',
         email: 'person@example.com',
         name: 'Person',
         role: 'tenant',
       },
     }),
   );
-  expect((await login(' person@example.com ', 'fixture-password')).id).toBe(8);
+  expect((await login(' person@example.com ', 'fixture-password')).id).toBe(
+    '000000000000000000000008',
+  );
   expect(fetchMock.mock.calls[1][1]).toMatchObject({
     method: 'POST',
     credentials: 'include',
@@ -109,7 +111,7 @@ it('registers with CSRF, trimmed identity fields, and unchanged passwords', asyn
     response(
       {
         user: {
-          id: 9,
+          id: '000000000000000000000009',
           name: 'Person',
           role: 'landlord',
           email: 'person@example.com',
@@ -118,7 +120,7 @@ it('registers with CSRF, trimmed identity fields, and unchanged passwords', asyn
       201,
     ),
   );
-  expect((await register(details)).id).toBe(9);
+  expect((await register(details)).id).toBe('000000000000000000000009');
   expect(fetchMock.mock.calls[1][0]).toContain('/auth/register/');
   expect(fetchMock.mock.calls[1][1]).toMatchObject({
     method: 'POST',
@@ -137,7 +139,7 @@ it('registers with CSRF, trimmed identity fields, and unchanged passwords', asyn
 
 it('restores only a valid server session and treats only 401 as signed out', async () => {
   const user = {
-    id: 1,
+    id: '000000000000000000000001',
     email: 'tenant@example.com',
     name: 'Tenant',
     role: 'tenant',
@@ -155,7 +157,30 @@ it('restores only a valid server session and treats only 401 as signed out', asy
 it.each(['admin', undefined, 1])('rejects an untrusted role %s', async role => {
   csrf();
   fetchMock.mockResolvedValueOnce(
-    response({ user: { id: 1, email: 'a@example.com', name: 'A', role } }),
+    response({
+      user: {
+        id: '000000000000000000000001',
+        email: 'a@example.com',
+        name: 'A',
+        role,
+      },
+    }),
+  );
+  await expect(login('a@example.com', 'password')).rejects.toThrow(
+    'invalid sign-in',
+  );
+});
+it.each([1, 'not-an-object-id'])('rejects an invalid ObjectId %s', async id => {
+  csrf();
+  fetchMock.mockResolvedValueOnce(
+    response({
+      user: {
+        id,
+        email: 'a@example.com',
+        name: 'A',
+        role: 'tenant',
+      },
+    }),
   );
   await expect(login('a@example.com', 'password')).rejects.toThrow(
     'invalid sign-in',
@@ -165,7 +190,12 @@ it('preserves legacy null roles and posts logout with a fresh CSRF token', async
   csrf();
   fetchMock.mockResolvedValueOnce(
     response({
-      user: { id: 1, email: 'a@example.com', name: 'A', role: null },
+      user: {
+        id: '000000000000000000000001',
+        email: 'a@example.com',
+        name: 'A',
+        role: null,
+      },
     }),
   );
   await expect(login('a@example.com', 'password')).resolves.toMatchObject({

@@ -40,13 +40,13 @@ import {
 
 jest.mock('../src/services/authService');
 const landlord: User = {
-  id: 2,
+  id: '000000000000000000000002',
   name: 'Alex Owner',
   email: 'owner@example.com',
   role: 'landlord',
 };
 const tenant: User = {
-  id: 1,
+  id: '000000000000000000000001',
   name: 'Test Tenant',
   email: 'tenant@example.com',
   role: 'tenant',

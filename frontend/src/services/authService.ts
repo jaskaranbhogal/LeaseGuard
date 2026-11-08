@@ -73,8 +73,8 @@ function isUser(value: unknown): value is User {
   }
   const user = value as Partial<User>;
   return (
-    typeof user.id === 'number' &&
-    user.id > 0 &&
+    typeof user.id === 'string' &&
+    /^[0-9a-f]{24}$/i.test(user.id) &&
     typeof user.email === 'string' &&
     typeof user.name === 'string' &&
     (user.role === 'tenant' || user.role === 'landlord' || user.role === null)

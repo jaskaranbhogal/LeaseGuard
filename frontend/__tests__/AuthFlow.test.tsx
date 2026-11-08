@@ -106,7 +106,7 @@ it('passes credentials to the service and never treats a rejection as success', 
 });
 it('acknowledges a legacy account without granting access to a role dashboard', async () => {
   login.mockResolvedValue({
-    id: 1,
+    id: '000000000000000000000001',
     email: 'resident@example.com',
     name: 'Resident',
     role: null,
@@ -297,7 +297,7 @@ it('blocks duplicate registration and confirms creation before returning to sign
   );
   await act(async () => {
     accept({
-      id: 10,
+      id: '00000000000000000000000a',
       name: 'New Resident',
       email: 'new@example.com',
       role: 'tenant',
@@ -332,7 +332,7 @@ it('cancels registration on leaving the screen', async () => {
   expect(signal?.aborted).toBe(true);
   await act(async () => {
     accept({
-      id: 10,
+      id: '00000000000000000000000a',
       name: 'New Resident',
       email: 'new@example.com',
       role: 'tenant',
@@ -371,7 +371,7 @@ it.each(['tenant', 'landlord'] as const)(
     jest
       .mocked(auth.register)
       .mockResolvedValueOnce({
-        id: 20,
+        id: '000000000000000000000014',
         name: 'New Resident',
         email: 'new@example.com',
         role,
