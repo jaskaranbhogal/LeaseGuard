@@ -9,7 +9,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
+from django_mongodb_backend import transaction
 from django.http import JsonResponse
 from django.middleware.csrf import get_token
 from django.views.decorators.cache import never_cache
@@ -22,7 +23,7 @@ from .models import AccountProfile, PasswordResetRequest
 
 def user_data(user):
     role = AccountProfile.objects.filter(user=user).values_list('role', flat=True).first()
-    return {'id': user.pk, 'email': user.email,
+    return {'id': str(user.pk), 'email': user.email,
             'name': user.get_full_name() or user.get_username(), 'role': role}
 
 

@@ -195,7 +195,11 @@ The following features represent the planned application scope. See the Developm
 | Navigation | React Navigation |
 | Backend | Python, Django |
 | API Development | Django REST Framework (planned for additional APIs) |
-| Current Database | SQLite |
+| Database | MongoDB Atlas via Django MongoDB Backend |
+| Python | 3.12 |
+| Django | 5.2.19 |
+| Django MongoDB Backend | 5.2.4 |
+| MongoDB Server | 6.0, 7.0, or 8.0 |
 | Planned AI Integration | Vision-capable AI API (provider to be finalized) |
 | iOS Development | Xcode, CocoaPods |
 | Android Development | Android Studio, Android SDK |
@@ -207,7 +211,7 @@ The following features represent the planned application scope. See the Developm
 | UI/UX Design | Figma |
 | Project Management | GitHub Projects |
 
-The current backend uses SQLite for development. A production database and AI service have not yet been finalized.
+The Django backend is configured to store application data in MongoDB Atlas. Local development and automated tests use the same MongoDB driver and isolated databases.
 
 ---
 
@@ -259,11 +263,11 @@ Future backend functionality will include property management, inspection schedu
 
 ### 3. Database — Data Layer
 
-LeaseGuard currently uses SQLite as its development database.
+LeaseGuard is configured for MongoDB Atlas through MongoDB's official Django MongoDB Backend 5.2.4. Django remains the only component that connects to the database; React Native calls the Django JSON API and never receives database credentials.
 
 Django's Object-Relational Mapper (ORM) provides an interface for storing and retrieving data without requiring raw SQL for routine database operations.
 
-The database currently manages:
+MongoDB collections currently manage:
 
 - User account information.
 - Authentication and session data.
@@ -279,7 +283,7 @@ Future database models will support:
 - Property condition history.
 - References to inspection photographs.
 
-A production database solution will be evaluated as the project approaches deployment.
+MongoDB uses ObjectId primary keys. Django serializes user IDs as strings in API responses. Existing SQLite migration files and the local `db.sqlite3` are retained for reference; this change does not copy SQLite records into MongoDB.
 
 ### 4. Planned AI Integration
 
@@ -306,14 +310,14 @@ The following diagram illustrates the current client-server structure and planne
 flowchart TD
     A[Landlord / Tenant] --> B[React Native Mobile App]
     B -->|HTTP API Requests| C[Django Backend]
-    C --> D[(SQLite Database)]
+    C --> D[(MongoDB Atlas)]
     B --> E[Local Tenant Prototype Data]
     C -. Future Integration .-> F[Property and Inspection Services]
     F -. Future Integration .-> G[Photo Storage and AI Analysis]
     F -. Future Integration .-> H[Notification Service]
 ```
 
-The solid connections represent the current application architecture. Dashed connections represent features planned for future development.
+The React Native app communicates only with Django. Django uses MongoDB Atlas for database access. The solid connections represent the current application architecture. Dashed connections represent features planned for future development.
 
 ---
 
@@ -347,7 +351,7 @@ cd LeaseGuard
 
 ### 2. Backend Setup
 
-The Django backend is located at the repository root.
+The Django backend is located at the repository root. Use Python 3.12 for the pinned backend dependencies.
 
 Create a Python virtual environment:
 
@@ -388,6 +392,8 @@ Example:
 ```env
 DJANGO_DEBUG=true
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,[::1]
+MONGODB_URI=<paste the connection string from MongoDB Atlas here>
+MONGODB_DB_NAME=leaseguard
 
 EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 PASSWORD_RESET_BASE_URL=http://localhost:8000
@@ -396,6 +402,18 @@ PASSWORD_RESET_BASE_URL=http://localhost:8000
 For local development, Django can generate a persistent development-only secret key.
 
 Production deployments must provide a secure `DJANGO_SECRET_KEY`.
+
+The backend requires `MONGODB_URI` and will fail at startup if it is missing or is not a MongoDB URI. `MONGODB_DB_NAME` defaults to `leaseguard`. Never commit a real Atlas URI or database password.
+
+#### MongoDB Atlas Setup
+
+1. Create a MongoDB Atlas cluster.
+2. Under **Database Access**, create a database user with read/write access to the `leaseguard` database.
+3. Under **Network Access**, allow the IP address of the machine running Django.
+4. Choose **Connect → Drivers → Python** and copy the connection URI.
+5. Put the URI in the ignored `.env` file as `MONGODB_URI`; replace the sample username, password, and cluster host. Set `MONGODB_DB_NAME=leaseguard`.
+
+Atlas passwords containing reserved URI characters must be URL-encoded. Keep the URI on the Django server; do not add it to React Native configuration.
 
 **Important:** Django does not automatically load the `.env` file.
 
@@ -412,6 +430,8 @@ Apply database migrations:
 ```bash
 python manage.py migrate
 ```
+
+This creates MongoDB collections and indexes for Django authentication, sessions, admin, account profiles, and password-reset requests. The MongoDB-compatible Django built-in app migrations are in `mongo_migrations/`. The original `accounts/migrations/` SQLite history is retained unchanged. Django migrations create the empty MongoDB structures; they do not transfer users, sessions, or password-reset records from `db.sqlite3`.
 
 Start the Django development server:
 
@@ -732,11 +752,39 @@ Check Django configuration:
 python manage.py check
 ```
 
-Check for missing database migrations:
+Check for missing MongoDB migrations:
 
 ```bash
 python manage.py makemigrations --check --dry-run
 ```
+
+The Django test runner uses a separate `test_` database name and drops it after the run. Registration uses MongoDB transactions, so tests must connect to a replica set or sharded cluster. Use an isolated local MongoDB replica set for tests; do not point tests at a shared Atlas database. The CI workflow starts a temporary MongoDB 8.0 replica set automatically.
+
+To start a local replica set when `mongod` and `mongosh` are installed, run this in one terminal and leave it running:
+
+```bash
+mkdir -p /tmp/leaseguard-mongodb-test
+mongod --dbpath /tmp/leaseguard-mongodb-test --bind_ip 127.0.0.1 \
+  --port 27028 --replSet leaseguard-test
+```
+
+In another terminal, initialize it once:
+
+```bash
+mongosh 'mongodb://127.0.0.1:27028/admin' --eval \
+  'rs.initiate({_id:"leaseguard-test",members:[{_id:0,host:"127.0.0.1:27028"}]})'
+```
+
+Then run the isolated backend tests:
+
+```bash
+MONGODB_URI='mongodb://127.0.0.1:27028/?replicaSet=leaseguard-test' \
+MONGODB_DB_NAME=leaseguard_local python manage.py test
+```
+
+The test command refuses remote MongoDB hosts to prevent its temporary database cleanup from affecting a shared Atlas cluster.
+
+To verify tenant and landlord registration manually, start Django and Metro, launch the app in Xcode, register one account with each role using different email addresses, then sign in and confirm each account retains its selected role. The backend test suite also exercises both roles, password hashing, duplicate registration, sessions, CSRF, logout, and password resets.
 
 ### 6. Future Testing
 
@@ -789,7 +837,8 @@ LeaseGuard is currently under active development.
 
 - [x] Initial React Native project setup.
 - [x] Django backend project setup.
-- [x] SQLite development database.
+- [x] MongoDB Django backend configuration and ObjectId authentication IDs.
+- [ ] Configure Atlas credentials and apply migrations to the selected Atlas cluster.
 - [x] React Navigation authentication flow.
 - [x] Loading/splash screen.
 - [x] Login screen.
