@@ -15,7 +15,7 @@ Workflow: [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
 
 The workflow runs on every branch push, pull requests to `main`, and manually. Only a successful `main` push can trigger the live Render deployment. Do not add real Atlas credentials to a PR workflow; untrusted PR code must not receive production secrets.
 
-The pipeline preserves the existing `Django Checks` and `React Native Checks` job names used in the `main` ruleset. Once the new `Test` job has run and passed, add `Test` to the required status checks in the existing **Protect main** ruleset.
+The pipeline preserves the `Django Checks` and `React Native Checks` job names used in the `main` ruleset. The **Protect main** ruleset has now been updated to require **Django Checks**, **React Native Checks**, and **Test**, plus at least one approving teammate review and an up-to-date branch.
 
 The existing [`mobile-build.yml`](../.github/workflows/mobile-build.yml) still performs native iOS and Android build checks.
 
@@ -25,7 +25,7 @@ The existing [`mobile-build.yml`](../.github/workflows/mobile-build.yml) still p
 
 The **Django Checks** and **Test** jobs run on Ubuntu 22.04 and each start a fresh MongoDB 8.0 container configured as a single-node replica set. MongoDB stops at startup on Linux kernels 6.19 through 7.0.13; Ubuntu 22.04 keeps these jobs on a compatible hosted-runner kernel. Each job sets `MONGODB_URI` to that local container and `MONGODB_DB_NAME` to `leaseguard_ci`; Django's test runner uses its separate `test_leaseguard_ci` database. This supports transaction-based registration tests and prevents CI from accessing a shared Atlas cluster. No Atlas credentials are needed in GitHub Actions.
 
-The Django migration branch is available in PR #63. Until it is merged, `main` still uses its SQLite configuration; after integration, the same checks and test job exercise the MongoDB backend. Keep the Android/iOS build checks and existing protected status check names while migrating.
+The MongoDB backend migration is merged into `main` in [PR #63](https://github.com/jaskaranbhogal/LeaseGuard/pull/63), and the four-stage CI/CD workflow was merged in [PR #62](https://github.com/jaskaranbhogal/LeaseGuard/pull/62). The [post-merge run](https://github.com/jaskaranbhogal/LeaseGuard/actions/runs/42539454212) passed all six jobs against the MongoDB-backed application. [Native iOS and Android build checks](https://github.com/jaskaranbhogal/LeaseGuard/actions/runs/42539454206) also passed. Real Atlas connectivity is separate and still requires verification.
 
 ## Activating a real Render deployment
 
@@ -47,12 +47,12 @@ If `RENDER_DEPLOY_HOOK_URL` is absent, Deploy deliberately records **“artifact
 
 ## Branch protection
 
-Keep **Protect main** active: block direct pushes, require a pull request and at least one approval, and require green checks. Add the `Test` job as a required status check only after GitHub reports that check at least once. Keep the existing checks required until replacements are verified.
+The active [Protect main ruleset](https://github.com/jaskaranbhogal/LeaseGuard/rules/24912861) protects the default branch with pull-request review, **one approving teammate review**, **up-to-date branch requirement**, and green **Django Checks**, **React Native Checks**, and **Test** jobs. Do not remove these protections when preparing future PRs.
 
 ## Assignment evidence and video
 
-When recording the three-minute video, show the user story issue, feature/merge PR, teammate approval, green **Test** job, and (once connected) the verified live **Deploy** job and running API URL. Do **not** label a placeholder artifact upload as a completed Django deployment. Record a new commit and green run with the MongoDB-based tests if those changes are required to demonstrate the final application.
+For the three-minute project video, show the GitHub Projects board, completed development-task issues [#64](https://github.com/jaskaranbhogal/LeaseGuard/issues/64) and [#65](https://github.com/jaskaranbhogal/LeaseGuard/issues/65), merged PRs, ruleset, the successful **Test** job, and the **Deploy** artifact-upload evidence. Eleven development tasks are completed; the larger original application user stories remain open until full end-to-end acceptance criteria pass. If actual live deployment is a grading requirement, provide a separate verified hosted API URL and health check. **Do not** describe the artifact upload as a completed Django deployment.
 
-## AI-use statement (to complete truthfully)
+## AI assistance and verification
 
-Describe which tasks you asked AI to assist with (for example, drafting pipeline stages or documentation), which generated configurations you checked, and **any actual errors you found and fixed**. Do not claim a specific error was discovered or corrected unless that happened.
+AI tools assisted with planning/refining parts of the CI/CD workflow and documentation. The team reviewed proposed changes, tested them through CI and PR review, and addressed MongoDB CI startup issues with clearer failure logs and compatible Ubuntu 22.04 runners in PR #62. See the README's AI-assisted development and verification section. Additional individual uses of AI should be disclosed accurately by the relevant team members; do not invent unverified activities.
