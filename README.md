@@ -714,7 +714,7 @@ The workflow is located at:
 
 These checks help identify errors before new code is merged into the main branch.
 
-Full native iOS and Android builds are not currently included in the GitHub Actions workflow.
+Native iOS and Android debug builds are validated by the separate GitHub Actions workflow at `.github/workflows/mobile-build.yml`.
 
 ### 5. Running the Tests
 
@@ -805,39 +805,25 @@ The test plan will continue to evolve as LeaseGuard's features are implemented.
 
 ---
 
-## Continuous Integration
 
-LeaseGuard uses GitHub Actions to automatically run code quality checks and tests.
+## Sprint 2: CI/CD Pipeline
 
-The workflow is defined in:
+LeaseGuard's [GitHub Actions CI/CD workflow](.github/workflows/ci.yml) has the four named stages required for Module 9: **Setup → Dependencies → Test → Deploy**.
 
-```text
-.github/workflows/ci.yml
-```
+- **Setup:** configures Python 3.12 and Node.js 22.
+- **Dependencies:** installs the Django and React Native dependencies.
+- **Django Checks:** validates the Django project and checks for missing migrations.
+- **React Native Checks:** runs TypeScript and ESLint.
+- **Test:** runs Django backend tests and React Native Jest tests, after both checks succeed.
+- **Deploy:** packages an auditable backend artifact and, **once Render is configured**, triggers and verifies a live Django API deployment only on successful pushes to `main`.
 
-### Django CI
+**Current deployment status:** The Deploy stage is an explicitly labeled **artifact-only placeholder**, not evidence of a live Django deployment. Render credentials, a hosted backend, and real deployment verification are still outstanding. The mobile application continues to run in Xcode or Android development environments.
 
-- Installs Python dependencies.
-- Runs Django system checks.
-- Checks database migration consistency.
-- Runs Django tests.
+The Django Checks and Test jobs run on Ubuntu 22.04, start an isolated MongoDB 8.0 replica set, and use a disposable CI database. They never connect to the team's Atlas database. This supports the MongoDB migration in PR #63; until that migration is merged, `main` continues to use its existing SQLite configuration.
 
-### React Native CI
+The separate [mobile build workflow](.github/workflows/mobile-build.yml) validates Android and iOS debug builds. The `main` branch is protected with pull-request approval and required status checks. Add `Test` as a required check after its first successful run.
 
-- Installs Node.js dependencies.
-- Checks TypeScript compilation.
-- Runs ESLint.
-- Executes Jest tests.
-
-The workflow runs automatically on:
-
-- Pull requests targeting `main`.
-- Pushes to `main` and the configured integration branch.
-- Manual workflow dispatch.
-
-This helps detect problems before code changes are merged into the main branch.
-
-**Current scope:** CI runs backend and frontend checks. Full native iOS/Android builds and automated deployment are not currently included.
+For the full workflow, secrets, MongoDB follow-up work, production deploy setup, and video evidence, see **[Sprint 2 CI/CD Guide](docs/SPRINT2_CICD.md)**.
 
 [View GitHub Actions](https://github.com/jaskaranbhogal/LeaseGuard/actions)
 
