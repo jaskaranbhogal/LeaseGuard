@@ -195,7 +195,7 @@ The following features represent the planned application scope. See the Developm
 | Navigation | React Navigation |
 | Backend | Python, Django |
 | API Development | Django REST Framework (planned for additional APIs) |
-| Database | MongoDB Atlas via Django MongoDB Backend |
+| Database | MongoDB via the official Django MongoDB Backend (Atlas connection pending verification) |
 | Python | 3.12 |
 | Django | 5.2.19 |
 | Django MongoDB Backend | 5.2.4 |
@@ -211,7 +211,7 @@ The following features represent the planned application scope. See the Developm
 | UI/UX Design | Figma |
 | Project Management | GitHub Projects |
 
-The Django backend is configured to store application data in MongoDB Atlas. Local development and automated tests use the same MongoDB driver and isolated databases.
+The Django backend now uses MongoDB through the official Django MongoDB Backend. CI runs against disposable local MongoDB replica sets; connectivity to the team's MongoDB Atlas cluster still needs to be configured and verified.
 
 ---
 
@@ -236,7 +236,7 @@ The frontend is responsible for:
 
 React Navigation is used to manage application navigation. Authentication state is maintained through a shared React context, which determines whether users access authentication screens or role-specific navigation.
 
-The application currently includes functional authentication screens and tenant prototype workflows. The landlord dashboard remains under development.
+The application includes functional authentication and role-based navigation, plus integrated tenant and landlord dashboard prototypes. Dashboard property, inspection, maintenance, and history records currently use sample data; persistent backend integration is still pending.
 
 The tenant prototype uses local sample data for inspections, maintenance records, and property history. These demonstrations will be connected to backend services as development progresses.
 
@@ -263,7 +263,7 @@ Future backend functionality will include property management, inspection schedu
 
 ### 3. Database — Data Layer
 
-LeaseGuard is configured for MongoDB Atlas through MongoDB's official Django MongoDB Backend 5.2.4. Django remains the only component that connects to the database; React Native calls the Django JSON API and never receives database credentials.
+LeaseGuard uses MongoDB through the official Django MongoDB Backend 5.2.4. MongoDB Atlas is the intended hosted database, but live Atlas connectivity has not yet been verified. Django remains the only component that connects to the database; React Native calls the Django JSON API and never receives database credentials.
 
 Django's Object-Relational Mapper (ORM) provides an interface for storing and retrieving data without requiring raw SQL for routine database operations.
 
@@ -310,14 +310,14 @@ The following diagram illustrates the current client-server structure and planne
 flowchart TD
     A[Landlord / Tenant] --> B[React Native Mobile App]
     B -->|HTTP API Requests| C[Django Backend]
-    C --> D[(MongoDB Atlas)]
+    C --> D[(MongoDB database)]
     B --> E[Local Tenant Prototype Data]
     C -. Future Integration .-> F[Property and Inspection Services]
     F -. Future Integration .-> G[Photo Storage and AI Analysis]
     F -. Future Integration .-> H[Notification Service]
 ```
 
-The React Native app communicates only with Django. Django uses MongoDB Atlas for database access. The solid connections represent the current application architecture. Dashed connections represent features planned for future development.
+The React Native app communicates only with Django, and Django uses MongoDB for database access. CI verifies database operations against a local replica set; production Atlas connectivity is not yet confirmed. Dashed connections represent services planned for future development.
 
 ---
 
@@ -598,7 +598,7 @@ For request formats, configuration, and verification details, refer to:
 
 [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
 
-**Current scope:** Tenants reach the tenant demo, landlords reach a coming-soon screen with logout, and legacy accounts without roles see an assignment-needed screen. Property ownership and unit membership are not granted by account type. See [tenant integration and verification](docs/TENANT_INTEGRATION.md).
+**Current scope:** Tenants and landlords reach role-specific prototype dashboards after authentication. Their property and inspection content still uses sample data; property ownership and unit membership are not granted by account type. Legacy accounts without a role need one assigned. See [tenant integration and verification](docs/TENANT_INTEGRATION.md).
 
 ---
 
@@ -819,13 +819,19 @@ LeaseGuard's [GitHub Actions CI/CD workflow](.github/workflows/ci.yml) has the f
 
 **Current deployment status:** The Deploy stage is an explicitly labeled **artifact-only placeholder**, not evidence of a live Django deployment. Render credentials, a hosted backend, and real deployment verification are still outstanding. The mobile application continues to run in Xcode or Android development environments.
 
-The Django Checks and Test jobs run on Ubuntu 22.04, start an isolated MongoDB 8.0 replica set, and use a disposable CI database. They never connect to the team's Atlas database. This supports the MongoDB migration in PR #63; until that migration is merged, `main` continues to use its existing SQLite configuration.
+The Django Checks and Test jobs run on Ubuntu 22.04 against a disposable MongoDB 8.0 replica set, not the team's Atlas cluster. The MongoDB migration is merged in [PR #63](https://github.com/jaskaranbhogal/LeaseGuard/pull/63), and the four-stage pipeline is merged in [PR #62](https://github.com/jaskaranbhogal/LeaseGuard/pull/62). The [post-merge `main` workflow](https://github.com/jaskaranbhogal/LeaseGuard/actions/runs/42539454212) passed all six jobs.
 
-The separate [mobile build workflow](.github/workflows/mobile-build.yml) validates Android and iOS debug builds. The `main` branch is protected with pull-request approval and required status checks. Add `Test` as a required check after its first successful run.
+The separate [mobile build workflow](.github/workflows/mobile-build.yml) validates Android and iOS debug builds. The active [Protect main ruleset](https://github.com/jaskaranbhogal/LeaseGuard/rules/24912861) requires a pull request, at least one approving teammate review, an up-to-date branch, and passing **Django Checks**, **React Native Checks**, and **Test** status checks.
 
 For the full workflow, secrets, MongoDB follow-up work, production deploy setup, and video evidence, see **[Sprint 2 CI/CD Guide](docs/SPRINT2_CICD.md)**.
 
 [View GitHub Actions](https://github.com/jaskaranbhogal/LeaseGuard/actions)
+
+---
+
+### AI-assisted development and verification
+
+AI assistance was used to help plan and refine parts of the CI/CD workflow and documentation. The team reviewed the proposed configuration and validated it through GitHub Actions runs and pull-request reviews. During implementation, MongoDB CI startup errors prompted additional container diagnostics and use of compatible Ubuntu 22.04 runners; the fixes were integrated into [PR #62](https://github.com/jaskaranbhogal/LeaseGuard/pull/62). Automated success does not establish a live Atlas or Render deployment.
 
 ---
 
@@ -838,7 +844,6 @@ LeaseGuard is currently under active development.
 - [x] Initial React Native project setup.
 - [x] Django backend project setup.
 - [x] MongoDB Django backend configuration and ObjectId authentication IDs.
-- [ ] Configure Atlas credentials and apply migrations to the selected Atlas cluster.
 - [x] React Navigation authentication flow.
 - [x] Loading/splash screen.
 - [x] Login screen.
@@ -852,17 +857,23 @@ LeaseGuard is currently under active development.
 - [x] Password reset request processing.
 - [x] Shared frontend components and styling.
 - [x] Tenant dashboard prototype with sample data.
+- [x] Landlord dashboard, add-property, inspection scheduling, AI review and history **prototypes** with sample data (PR #33).
 - [x] Guided inspection prototype.
 - [x] Tenant maintenance and availability prototype screens.
+- [x] Maintenance report camera/gallery selection and local photo previews (PR #28); backend submission remains pending.
+- [x] Shared Notifications and Settings prototypes, plus Profile, Privacy & Security, and in-app Privacy Policy screens (PRs #33 and #61).
 - [x] iOS scene lifecycle compatibility changes.
 - [x] Frontend authentication and navigation tests.
 - [x] Backend authentication tests.
-- [x] GitHub Actions CI workflow.
+- [x] Four-stage GitHub Actions CI/CD workflow (Setup, Dependencies, Test, Deploy-artifact preparation; PR #62).
+- [x] MongoDB-compatible authentication migrations, ObjectId IDs, and isolated MongoDB-backed automated tests (PR #63).
+- [x] Native iOS and Android build checks (PR #29).
+- [x] Branch protection with teammate approval and required Django, React Native and Test checks.
 - [x] Figma prototype with personas, context diagram, UI designs, and UX workflows.
 
 ### Planned / In Progress
 
-- [ ] Complete landlord dashboard.
+- [ ] Configure Atlas credentials, run migrations on the intended cluster, and verify application connectivity.
 - [ ] Complete tenant dashboard with backend data.
 - [ ] Property and unit management APIs.
 - [ ] Property creation and editing.
@@ -872,17 +883,17 @@ LeaseGuard is currently under active development.
 - [ ] Photo uploads and baseline storage.
 - [ ] AI-assisted image comparison.
 - [ ] Damage severity classification.
-- [ ] Landlord inspection review.
+- [ ] Connect landlord inspection review prototype to persisted inspections and AI findings.
 - [ ] Maintenance request submission and backend tracking.
 - [ ] Persistent property condition history.
-- [ ] Notifications.
+- [ ] Event-based notification delivery and persistent notification records.
 - [ ] Frontend integration with the remaining backend APIs.
 - [ ] End-to-end testing.
 - [ ] Production deployment.
 
-Some tenant screens currently demonstrate functionality using local sample data. These screens are not yet connected to persistent inspection, maintenance, or property management services.
+Tenant and landlord prototype screens use local sample records for properties, inspections, maintenance and history. Their full original user stories (#1–#21) remain open until their respective acceptance criteria pass; completing a frontend prototype or an engineering task does not automatically complete its broader user story.
 
-Development tasks and priorities are tracked through the project's GitHub board.
+As of the Sprint 2 review, **11 development tasks** are recorded as completed, including [#64 MongoDB migration](https://github.com/jaskaranbhogal/LeaseGuard/issues/64) and [#65 four-stage CI/CD and required Test check](https://github.com/jaskaranbhogal/LeaseGuard/issues/65). [#54 Production Database and Deployment](https://github.com/jaskaranbhogal/LeaseGuard/issues/54) remains open for Atlas configuration and optional live hosting. Development tasks and priorities are tracked through the project's GitHub board.
 
 ---
 
@@ -892,7 +903,8 @@ Development tasks and priorities are tracked through the project's GitHub board.
 LeaseGuard/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml
+│       ├── ci.yml
+│       └── mobile-build.yml
 │
 ├── accounts/
 │   ├── management/
@@ -910,7 +922,10 @@ LeaseGuard/
 │
 ├── docs/
 │   ├── AUTHENTICATION.md
+│   ├── SPRINT2_CICD.md
 │   └── TENANT_INTEGRATION.md
+│
+├── mongo_migrations/
 │
 ├── frontend/
 │   ├── android/
@@ -952,10 +967,10 @@ The team uses GitHub Projects to organize user stories, monitor development prog
 
 The project board uses the following workflow:
 
-1. Product Backlog
-2. Sprint Backlog
-3. In Progress
-4. Testing / Review
+1. Backlog
+2. Ready
+3. In progress
+4. In review
 5. Done
 
 Features are broken down into user stories with acceptance criteria to guide implementation and testing.
