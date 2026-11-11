@@ -8,7 +8,7 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 
 **Project links:** [Figma prototype](https://www.figma.com/design/28N5do1M7uUQwJWH3uKGSb/LeaseGuard-%E2%80%93-Sprint-Prototype) · [GitHub Kanban board](https://github.com/users/jaskaranbhogal/projects/1/views/1) · [User stories and acceptance criteria](USER_STORIES.md) · [GitHub Actions](https://github.com/jaskaranbhogal/LeaseGuard/actions)
 
-## Features and Development Status
+## Sprint 0 — Project Scope and Backlog
 
 | Implemented / prototype | Planned or in progress |
 | --- | --- |
