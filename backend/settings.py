@@ -49,6 +49,7 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1
 
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
+    'inspections.apps.InspectionsConfig',
     'backend.apps.MongoAdminConfig',
     'backend.apps.MongoAuthConfig',
     'backend.apps.MongoContentTypesConfig',
@@ -129,6 +130,10 @@ MIGRATION_MODULES = {
     'contenttypes': 'mongo_migrations.contenttypes',
     'accounts': 'mongo_migrations.accounts',
 }
+
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash-lite').strip() or 'gemini-3.5-flash-lite'
 
 
 # Password validation
