@@ -51,7 +51,7 @@ The React Native landlord inspection review screen includes a **Live photo compa
 - `GET /api/inspections/<id>/photos/<baseline|current>/`: owner-only private JPEG response with no-cache headers. No public bucket links.
 - `POST /api/inspections/<id>/decision/`: landlord-account-only confirmation, dismissal, or resolution of an owner's comparison; saves decision history.
 
-Each image is limited to 8 MB upload, 20 megapixels decoded, and resized to 1500 px max side. The backend allows **three AI requests per user per UTC day**; the same photo pair, room and area are content-addressed, so a repeated submission uses the cached result and never calls Gemini again. There are no provider retries.
+Each image is limited to 8 MB upload, 20 megapixels decoded, and resized to 1500 px max side. The backend allows **three AI requests per user per UTC day and at most 30 AI requests globally per UTC day**; the same photo pair, room and area are content-addressed, so a repeated submission uses the cached result and never calls Gemini again. There are no provider retries.
 
 Image records carry `retain_until = created_at + 90 days`. `python manage.py cleanup_inspection_media` lists expired comparisons and `python manage.py cleanup_inspection_media --execute` removes only those past their retention date. The cleanup command must be scheduled and verified before a production rollout; without it, images are kept **longer** than 90 days. MongoDB stores binary media with GridFS; the React Native app never connects directly to MongoDB.
 

@@ -9,7 +9,7 @@ from pymongo.errors import PyMongoError
 
 from accounts.models import AccountProfile
 from . import storage
-from .services import AIComparisonError, compare_images_safe, prepare_image
+from .services import AIComparisonError, MAX_UPLOAD_BYTES, compare_images_safe, prepare_image
 
 
 def _auth(request):
@@ -51,6 +51,8 @@ def compare_photo_view(request):
     baseline, current = request.FILES.get("baseline"), request.FILES.get("current")
     if not baseline or not current:
         return JsonResponse({"detail": "Upload a baseline and current photo."}, status=400)
+    if baseline.size > MAX_UPLOAD_BYTES or current.size > MAX_UPLOAD_BYTES:
+        return JsonResponse({"detail": "Each photo must be 8 MB or smaller."}, status=413)
     room = request.POST.get("room", "").strip()
     area = request.POST.get("area", "").strip()
     if not (1 <= len(room) <= 100 and 1 <= len(area) <= 100):

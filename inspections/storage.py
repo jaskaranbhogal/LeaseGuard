@@ -15,6 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 RETENTION_DAYS = 90
 DAILY_AI_CALLS_PER_USER = 3
+GLOBAL_AI_CALLS_PER_DAY = 30
 
 
 @lru_cache(maxsize=1)
@@ -23,7 +24,7 @@ def _client():
 
 
 def database():
-    return _client()[settings.MONGODB_DB_NAME]
+    return _client()[settings.DATABASES['default']['NAME']]
 
 
 def _pair_id(owner_id, baseline_bytes, current_bytes, room, area):
@@ -80,19 +81,27 @@ def create_pair(owner_id, room, area, baseline_bytes, current_bytes):
 
 
 def consume_daily_call(owner_id):
-    """Atomic, server-side quota. Returns False after 3 calls/day per account."""
+    """Atomic global and per-user limits; never more than 30 model calls/day."""
     db = database()
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    try:
-        updated = db.inspection_ai_usage.find_one_and_update(
-            {"_id": f"{owner_id}:{day}", "calls": {"$lt": DAILY_AI_CALLS_PER_USER}},
-            {"$inc": {"calls": 1}, "$setOnInsert": {"day": day}},
-            upsert=True,
-            return_document=ReturnDocument.AFTER,
-        )
-    except DuplicateKeyError:
-        return False
-    return bool(updated and updated["calls"] <= DAILY_AI_CALLS_PER_USER)
+
+    def reserve(key, limit):
+        try:
+            updated = db.inspection_ai_usage.find_one_and_update(
+                {"_id": key, "calls": {"$lt": limit}},
+                {"$inc": {"calls": 1}, "$setOnInsert": {"day": day}},
+                upsert=True,
+                return_document=ReturnDocument.AFTER,
+            )
+        except DuplicateKeyError:
+            return False
+        return bool(updated and updated["calls"] <= limit)
+
+    # The global reservation is deliberately first: requests must never
+    # exceed the deployment's overall credit budget, even with many accounts.
+    return reserve(f"global:{day}", GLOBAL_AI_CALLS_PER_DAY) and reserve(
+        f"{owner_id}:{day}", DAILY_AI_CALLS_PER_USER
+    )
 
 
 def complete_pair(owner_id, record_id, result):

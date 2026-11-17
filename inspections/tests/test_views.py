@@ -77,3 +77,4 @@ class ComparisonAPITests(SimpleTestCase):
         self.assertNotEqual(first, another)
         self.assertGreaterEqual(storage.RETENTION_DAYS, 90)
         self.assertEqual(storage.DAILY_AI_CALLS_PER_USER, 3)
+        self.assertEqual(storage.GLOBAL_AI_CALLS_PER_DAY, 30)
