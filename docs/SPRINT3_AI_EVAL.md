@@ -5,7 +5,7 @@
 - Backend proof of concept compares a move-in baseline and later photo using Google's Gemini Python SDK. Versioned prompt: `inspections/prompts/image_comparison_v1.txt`.
 - The prompt labels photos as baseline versus current and instructs the model to distinguish normal wear from possible damage. Pydantic validates output and rejects inconsistent classifications. All results are advisory, not a landlord's final decision.
 - Current comparison entry point: `python manage.py compare_photos baseline.jpg current.jpg --room Kitchen --area Sink`. It invokes the real provider once; it is for local manual testing.
-- The backend API, durable inspection image storage, tenant-to-unit authorization, frontend submission/review integration, and persistent landlord decisions are not yet included. Existing UI screenshots are prototypes. Do not close parent stories merely because the comparison service returns JSON.
+- An authenticated standalone landlord-facing comparison flow now accepts a baseline and current image, persists the processed JPEGs in MongoDB GridFS, invokes the one-shot AI fallback service, retrieves owner-scoped history, and records the landlord's decision. The original tenant inspection workflow, tenant-to-unit authorization, scheduling, and cross-account sharing are not connected; do not close the entire AI epic or relevant user stories yet.
 
 ## Fallback
 
@@ -41,3 +41,18 @@ The existing Setup → Dependencies → Test → Deploy pipeline now includes a 
 ## Testing and AI assistance disclosure
 
 Backend tests mock the Gemini client and make no real API requests. The fallback tests cover timeouts, missing keys, invalid JSON and contradictory results; evaluator tests prove hallucination/consistency thresholds can fail. The AI-assisted draft was checked against the assignment, and the prior exception-only error behavior and absent Eval job were addressed. Live/provider performance, cloud storage retention and end-to-end user stories remain unverified until real deployment and manual testing.
+
+## Experimental authenticated API and photo retention
+
+The React Native landlord inspection review screen includes a **Live photo comparison (experimental)** panel. Django routes:
+
+- `POST /api/inspections/compare/`: multipart `baseline`, `current`, `room`, `area`, optional `notes`. Requires Django session + CSRF; accepts two validated image uploads, normalizes EXIF orientation, saves both private images in GridFS and their metadata in MongoDB, and returns a saved comparison ID and fallback-safe result.
+- `GET /api/inspections/recent/`: up to 20 saved comparisons for the signed-in owner.
+- `GET /api/inspections/<id>/photos/<baseline|current>/`: owner-only private JPEG response with no-cache headers. No public bucket links.
+- `POST /api/inspections/<id>/decision/`: landlord-account-only confirmation, dismissal, or resolution of an owner's comparison; saves decision history.
+
+Each image is limited to 8 MB upload, 20 megapixels decoded, and resized to 1500 px max side. The backend allows **three AI requests per user per UTC day**; the same photo pair, room and area are content-addressed, so a repeated submission uses the cached result and never calls Gemini again. There are no provider retries.
+
+Image records carry `retain_until = created_at + 90 days`. `python manage.py cleanup_inspection_media` lists expired comparisons and `python manage.py cleanup_inspection_media --execute` removes only those past their retention date. The cleanup command must be scheduled and verified before a production rollout; without it, images are kept **longer** than 90 days. MongoDB stores binary media with GridFS; the React Native app never connects directly to MongoDB.
+
+**Current limitation:** this is an authenticated *self-owned* comparison flow, not a tenant-to-landlord inspection submission system. An authenticated tenant can store their own pair via the endpoint but only their own account can retrieve it; a landlord cannot bypass ownership or review a tenant's records. Proper property/tenant membership and landlord assignment are prerequisites for cross-account access, and belong in a separately reviewed data-model change.

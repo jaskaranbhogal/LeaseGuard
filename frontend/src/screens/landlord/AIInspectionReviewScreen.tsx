@@ -1,4 +1,5 @@
 import DemoNotice from '../../components/DemoNotice';
+import LiveComparisonPanel from '../../components/LiveComparisonPanel';
 import Header from '../../components/Header';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
@@ -113,6 +114,7 @@ export default function AIInspectionReviewScreen({ navigation }: Props) {
           style={styles.decision}
         />
       </View>
+      <LiveComparisonPanel />
       <Button
         title="Open unit history"
         variant="outline"

@@ -17,9 +17,14 @@ Including another URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from accounts import views
+from inspections import views as inspection_views
 from django.urls import path
 
 urlpatterns = [
+    path('api/inspections/compare/', inspection_views.compare_photo_view),
+    path('api/inspections/recent/', inspection_views.recent_comparisons),
+    path('api/inspections/<str:comparison_id>/photos/<str:kind>/', inspection_views.read_comparison_photo),
+    path('api/inspections/<str:comparison_id>/decision/', inspection_views.set_comparison_decision),
     path('admin/', admin.site.urls),
     path('api/auth/csrf/', views.csrf_token),
     path('api/auth/session/', views.session_status),
