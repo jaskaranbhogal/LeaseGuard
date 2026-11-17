@@ -39,13 +39,14 @@ class ComparisonAPITests(SimpleTestCase):
         listing.user = AnonymousUser()
         self.assertEqual(recent_comparisons(listing).status_code, 401)
 
+    @patch("inspections.views.storage.read_pair_photo", return_value=b"stored-photo")
     @patch("inspections.views.storage.get_pair")
     @patch("inspections.views.storage.complete_pair")
     @patch("inspections.views.compare_images_safe")
     @patch("inspections.views.storage.consume_daily_call", return_value=False)
     @patch("inspections.views.storage.create_pair")
     def test_quota_saves_photos_but_never_calls_provider(
-        self, create_pair, consume_daily_call, ai, complete_pair, get_pair,
+        self, create_pair, consume_daily_call, ai, complete_pair, get_pair, read_photo,
     ):
         timestamp = datetime.now(timezone.utc)
         record = {

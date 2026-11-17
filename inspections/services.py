@@ -41,6 +41,8 @@ def prepare_image(image):
         raise AIComparisonError("Photo is empty or exceeds the 8 MB limit")
     try:
         with Image.open(io.BytesIO(data)) as source:
+            if source.format not in {"JPEG", "PNG"}:
+                raise AIComparisonError("Only JPEG and PNG photos are supported")
             if source.width * source.height > MAX_IMAGE_PIXELS:
                 raise AIComparisonError("Photo dimensions exceed safety limits")
             img = ImageOps.exif_transpose(source).convert("RGB")

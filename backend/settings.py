@@ -209,3 +209,6 @@ PASSWORD_RESET_DELIVERY = (
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+
+# Backend only; validate lazily so offline tests need no provider credentials.
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '').strip()

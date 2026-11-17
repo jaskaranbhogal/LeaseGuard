@@ -152,7 +152,7 @@ All four members participate in planning, implementation, testing, and peer revi
 
 ## Sprint 3 — AI Image Comparison and Golden Evals
 
-The `ai-image-comparison` branch adds a server-side Gemini image comparison proof of concept. The audit-friendly system prompt is in [`inspections/prompts/image_comparison_v1.txt`](inspections/prompts/image_comparison_v1.txt); never commit API keys. Use `GEMINI_API_KEY` in your ignored local `.env` and configure it as a GitHub Actions **repository secret** for trusted manual live evaluation. An experimental landlord comparison panel now supports camera/library selection, a secure Django endpoint, MongoDB GridFS photo persistence, and saved human-review decisions. Full tenant-to-landlord sharing and property/unit authorization are still planned and the original inspection/maintenance prototypes remain incomplete.
+The `ai-image-comparison` branch adds a server-side Gemini image comparison proof of concept. The audit-friendly system prompt is in [`inspections/prompts/image_comparison_v1.txt`](inspections/prompts/image_comparison_v1.txt); never commit API keys. Use `GEMINI_API_KEY` in your ignored local `.env` and configure it as a GitHub Actions **repository secret** for trusted manual live evaluation. An experimental landlord comparison panel now supports camera/library selection, a secure Django endpoint, authenticated Cloudinary photo storage with legacy GridFS reads, and saved human-review decisions. Full tenant-to-landlord sharing and property/unit authorization are still planned and the original inspection/maintenance prototypes remain incomplete.
 
 - **Fallback:** Invalid photos, provider timeout, invalid response, or missing API key must not produce a damage finding. `compare_images_safe` marks the comparison unavailable and requires human review. No automatic retry; provider timeout is 20 seconds. Gemini calls are limited to 3 per account and 30 globally per UTC day.
 - **Golden dataset:** [19 labeled synthetic baseline/current cases](inspections/evals/golden_cases.json). Checks include zero false damage classifications on non-damage cases (hallucination rate ≤ 0), ≥95% agreement across two runs (consistency), and ≥80% match to expected photo quality/classification. All checks must pass.
@@ -161,3 +161,12 @@ The `ai-image-comparison` branch adds a server-side Gemini image comparison proo
 - **AI-use statement:** AI assistance helped draft the fallback implementation, test cases, workflow changes, and documentation. We identified the original exception-only fallback and absence of a golden evaluation gate through repository review and added tests/checks for those gaps. Do not claim any real-provider evaluation passed until a live run is executed and reviewed.
 
 For usage, thresholds, limitations and example cases see [Sprint 3 evaluation details](docs/SPRINT3_AI_EVAL.md). The AI epic and end-to-end landlord/tenant story acceptance criteria must remain open until they are fully implemented and manually tested.
+
+
+New inspection photos use backend-only **authenticated Cloudinary** storage;
+MongoDB stores references, AI findings and review history. The existing owner-only
+photo endpoint proxies private bytes. Both photos are retained for at least 90
+days; cleanup is dry-run unless `--execute` is specified. Configure
+`CLOUDINARY_URL` in the local Django process or hosting environment, separately
+from GitHub Secrets. See [storage configuration, failure recovery, cleanup,
+GridFS transition and manual verification](docs/CLOUDINARY_STORAGE.md).

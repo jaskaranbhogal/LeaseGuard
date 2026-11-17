@@ -68,15 +68,24 @@ def compare_photo_view(request):
     try:
         record, new = storage.create_pair(owner, room, area, first, second)
         if not new:
+            if record["status"] == "storage_failed":
+                raise storage.StorageError("Previous upload failed")
+            if record["status"] != "completed":
+                return JsonResponse({"comparison": _serialize(record)}, status=202)
             # Concurrent re-submissions never trigger a second paid request.
             return JsonResponse({"comparison": _serialize(record)}, status=200)
+        # Retrieve the owner-authorized stored evidence before reserving AI credit.
+        first = storage.read_pair_photo(owner, record["_id"], "baseline")
+        second = storage.read_pair_photo(owner, record["_id"], "current")
+        if first is None or second is None:
+            raise storage.StorageError("Stored photos unavailable")
         if not storage.consume_daily_call(owner):
             result = _manual_result("Daily AI comparison budget reached. Photos saved for manual review.")
         else:
             result = compare_images_safe(first, second, room, area, notes, known_issues)
         storage.complete_pair(owner, record["_id"], result)
         record = storage.get_pair(owner, record["_id"])
-    except PyMongoError:
+    except (PyMongoError, storage.StorageError):
         return JsonResponse({"detail": "Secure photo storage is temporarily unavailable. Try again later."}, status=503)
     return JsonResponse({"comparison": _serialize(record)}, status=201)
 
@@ -88,7 +97,7 @@ def recent_comparisons(request):
         return JsonResponse({"detail": "Sign in to view comparisons."}, status=401)
     try:
         records = storage.list_pairs(_owner_id(request))
-    except PyMongoError:
+    except (PyMongoError, storage.StorageError):
         return JsonResponse({"detail": "Comparison history is temporarily unavailable."}, status=503)
     return JsonResponse({"comparisons": [_serialize(r) for r in records]})
 
@@ -100,7 +109,7 @@ def read_comparison_photo(request, comparison_id, kind):
         return JsonResponse({"detail": "Sign in to view photos."}, status=401)
     try:
         data = storage.read_pair_photo(_owner_id(request), comparison_id, kind)
-    except PyMongoError:
+    except (PyMongoError, storage.StorageError):
         return JsonResponse({"detail": "Photo retrieval is temporarily unavailable."}, status=503)
     if data is None:
         return JsonResponse({"detail": "Photo not found."}, status=404)
@@ -129,7 +138,7 @@ def set_comparison_decision(request, comparison_id):
         return JsonResponse({"detail": "Invalid decision."}, status=400)
     try:
         record = storage.decide(_owner_id(request), comparison_id, action)
-    except PyMongoError:
+    except (PyMongoError, storage.StorageError):
         return JsonResponse({"detail": "Could not save decision."}, status=503)
     if record is None:
         return JsonResponse({"detail": "Comparison not found or not ready."}, status=404)

@@ -1,9 +1,10 @@
-"""Owner-scoped MongoDB GridFS storage for 90+-day inspection-photo retention.
+"""Owner-scoped Cloudinary references and legacy GridFS photo storage.
 
 The comparison id is a content-derived key per owner, preventing repeat charges
 for the exact same image pair. No direct client-to-MongoDB access is allowed.
 """
 import hashlib
+import uuid
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
@@ -12,6 +13,9 @@ from bson import ObjectId
 from django.conf import settings
 from pymongo import MongoClient, ReturnDocument
 from pymongo.errors import DuplicateKeyError
+
+from . import media
+from .media import StorageError
 
 RETENTION_DAYS = 90
 DAILY_AI_CALLS_PER_USER = 3
@@ -41,6 +45,8 @@ def create_pair(owner_id, room, area, baseline_bytes, current_bytes):
     stored = db.inspection_comparisons.find_one({"_id": key, "owner_id": owner_id})
     if stored:
         return stored, False
+    # Invalid local configuration must not poison an otherwise retryable pair.
+    media.configuration()
     now = datetime.now(timezone.utc)
     record = {
         "_id": key,
@@ -58,25 +64,36 @@ def create_pair(owner_id, room, area, baseline_bytes, current_bytes):
         db.inspection_comparisons.insert_one(record)
     except DuplicateKeyError:
         return db.inspection_comparisons.find_one({"_id": key, "owner_id": owner_id}), False
-    fs = gridfs.GridFS(db)
-    uploaded = []
+    # Persist upload intents BEFORE any network operation. Even a timeout or a
+    # process crash leaves a discoverable identifier for retention cleanup.
     try:
-        for which, photo in (("baseline", baseline_bytes), ("current", current_bytes)):
-            photo_id = fs.put(
-                photo, content_type="image/jpeg", filename=f"{which}.jpg",
-                metadata={"owner_id": owner_id, "comparison_id": key, "retain_until": record["retain_until"]},
+        for kind, photo in (("baseline", baseline_bytes), ("current", current_bytes)):
+            started = datetime.now(timezone.utc)
+            ref = {
+                "provider": "cloudinary", "public_id": f"leaseguard/inspections/{uuid.uuid4().hex}/{kind}",
+                "asset_id": None, "resource_type": "image", "delivery_type": "authenticated",
+                "kind": kind, "owner_id": owner_id, "comparison_id": key,
+                "uploaded_at": started, "retain_until": started + timedelta(days=RETENTION_DAYS, minutes=5),
+                "sha256": hashlib.sha256(photo).hexdigest(), "format": "jpg",
+            }
+            record[f"{kind}_photo"] = ref
+            db.inspection_comparisons.update_one(
+                {"_id": key}, {"$set": {f"{kind}_photo": ref, "retain_until": ref["retain_until"]}},
             )
-            uploaded.append(photo_id)
-        db.inspection_comparisons.update_one(
-            {"_id": key, "owner_id": owner_id},
-            {"$set": {"baseline_file_id": uploaded[0], "current_file_id": uploaded[1]}},
-        )
+            ref = media.upload(ref, photo)
+            finished = datetime.now(timezone.utc)
+            ref.update(uploaded_at=finished, retain_until=finished + timedelta(days=RETENTION_DAYS))
+            record[f"{kind}_photo"] = ref
+            record["retain_until"] = ref["retain_until"]
+            db.inspection_comparisons.update_one(
+                {"_id": key}, {"$set": {f"{kind}_photo": ref, "retain_until": ref["retain_until"]}},
+            )
+        record["status"] = "stored"
+        db.inspection_comparisons.update_one({"_id": key}, {"$set": {"status": "stored"}})
     except Exception:
-        for photo_id in uploaded:
-            fs.delete(photo_id)
-        db.inspection_comparisons.delete_one({"_id": key, "owner_id": owner_id})
-        raise
-    record.update({"baseline_file_id": uploaded[0], "current_file_id": uploaded[1]})
+        # Do not delete evidence before 90 days, or lose ambiguous timeout IDs.
+        db.inspection_comparisons.update_one({"_id": key}, {"$set": {"status": "storage_failed"}})
+        raise StorageError("Private photo storage failed") from None
     return record, True
 
 
@@ -125,8 +142,11 @@ def read_pair_photo(owner_id, record_id, kind):
     if kind not in {"baseline", "current"}:
         return None
     record = get_pair(owner_id, record_id)
-    if record is None:
+    if record is None or record.get("media_deleted"):
         return None
+    ref = record.get(f"{kind}_photo")
+    if ref:
+        return None if ref.get("deleted_at") else media.retrieve(ref)
     file_id = record.get(f"{kind}_file_id")
     if not isinstance(file_id, ObjectId):
         return None
