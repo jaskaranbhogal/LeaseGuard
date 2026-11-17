@@ -149,3 +149,15 @@ For full pipeline stages, branch-protection settings, deployment setup, and assi
 | Dev Mondal | Tenant workflows and media features |
 
 All four members participate in planning, implementation, testing, and peer review.
+
+## Sprint 3 — AI Image Comparison and Golden Evals
+
+The `ai-image-comparison` branch adds a server-side Gemini image comparison proof of concept. The audit-friendly system prompt is in [`inspections/prompts/image_comparison_v1.txt`](inspections/prompts/image_comparison_v1.txt); never commit API keys. Use `GEMINI_API_KEY` in your ignored local `.env` and configure it as a GitHub Actions **repository secret** for trusted manual live evaluation. The React Native inspection screens and photo persistence remain prototypes until backend and frontend integration is finished.
+
+- **Fallback:** Invalid photos, provider timeout, invalid response, or missing API key must not produce a damage finding. `compare_images_safe` marks the comparison unavailable and requires human review. No automatic retry; provider timeout is 20 seconds.
+- **Golden dataset:** [19 labeled synthetic baseline/current cases](inspections/evals/golden_cases.json). Checks include zero false damage classifications on non-damage cases (hallucination rate ≤ 0), ≥95% agreement across two runs (consistency), and ≥80% match to expected photo quality/classification. All checks must pass.
+- **One-command PR evaluation:** `python manage.py run_ai_evals`. CI's **Eval** job executes safe mocked replay on PRs to main; it never consumes paid model credits. `python manage.py run_ai_evals --live` makes at most 38 one-shot calls and requires a configured private key; only run live mode deliberately on the trusted default branch. Replay alone **cannot** detect a model update tomorrow.
+- **Prompt-injection risk:** User-entered notes or text in photos may instruct Gemini to misreport damage. These are untrusted inputs, not higher-priority rules. Threat identified for Sprint 4 adversarial hardening; do not treat current prompt guidance as a proven defense.
+- **AI-use statement:** AI assistance helped draft the fallback implementation, test cases, workflow changes, and documentation. We identified the original exception-only fallback and absence of a golden evaluation gate through repository review and added tests/checks for those gaps. Do not claim any real-provider evaluation passed until a live run is executed and reviewed.
+
+For usage, thresholds, limitations and example cases see [Sprint 3 evaluation details](docs/SPRINT3_AI_EVAL.md). The AI epic and end-to-end landlord/tenant story acceptance criteria must remain open until they are fully implemented and manually tested.
