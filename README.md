@@ -10,15 +10,17 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 
 ## Guided photo inspections
 
-Verified landlords can assign customizable move-in, periodic, move-out and follow-up
+Verified landlords can create and resume private move-in baselines for individual
+units without a tenant, and assign customizable move-in, periodic, move-out and follow-up
 inspections. Tenants capture/review real photos, resume saved drafts and submit through
 Django. Landlords approve immutable unit baselines, explicitly request Gemini analysis,
-record decisions/retakes and link maintenance follow-ups. Images stay in authenticated
+record individual finding decisions (including resolution), receive unverified
+high-severity alerts, and link maintenance follow-ups. Images stay in authenticated
 Cloudinary storage; MongoDB persists the workflow and in-app notifications. Shared AI
 limits remain 3/account/day and 30 globally/day.
 
 See [architecture, API, retention, local setup and demonstration](docs/GUIDED_INSPECTIONS.md)
-and the [implementation/verification report](docs/GUIDED_INSPECTIONS_REPORT.md).
+and the [Sprint 3 finalization report](docs/SPRINT3_FINALIZATION_REPORT.md).
 Provider/dashboard and physical-device verification remain separate from local tests.
 Property setup and availability demos remain labeled prototypes.
 

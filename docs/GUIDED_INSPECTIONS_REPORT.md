@@ -1,3 +1,7 @@
+> Historical guided implementation report. For the latest Sprint 3 code, test totals,
+> provider verification and remaining gates, read
+> [Sprint 3 finalization report](SPRINT3_FINALIZATION_REPORT.md).
+
 # Guided inspections implementation report
 
 Verification date: November 18, 2026. Branch: `feature/guided-photo-inspections`,

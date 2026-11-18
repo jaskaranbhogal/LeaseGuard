@@ -1,3 +1,8 @@
+> **18 November 2026 finalization:** landlord-authored baselines, explicit supersession,
+> individual finding decisions and high-severity alerts are documented in
+> [the finalization report](SPRINT3_FINALIZATION_REPORT.md). Its results supersede older
+> test totals/provider status in this document.
+
 # Guided photo inspections
 
 Guided inspections use persisted, verified housing relationships. The mobile client
@@ -234,3 +239,13 @@ device testing remain manual. The computer-use tool did not expose Simulator for
 visual inspection. Android build is blocked by an unconfigured SDK. Golden replay
 checks schema/pipeline behavior, not real-model accuracy or resistance to injection;
 consented real-image evaluation is still required before production use.
+
+
+## Landlord-created move-in baselines
+
+Dashboard → Create Move-In Baseline uses real manager-scoped units, saved templates,
+shared PhotoReview and multipart upload. `LandlordBaselineDraft` has no tenant field;
+it reuses guided upload/recovery/revision logic and publishes into `UnitBaseline`.
+See [API contracts, matching, supersession and iOS walkthrough](SPRINT3_FINALIZATION_REPORT.md).
+Django now loads local `.env` with python-dotenv without replacing exported process
+values. Restart the backend after installing updated requirements.

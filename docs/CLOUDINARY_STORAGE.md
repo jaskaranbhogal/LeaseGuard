@@ -221,3 +221,19 @@ and maintenance records sharing them are excluded from destructive cleanup. All
 guided evidence is under an indefinite hold; minimum timestamps alone do not permit
 deletion. See [guided storage and retention](GUIDED_INSPECTIONS.md#storage-recovery-and-retention).
 Live provider checks for this namespace remain pending.
+
+
+## Landlord baseline extension — 18 November 2026
+
+Landlord drafts reuse the `leaseguard/guided/<draft-id>/<content-location-id>`
+authenticated namespace, JPEG/PNG normalization, EXIF removal, size/pixel bounds,
+private upload confirmation and interrupted-upload recovery. No second storage
+framework or public image URLs were introduced. Every draft/photo/history route
+rechecks current property-manager membership and exact unit scope. Approved versions
+and shared references remain under the existing indefinite guided-evidence hold,
+which also protects active baselines beyond 90 days. Supersession never deletes assets.
+
+The browser's `leaseguard (Test)` Usage Reports page was accessible in this run;
+64 assets / 161.44 MB were visible. No synthetic upload or asset access experiment
+was performed, and local credential-to-environment correspondence remains pending.
+See [current verification boundaries](SPRINT3_FINALIZATION_REPORT.md).

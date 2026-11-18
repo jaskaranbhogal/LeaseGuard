@@ -1,3 +1,8 @@
+> **Current audit update, 18 November 2026:** npm audit now reports **0 vulnerabilities**;
+> the historical picomatch counts below describe the earlier review. Current tests,
+> provider boundaries and Python audit result are recorded in
+> [Sprint 3 finalization report](SPRINT3_FINALIZATION_REPORT.md).
+
 # Maintenance security review — 2026-11-18
 
 This review covers the maintenance feature and its integration with the existing
@@ -98,3 +103,27 @@ controls and backups. Application quotas do not replace ingress protection for
 unauthenticated traffic. No production deployment or configuration changes are part
 of this push. Dependency/advisory databases and provider settings can change;
 re-run audits before any release.
+
+
+## Baseline/finding security extension
+
+Dedicated manager-only baseline endpoints preserve tenant-only capture authorization.
+Unit scoping, confirmed private uploads, revision CAS, deterministic draft identity,
+explicit expected-head supersession and immutable snapshots are integration-tested.
+Active/historical guided assets remain indefinitely retained. Interrupted publication
+is recoverable without creating duplicate versions or silently replacing another head.
+
+Adversarial tests reject extra model fields that attempt to set human decisions,
+ownership or maintenance actions. Room/notes and photographed instructions remain
+untrusted; the versioned prompt cautions against them. The added photographed-text
+fixture is replayed, not a validated real-model injection defense. The model has no
+tools or write authority, and only authenticated human endpoints change decisions.
+Individual findings retain independent decisions and indexed audit events.
+
+Actual parallel tests exercise account/global quota contention and one provider call
+for a contested pair. SDK transport explicitly allows one attempt with a 20-second
+timeout. Private retrieval failure stores an empty manual fallback before any budget
+reservation. Completed results retain their exact original evidence after supersession.
+High-severity alerts are unverified, deduplicated, manager-scoped and suppressed on
+unavailable or low-confidence results. Notification opening revalidates record access.
+No branch protections, provider secrets, billing, remote assignments or assets changed.
