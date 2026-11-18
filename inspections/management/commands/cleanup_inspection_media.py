@@ -41,7 +41,7 @@ class Command(BaseCommand):
         db = database()
         now = datetime.now(timezone.utc)
         records = db.inspection_comparisons.find({
-            'retain_until': {'$lte': now}, 'media_deleted': {'$ne': True},
+            'retain_until': {'$lte': now}, 'media_deleted': {'$ne': True}, 'guided': {'$ne': True},
         }).limit(max(1, min(options['limit'], 1000)))
         found = deleted = failed = 0
         for record in records:

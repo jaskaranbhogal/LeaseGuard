@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'inspections.apps.InspectionsConfig',
     'maintenance.apps.MaintenanceConfig',
+    'guided_inspections.apps.GuidedInspectionsConfig',
     'backend.apps.MongoAdminConfig',
     'backend.apps.MongoAuthConfig',
     'backend.apps.MongoContentTypesConfig',

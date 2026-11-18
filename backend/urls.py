@@ -18,10 +18,11 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from accounts import views
 from inspections import views as inspection_views
-from django.urls import path
+from django.urls import path, include
 from maintenance import views as maintenance_views
 
 urlpatterns = [
+    path('api/guided-inspections/', include('guided_inspections.urls')),
     path('api/maintenance/units/', maintenance_views.assigned_units),
     path('api/maintenance/', maintenance_views.requests),
     path('api/maintenance/<str:request_id>/', maintenance_views.detail),

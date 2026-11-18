@@ -39,7 +39,7 @@ def endpoint(methods):
                 return JsonResponse({'detail': 'Secure storage is unavailable. Refresh and retry.'}, status=503)
             except store.Conflict as exc:
                 return JsonResponse({'detail': str(exc)}, status=409)
-            except (ValueError, TypeError, AttributeError, RequestDataTooBig, TooManyFilesSent):
+            except (ValueError, TypeError, AttributeError, KeyError, OverflowError, RequestDataTooBig, TooManyFilesSent):
                 return JsonResponse({'detail': 'Invalid request. Check your fields and photo.'}, status=400)
         return wrapped
     return decorate
