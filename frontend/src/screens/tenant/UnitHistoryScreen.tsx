@@ -23,6 +23,7 @@ export default function UnitHistoryScreen() {
         }
       />
       <GuidedRecords
+        tenant
         onOpen={inspectionId =>
           navigation.navigate('GuidedInspection', { inspectionId })
         }

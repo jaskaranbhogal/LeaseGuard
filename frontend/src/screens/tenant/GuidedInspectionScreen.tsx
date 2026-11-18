@@ -124,6 +124,7 @@ export default function GuidedInspectionScreen({
         />
         {!id ? (
           <GuidedRecords
+            tenant
             onOpen={inspectionId => navigation.setParams({ inspectionId })}
           />
         ) : (

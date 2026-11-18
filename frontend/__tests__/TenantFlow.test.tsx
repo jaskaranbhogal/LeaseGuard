@@ -169,7 +169,7 @@ it.each([tenant, landlord])(
 it('routes repeated logins and clears private inspection screens on logout', async () => {
   await mount(null);
   await signIn(tenant);
-  await press('Open move-in inspection');
+  await press('Start guided inspection');
   expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
   await act(async () => navigation.dispatch(StackActions.popTo('TenantTabs')));
   await press('Settings');
@@ -181,12 +181,43 @@ it('routes repeated logins and clears private inspection screens on logout', asy
   await press('Settings');
   await press('Log out');
   await signIn(tenant);
-  await press('Open move-in inspection');
+  await press('Start guided inspection');
   expect(navigation.getCurrentRoute()?.params).toEqual({
     inspectionId: guidedFixture.id,
   });
 });
 
+it('explains an empty inspection list and offers maintenance without an inspection', async () => {
+  jest
+    .mocked(guided.listGuided)
+    .mockResolvedValue({ inspections: [], next: null });
+  await mount();
+  await press('Inspections');
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Your landlord needs to assign',
+  );
+  expect(
+    app.root
+      .findAllByType(Button)
+      .filter(b => b.props.title === 'Start guided inspection'),
+  ).toHaveLength(0);
+  await press('Report maintenance');
+  expect(navigation.getCurrentRoute()?.name).toBe('ReportMaintenance');
+});
+it('resumes an assigned draft from its saved inspection record', async () => {
+  jest
+    .mocked(guided.listGuided)
+    .mockResolvedValue({
+      inspections: [{ ...guidedFixture, status: 'draft', progress: 1 }],
+      next: null,
+    });
+  await mount();
+  await press('Resume guided inspection');
+  expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
+  expect(navigation.getCurrentRoute()?.params).toEqual({
+    inspectionId: guidedFixture.id,
+  });
+});
 it('shows logout failures and permits a retry', async () => {
   await mount(landlord);
   jest
@@ -239,18 +270,14 @@ it('captures five real photos, discards previews, waits for uploads and submits'
     saved = { ...saved, status: 'submitted' };
     return saved;
   });
-  jest
-    .mocked(launchCamera)
-    .mockResolvedValue({
-      assets: [{ uri: 'file:///camera.jpg', type: 'image/jpeg' }],
-    });
-  jest
-    .mocked(launchImageLibrary)
-    .mockResolvedValue({
-      assets: [{ uri: 'file:///gallery.jpg', type: 'image/jpeg' }],
-    });
+  jest.mocked(launchCamera).mockResolvedValue({
+    assets: [{ uri: 'file:///camera.jpg', type: 'image/jpeg' }],
+  });
+  jest.mocked(launchImageLibrary).mockResolvedValue({
+    assets: [{ uri: 'file:///gallery.jpg', type: 'image/jpeg' }],
+  });
   await mount();
-  await press('Open move-in inspection');
+  await press('Start guided inspection');
   await press('Take photo', app.root.findByType(GuidedInspectionScreen));
   await act(async () => app.root.findByType(PhotoReview).props.onDiscard());
   expect(guided.uploadGuided).not.toHaveBeenCalled();
@@ -576,7 +603,7 @@ it('reloads persisted inspection progress during session revalidation', async ()
   const saved = { ...guidedFixture, progress: 1, status: 'draft' };
   jest.mocked(guided.getGuided).mockResolvedValue(saved);
   await mount();
-  await press('Open move-in inspection');
+  await press('Start guided inspection');
   jest.mocked(auth.getSession).mockResolvedValueOnce(tenant);
   await act(async () =>
     listener.mock.calls[listener.mock.calls.length - 1][1]('active'),

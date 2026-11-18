@@ -14,7 +14,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { TenantTabParamList } from '../../navigation/types';
 import type { TenantStackParamList } from '../../navigation/types';
 
-
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TenantTabParamList, 'Home'>,
   NativeStackScreenProps<TenantStackParamList>
@@ -55,7 +54,12 @@ export default function TenantDashboardScreen({ navigation }: Props) {
             onNotificationsPress={() => navigation.navigate('Notifications')}
           />
 
-          <GuidedRecords onOpen={inspectionId => navigation.navigate('GuidedInspection', { inspectionId })} />
+          <GuidedRecords
+            tenant
+            onOpen={inspectionId =>
+              navigation.navigate('GuidedInspection', { inspectionId })
+            }
+          />
 
           {/* Quick actions */}
           <Text style={styles.sectionTitle}>Quick actions</Text>

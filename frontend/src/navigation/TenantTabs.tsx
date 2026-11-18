@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
@@ -14,6 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import SettingsScreen from '../screens/shared/SettingsScreen';
 import ScreenContainer from '../components/ScreenContainer';
 import GuidedRecords from '../components/GuidedRecords';
+import Button from '../components/Button';
 
 const Tab = createBottomTabNavigator<TenantTabParamList>();
 
@@ -23,8 +25,27 @@ function InspectionsScreen({
   BottomTabScreenProps<TenantTabParamList, 'Inspections'>,
   NativeStackScreenProps<TenantStackParamList>
 >) {
-  return <ScreenContainer><GuidedRecords onOpen={inspectionId => navigation.navigate('GuidedInspection', { inspectionId })} /></ScreenContainer>;
-
+  return (
+    <ScreenContainer style={styles.inspections}>
+      <GuidedRecords
+        tenant
+        onOpen={inspectionId =>
+          navigation.navigate('GuidedInspection', { inspectionId })
+        }
+      />
+      <View style={styles.help}>
+        <Text style={styles.title}>Need a repair?</Text>
+        <Text>
+          You can report maintenance without an assigned inspection. A verified
+          unit assignment is required.
+        </Text>
+        <Button
+          title="Report maintenance"
+          onPress={() => navigation.navigate('ReportMaintenance')}
+        />
+      </View>
+    </ScreenContainer>
+  );
 }
 function TenantSettingsScreen({
   navigation,
@@ -59,3 +80,9 @@ export default function TenantTabs() {
     </Tab.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  inspections: { padding: 24, gap: 24 },
+  help: { gap: 12 },
+  title: { fontSize: 20, fontWeight: '600', color: '#131824' },
+});
