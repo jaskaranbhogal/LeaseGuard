@@ -73,3 +73,11 @@ still run mocked replay and do not receive Cloudinary or Gemini secrets. Real
 Cloudinary anonymous-access rejection, API download, and deletion behavior require
 the staging verification documented in [CLOUDINARY_STORAGE.md](CLOUDINARY_STORAGE.md).
 No real paid evaluation was run for this integration.
+
+## Guided inspection extension
+
+The replay set now includes 20 cases, including an untrusted instruction-injection
+observation. Replay still makes zero provider calls and cannot establish real-model
+robustness. Guided integration tests cover missing/incompatible baselines, shared
+quotas, stored-result recovery and duplicate-call protection. See
+[guided Gemini safeguards](GUIDED_INSPECTIONS.md#gemini-and-security).

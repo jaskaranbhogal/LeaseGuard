@@ -8,6 +8,20 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 
 **Project links:** [Figma prototype](https://www.figma.com/design/28N5do1M7uUQwJWH3uKGSb/LeaseGuard-%E2%80%93-Sprint-Prototype) · [GitHub Kanban board](https://github.com/users/jaskaranbhogal/projects/1/views/1) · [User stories and acceptance criteria](USER_STORIES.md) · [GitHub Actions](https://github.com/jaskaranbhogal/LeaseGuard/actions)
 
+## Guided photo inspections
+
+Verified landlords can assign customizable move-in, periodic, move-out and follow-up
+inspections. Tenants capture/review real photos, resume saved drafts and submit through
+Django. Landlords approve immutable unit baselines, explicitly request Gemini analysis,
+record decisions/retakes and link maintenance follow-ups. Images stay in authenticated
+Cloudinary storage; MongoDB persists the workflow and in-app notifications. Shared AI
+limits remain 3/account/day and 30 globally/day.
+
+See [architecture, API, retention, local setup and demonstration](docs/GUIDED_INSPECTIONS.md)
+and the [implementation/verification report](docs/GUIDED_INSPECTIONS_REPORT.md).
+Provider/dashboard and physical-device verification remain separate from local tests.
+Property setup and availability demos remain labeled prototypes.
+
 ## Sprint 0 — Project Scope and Backlog
 
 | Implemented / prototype | Planned or in progress |
@@ -26,7 +40,7 @@ photos individually, submit **5–20** private photos, and retrieve real mainten
 history. Authorized property managers can view requests/photos and advance status.
 MongoDB persists housing relationships, drafts, photo references and review history;
 Cloudinary stores authenticated images with at least 90-day retention. Maintenance
-does not call Gemini; unit-linked comparison awaits a verified baseline workflow.
+does not call Gemini; guided inspections now provide approved unit baselines and explicit comparisons.
 
 Run `python manage.py migrate` on your development database and provision verified
 relationships using the operator-only `assign_maintenance_unit` command. See
@@ -53,18 +67,18 @@ LeaseGuard uses a **client–server architecture**:
 - **Frontend:** React Native and TypeScript for iOS/Android screens, navigation, forms, and HTTP/JSON requests.
 - **Backend:** Python 3.12 and Django 5.2 for authentication, sessions, API logic, and data access.
 - **Database:** MongoDB using the official Django MongoDB Backend. Automated CI tests use an isolated replica set; the team's hosted Atlas connection still needs verification.
-- **Planned integration:** Secure photo storage and AI-assisted comparisons between baseline and later inspection images, with findings reviewed by landlords.
+- **Integrations:** Authenticated Cloudinary storage and explicit Gemini comparisons between approved baseline and later inspection images, with findings reviewed by landlords.
 
 ```mermaid
 flowchart TD
     A[Landlord / Tenant] --> B[React Native App]
     B -->|HTTP / JSON| C[Django Backend]
     C --> D[(MongoDB)]
-    C -. Planned .-> E[Photo Storage + AI Analysis]
-    C -. Planned .-> F[Notifications]
+    C --> E[Private Photo Storage + Explicit AI Analysis]
+    C --> F[Persisted In-app Notifications]
 ```
 
-The React Native app never connects directly to MongoDB or stores database credentials. The dashed diagram connections represent planned functionality.
+The React Native app never connects directly to MongoDB or stores database credentials. Email and push notification delivery are not configured.
 
 ## Getting Started
 

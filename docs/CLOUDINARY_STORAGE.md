@@ -212,3 +212,12 @@ unexpired/missing retention metadata or a request updated within 90 days. Existi
 inspection behavior and legacy GridFS compatibility remain unchanged. Complete
 API, authorization, retry and iOS procedures are in
 [the maintenance guide](SPRINT3_MAINTENANCE.md).
+
+## Guided inspection evidence
+
+The guided workflow reuses authenticated uploads, normalization, recovery and Django
+proxy delivery at `leaseguard/guided/<inspection-id>/<intent-id>`. Guided references
+and maintenance records sharing them are excluded from destructive cleanup. All
+guided evidence is under an indefinite hold; minimum timestamps alone do not permit
+deletion. See [guided storage and retention](GUIDED_INSPECTIONS.md#storage-recovery-and-retention).
+Live provider checks for this namespace remain pending.

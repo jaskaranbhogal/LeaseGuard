@@ -153,3 +153,10 @@ frontend/src/services/authService.ts
 frontend/src/types/maintenance.ts
 frontend/src/types/user.ts
 ```
+
+## Persisted guided inspections
+
+The dashboard and inspection tab now load authorized assignments. Camera/gallery
+previews use the shared PhotoReview component, with server-confirmed uploads,
+restart-safe drafts, submission, retakes and maintenance follow-up. The obsolete
+mock InspectionContext has been removed. See [guided demo instructions](GUIDED_INSPECTIONS.md#tenantlandlord-demonstration).
