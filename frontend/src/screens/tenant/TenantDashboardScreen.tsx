@@ -1,3 +1,4 @@
+import { MaintenanceRecords } from '../../components/MaintenanceRecords';
 import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
@@ -38,7 +39,7 @@ const COLORS = {
 export default function TenantDashboardScreen({ navigation }: Props) {
   const { user } = useAuth();
   const demo = useInspection();
-  const { tenant, inspection, recentMaintenance } = tenantMockData;
+  const { tenant, inspection } = tenantMockData;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -141,37 +142,14 @@ export default function TenantDashboardScreen({ navigation }: Props) {
           {/* Recent activity */}
           <Text style={styles.sectionTitle}>Recent activity</Text>
 
-          {recentMaintenance ? (
-            <Pressable
-              accessibilityRole="button"
-              style={styles.activityCard}
-              onPress={() =>
-                navigation.navigate('MaintenanceDetail', {
-                  requestId: recentMaintenance.requestId,
-                })
-              }
-            >
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>
-                  {recentMaintenance.status.toUpperCase()}
-                </Text>
-              </View>
-
-              <Text style={styles.activityTitle}>
-                {recentMaintenance.title}
-              </Text>
-
-              <Text style={styles.activityDescription}>
-                {recentMaintenance.update}
-              </Text>
-            </Pressable>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.mutedText}>
-                No recent maintenance activity.
-              </Text>
-            </View>
-          )}
+          <MaintenanceRecords
+            onOpen={id =>
+              navigation.navigate('MaintenanceDetail', { requestId: id })
+            }
+            onResume={id =>
+              navigation.navigate('ReportMaintenance', { draftId: id })
+            }
+          />
 
           {/* View unit history */}
           <Pressable

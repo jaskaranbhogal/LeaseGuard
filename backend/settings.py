@@ -50,6 +50,7 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'inspections.apps.InspectionsConfig',
+    'maintenance.apps.MaintenanceConfig',
     'backend.apps.MongoAdminConfig',
     'backend.apps.MongoAuthConfig',
     'backend.apps.MongoContentTypesConfig',
@@ -212,3 +213,14 @@ CSRF_COOKIE_SECURE = not DEBUG
 
 # Backend only; validate lazily so offline tests need no provider credentials.
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '').strip()
+
+# Stream large uploads to temporary files; endpoints bound file bytes and count.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 64 * 1024
+DATA_UPLOAD_MAX_NUMBER_FILES = 2
+
+FILE_UPLOAD_HANDLERS = [
+    'maintenance.upload_handlers.BoundedImageUploadHandler',
+    'django.core.files.uploadhandler.MemoryFileUploadHandler',
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]

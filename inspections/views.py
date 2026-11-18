@@ -49,6 +49,8 @@ def compare_photo_view(request):
     if not _auth(request):
         return JsonResponse({"detail": "Sign in to compare photos."}, status=401)
     baseline, current = request.FILES.get("baseline"), request.FILES.get("current")
+    if getattr(request, "upload_limit_exceeded", False):
+        return JsonResponse({"detail": "Each photo must be 8 MB or smaller."}, status=413)
     if not baseline or not current:
         return JsonResponse({"detail": "Upload a baseline and current photo."}, status=400)
     if baseline.size > MAX_UPLOAD_BYTES or current.size > MAX_UPLOAD_BYTES:

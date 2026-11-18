@@ -46,6 +46,7 @@ export default function LandlordDashboardScreen({ navigation }: Props) {
         onNotificationsPress={() => navigation.navigate('Notifications')}
       />
 
+      <Button title="View saved maintenance requests" onPress={() => navigation.navigate('MaintenanceRequests')} />
       <DemoNotice />
       {reviewCount > 0 && (
         <Card

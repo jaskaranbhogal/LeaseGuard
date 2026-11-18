@@ -31,7 +31,7 @@ def configuration():
 def _options(ref):
     if (ref.get('provider') != 'cloudinary' or ref.get('resource_type') != 'image'
             or ref.get('delivery_type') != 'authenticated'
-            or not re.fullmatch(r'leaseguard/inspections/[a-f0-9]{32}/(baseline|current)', ref.get('public_id', ''))):
+            or not re.fullmatch(r'leaseguard/(?:inspections/[a-f0-9]{32}/(?:baseline|current)|maintenance/[a-f0-9]{32}/[a-f0-9]{64})', ref.get('public_id', ''))):
         raise StorageError('Invalid image reference')
     return dict(configuration(), resource_type='image', type='authenticated')
 
@@ -85,9 +85,9 @@ def delete(ref):
     options = _options(ref)
     try:
         import cloudinary.uploader
-        if not ref.get('asset_id'):
-            # Ambiguous upload timeouts must use provider time, not the intent's
-            # clock, before destruction. A delayed provider write cannot shorten
+        if not ref.get('asset_id') or ref['public_id'].startswith('leaseguard/maintenance/'):
+            # Maintenance assets and ambiguous inspection timeouts use provider
+            # time, not the intent's clock, before destruction. A delayed provider write cannot shorten
             # the minimum evidence retention period.
             import cloudinary.api
             from cloudinary.exceptions import NotFound
@@ -104,3 +104,26 @@ def delete(ref):
             raise StorageError('Deletion not confirmed')
     except Exception:
         raise StorageError('Private photo deletion failed') from None
+
+
+def upload_or_recover(ref, data):
+    """Recover a timed-out maintenance write at its deterministic content address.
+
+    Never overwrite an existing asset; provider metadata confirms private storage.
+    Provider URLs never leave this module.
+    """
+    options = _options(ref)
+    try:
+        import cloudinary.api
+        from cloudinary.exceptions import NotFound
+        try:
+            asset = cloudinary.api.resource(ref['public_id'], timeout=20, **options)
+        except NotFound:
+            return upload(ref, data)
+        if (asset.get('public_id') != ref['public_id'] or not asset.get('asset_id')
+                or asset.get('resource_type') != 'image' or asset.get('type') != 'authenticated'
+                or asset.get('format') != 'jpg'):
+            raise StorageError('Invalid recovered asset')
+        return {**ref, 'asset_id': asset['asset_id'], 'format': 'jpg'}
+    except Exception:
+        raise StorageError('Private photo upload failed; retry this photo') from None

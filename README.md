@@ -17,7 +17,23 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 | Guided inspection, maintenance, history, notifications, and settings **prototypes** | Image storage, baseline comparisons, and AI-assisted damage findings |
 | Django authentication backed by MongoDB, automated tests, and CI | Verify live MongoDB Atlas connection and production deployment |
 
-**Scope:** Screens for properties, inspections, maintenance, and history are largely prototypes; completing a screen does not complete its full user story. Details and priorities are tracked on the [project board](https://github.com/users/jaskaranbhogal/projects/1/views/1). The initial backlog and acceptance criteria are in [USER_STORIES.md](USER_STORIES.md).
+**Original Sprint 0 scope:** Screens for properties, inspections, maintenance, and history were prototypes; completing a screen does not complete its full user story. Details and priorities are tracked on the [project board](https://github.com/users/jaskaranbhogal/projects/1/views/1). The initial backlog and acceptance criteria are in [USER_STORIES.md](USER_STORIES.md).
+
+## Sprint 3 — Maintenance workflow
+
+Tenants with verified unit assignments can save drafts, review camera/gallery
+photos individually, submit **5–20** private photos, and retrieve real maintenance
+history. Authorized property managers can view requests/photos and advance status.
+MongoDB persists housing relationships, drafts, photo references and review history;
+Cloudinary stores authenticated images with at least 90-day retention. Maintenance
+does not call Gemini; unit-linked comparison awaits a verified baseline workflow.
+
+Run `python manage.py migrate` on your development database and provision verified
+relationships using the operator-only `assign_maintenance_unit` command. See
+[maintenance API, setup, recovery and iOS testing](docs/SPRINT3_MAINTENANCE.md) and
+[Cloudinary retention](docs/CLOUDINARY_STORAGE.md). Other sample screens remain
+prototypes. Live upload/private-delivery spot checks passed; physical-device validation remains
+required. See the [security review and remaining dependency advisory](docs/SECURITY_REVIEW.md).
 
 ## Prototype (Sprint 1)
 

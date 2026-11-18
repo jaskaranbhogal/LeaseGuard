@@ -27,11 +27,32 @@ import UnitHistoryScreen from '../src/screens/tenant/UnitHistoryScreen';
 import LoginScreen from '../src/screens/auth/LoginScreen';
 import Button from '../src/components/Button';
 import * as auth from '../src/services/authService';
+import * as maintenance from '../src/services/maintenanceService';
+import PhotoReview from '../src/components/PhotoReview';
+import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { ApiError } from '../src/services/api';
 import type { User } from '../src/types/user';
 import type { MaintenanceRequestId } from '../src/types/maintenance';
 
 jest.mock('../src/services/authService');
+jest.mock('../src/services/maintenanceService');
+const savedRequest: maintenance.MaintenanceRequest = {
+  id: 'a'.repeat(32),
+  unit_id: 'b'.repeat(24),
+  property: 'Verified property',
+  unit: '101',
+  area: 'Kitchen sink leak',
+  description: 'Water leaking under sink cabinet',
+  urgency: 'normal',
+  status: 'submitted',
+  created_at: '2026-11-18T12:00:00Z',
+  updated_at: '2026-11-18T12:00:00Z',
+  submitted_at: '2026-11-18T12:00:00Z',
+  photos: [],
+  history: [],
+  comparison_available: false,
+  comparison_limitation: 'No verified baseline linked to this unit and area.',
+};
 const tenant: User = {
   id: '000000000000000000000001',
   name: 'Test Tenant',
@@ -52,6 +73,19 @@ let navigation: ReturnType<
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  jest
+    .mocked(maintenance.listMaintenance)
+    .mockResolvedValue({ requests: [savedRequest], next: null });
+  jest
+    .mocked(maintenance.assignedUnits)
+    .mockResolvedValue([
+      { id: savedRequest.unit_id, label: '101', property: 'Verified property' },
+    ]);
+  jest.mocked(maintenance.getMaintenance).mockImplementation(async id => {
+    if (id !== savedRequest.id)
+      throw new ApiError('Maintenance request not found.', 404);
+    return savedRequest;
+  });
   jest.mocked(auth.getSession).mockReset();
   jest.mocked(auth.logout).mockReset().mockResolvedValue(undefined);
   navigation = createNavigationContainerRef<TenantStackParamList>();
@@ -227,49 +261,23 @@ it('progresses through four steps, supports retake/back, and clears review histo
   expect(navigation.getCurrentRoute()?.name).toBe('Home');
   expect(navigation.canGoBack()).toBe(false);
 });
-it('selects maintenance IDs from dashboard/history with correct back behavior', async () => {
+it('opens persisted maintenance records from dashboard and history', async () => {
   await mount();
   await press('Kitchen sink leak', app.root.findByType(TenantDashboardScreen));
   expect(navigation.getCurrentRoute()?.params).toEqual({
-    requestId: 'maintenance-1',
+    requestId: savedRequest.id,
   });
-  expect(
-    app.root
-      .findByType(MaintenanceDetailScreen)
-      .findAllByType(Text)
-      .some(t => t.props.children === 'Water leaking under sink cabinet'),
-  ).toBe(true);
+  expect(maintenance.getMaintenance).toHaveBeenCalledWith(savedRequest.id);
+  expect(JSON.stringify(app.toJSON())).toContain(savedRequest.description);
   await press(
     'Back to my requests',
     app.root.findByType(MaintenanceDetailScreen),
   );
-  expect(navigation.getCurrentRoute()?.name).toBe('Home');
-  await press('View unit history', app.root.findByType(TenantDashboardScreen));
   expect(navigation.getCurrentRoute()?.name).toBe('History');
-  expect(JSON.stringify(app.toJSON())).toContain(
-    '1 landlord-confirmed finding',
-  );
-  await press('Bedroom window latch', app.root.findByType(UnitHistoryScreen));
+  await press('Kitchen sink leak', app.root.findByType(UnitHistoryScreen));
   expect(navigation.getCurrentRoute()?.params).toEqual({
-    requestId: 'maintenance-2',
+    requestId: savedRequest.id,
   });
-  expect(
-    app.root
-      .findByType(MaintenanceDetailScreen)
-      .findAllByType(Text)
-      .some(t => t.props.children === 'Window latch sticks when closing'),
-  ).toBe(true);
-  await press(
-    'Back to my requests',
-    app.root.findByType(MaintenanceDetailScreen),
-  );
-  expect(navigation.getCurrentRoute()?.name).toBe('History');
-  await press('Back to dashboard', app.root.findByType(UnitHistoryScreen));
-  expect(navigation.getCurrentRoute()?.name).toBe('Home');
-  expect(navigation.canGoBack()).toBe(false);
-  await press('View unit history', app.root.findByType(TenantDashboardScreen));
-  await act(async () => navigation.goBack());
-  expect(navigation.getCurrentRoute()?.name).toBe('Home');
 });
 it('opens History when a maintenance detail has no previous route', async () => {
   await mount();
@@ -277,7 +285,7 @@ it('opens History when a maintenance detail has no previous route', async () => 
     navigation.reset({
       index: 0,
       routes: [
-        { name: 'MaintenanceDetail', params: { requestId: 'maintenance-1' } },
+        { name: 'MaintenanceDetail', params: { requestId: savedRequest.id } },
       ],
     }),
   );
@@ -299,35 +307,233 @@ it.each(['unknown', undefined])(
         requestId: id as MaintenanceRequestId,
       }),
     );
-    expect(JSON.stringify(app.toJSON())).toContain('Sample request not found');
+    expect(JSON.stringify(app.toJSON())).toContain(
+      'Maintenance request not found.',
+    );
     await press('Back to my requests');
-    expect(navigation.getCurrentRoute()?.name).toBe('Home');
+    expect(navigation.getCurrentRoute()?.name).toBe('History');
   },
 );
-it('preserves maintenance validation and reports only a demo preview', async () => {
+it('validates fields and requires five securely saved photos', async () => {
+  await mount();
+  await press('Report issue');
+  const form = app.root.findByType(ReportMaintenanceScreen);
+  await press('Save draft', form);
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'enter an area and description',
+  );
+  const submit = form
+    .findAll(node => typeof node.props.onPress === 'function')
+    .find(node =>
+      node.findAllByType(Text).some(t => t.props.children === 'Submit request'),
+    )!;
+  expect(submit.props.disabled).toBe(true);
+  expect(maintenance.submitMaintenance).not.toHaveBeenCalled();
+  expect(JSON.stringify(app.toJSON())).not.toContain('Preview demo request');
+});
+it('reviews multiple gallery photos individually and confirms real submission', async () => {
+  let draft: maintenance.MaintenanceRequest = {
+    ...savedRequest,
+    status: 'draft',
+    submitted_at: null,
+  };
+  jest
+    .mocked(maintenance.createDraft)
+    .mockImplementation(async (_id, fields) => {
+      draft = { ...draft, ...fields };
+      return draft;
+    });
+  jest.mocked(maintenance.saveDraft).mockImplementation(async (_id, fields) => {
+    draft = { ...draft, ...fields };
+    return draft;
+  });
+  jest.mocked(maintenance.getMaintenance).mockImplementation(async () => draft);
+  jest
+    .mocked(maintenance.uploadMaintenancePhoto)
+    .mockImplementation(async (_id, _asset, progress) => {
+      progress(100);
+      draft = {
+        ...draft,
+        photos: [
+          ...draft.photos,
+          {
+            id: String(draft.photos.length),
+            state: 'ready',
+            available: true,
+            retain_until: '2027-02-18',
+          },
+        ],
+      };
+      return draft;
+    });
+  jest.mocked(maintenance.submitMaintenance).mockImplementation(async () => {
+    draft = {
+      ...draft,
+      status: 'submitted',
+      submitted_at: '2026-11-18T12:00:00Z',
+    };
+    return draft;
+  });
+  jest.mocked(launchImageLibrary).mockResolvedValue({
+    assets: Array.from({ length: 6 }, (_, i) => ({
+      uri: `file:///photo-${i}.jpg`,
+      type: 'image/jpg',
+    })),
+  });
   const alert = jest.spyOn(Alert, 'alert');
   await mount();
   await press('Report issue');
   const form = app.root.findByType(ReportMaintenanceScreen);
-  await press('Preview demo request', form);
-  expect(alert).toHaveBeenLastCalledWith('Area required', expect.any(String));
+  await act(async () => {
+    form.findAllByType(TextInput)[0].props.onChangeText('Kitchen');
+    form.findAllByType(TextInput)[1].props.onChangeText('Leak');
+  });
+  await press('Add photos', form);
+  const actions = alert.mock.calls[alert.mock.calls.length - 1][2]!;
   await act(async () =>
-    form.findAllByType(TextInput)[0].props.onChangeText('Kitchen'),
+    actions.find(a => a.text === 'Choose from Library')!.onPress!(),
   );
-  await press('Preview demo request', form);
-  expect(alert).toHaveBeenLastCalledWith(
-    'Description required',
+  expect(maintenance.uploadMaintenancePhoto).not.toHaveBeenCalled();
+  await act(async () => app.root.findByType(PhotoReview).props.onDiscard());
+  for (let i = 0; i < 5; i++)
+    await act(async () => app.root.findByType(PhotoReview).props.onAccept());
+  expect(maintenance.uploadMaintenancePhoto).toHaveBeenCalledTimes(5);
+  expect(maintenance.uploadMaintenancePhoto).toHaveBeenCalledWith(
     expect.any(String),
+    expect.objectContaining({ type: 'image/jpeg' }),
+    expect.any(Function),
   );
+  expect(maintenance.uploadMaintenancePhoto).not.toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ uri: 'file:///photo-0.jpg' }),
+    expect.anything(),
+  );
+  await press('Submit request', form);
+  expect(maintenance.submitMaintenance).toHaveBeenCalledTimes(1);
+  expect(JSON.stringify(app.toJSON())).toContain('Request submitted');
+});
+it('recovers a failed accepted camera upload and does not show false success', async () => {
+  const draft = {
+    ...savedRequest,
+    status: 'draft' as const,
+    submitted_at: null,
+  };
+  jest.mocked(maintenance.createDraft).mockResolvedValue(draft);
+  jest.mocked(maintenance.getMaintenance).mockResolvedValue(draft);
+  jest.mocked(maintenance.saveDraft).mockResolvedValue(draft);
+  jest
+    .mocked(maintenance.uploadMaintenancePhoto)
+    .mockRejectedValueOnce(new ApiError('Storage unavailable. Retry.'))
+    .mockResolvedValueOnce({
+      ...draft,
+      photos: [
+        {
+          id: '1',
+          state: 'ready',
+          available: true,
+          retain_until: '2027-02-18',
+        },
+      ],
+    });
+  jest.mocked(launchCamera).mockResolvedValue({
+    assets: [{ uri: 'file:///camera.jpg', type: 'image/jpeg' }],
+  });
+  const alert = jest.spyOn(Alert, 'alert');
+  await mount();
+  await press('Report issue');
+  const form = app.root.findByType(ReportMaintenanceScreen);
+  await act(async () => {
+    form.findAllByType(TextInput)[0].props.onChangeText('Kitchen');
+    form.findAllByType(TextInput)[1].props.onChangeText('Leak');
+  });
+  await press('Add photos', form);
   await act(async () =>
-    form.findAllByType(TextInput)[1].props.onChangeText('Leak'),
+    alert.mock.calls[alert.mock.calls.length - 1][2]!.find(
+      a => a.text === 'Take Photo',
+    )!.onPress!(),
   );
-  await press('Preview demo request', form);
-  expect(alert).toHaveBeenLastCalledWith(
-    'Demo form complete',
-    expect.stringContaining('Nothing has been submitted'),
-    expect.any(Array),
+  await act(async () => app.root.findByType(PhotoReview).props.onAccept());
+  expect(JSON.stringify(app.toJSON())).toContain('Storage unavailable');
+  expect(JSON.stringify(app.toJSON())).not.toContain('Request submitted');
+  await press('Retry accepted photo', form);
+  expect(maintenance.uploadMaintenancePhoto).toHaveBeenCalledTimes(2);
+  expect(maintenance.submitMaintenance).not.toHaveBeenCalled();
+});
+it('keeps the next gallery photo awaiting review after an upload retry', async () => {
+  const draft = {
+    ...savedRequest,
+    status: 'draft' as const,
+    submitted_at: null,
+  };
+  jest.mocked(maintenance.createDraft).mockResolvedValue(draft);
+  jest.mocked(maintenance.getMaintenance).mockResolvedValue(draft);
+  jest.mocked(maintenance.saveDraft).mockResolvedValue(draft);
+  jest
+    .mocked(maintenance.uploadMaintenancePhoto)
+    .mockRejectedValueOnce(new ApiError('Interrupted'))
+    .mockResolvedValueOnce(draft);
+  jest.mocked(launchImageLibrary).mockResolvedValue({
+    assets: [{ uri: 'file:///first.jpg' }, { uri: 'file:///next.jpg' }],
+  });
+  const alert = jest.spyOn(Alert, 'alert');
+  await mount();
+  await press('Report issue');
+  const form = app.root.findByType(ReportMaintenanceScreen);
+  await act(async () => {
+    form.findAllByType(TextInput)[0].props.onChangeText('Kitchen');
+    form.findAllByType(TextInput)[1].props.onChangeText('Leak');
+  });
+  await press('Add photos', form);
+  await act(async () =>
+    alert.mock.calls[alert.mock.calls.length - 1][2]!.find(
+      a => a.text === 'Choose from Library',
+    )!.onPress!(),
   );
+  await act(async () => app.root.findByType(PhotoReview).props.onAccept());
+  await press('Retry accepted photo', form);
+  expect(app.root.findByType(PhotoReview).props.asset.uri).toBe(
+    'file:///next.jpg',
+  );
+  expect(maintenance.uploadMaintenancePhoto).toHaveBeenCalledTimes(2);
+});
+it('waits for backend submission confirmation and prevents repeated taps', async () => {
+  const draft: maintenance.MaintenanceRequest = {
+    ...savedRequest,
+    status: 'draft',
+    submitted_at: null,
+    photos: Array.from({ length: 5 }, (_, i) => ({
+      id: String(i),
+      state: 'ready',
+      available: true,
+      retain_until: '2027-02-18',
+    })),
+  };
+  jest.mocked(maintenance.getMaintenance).mockResolvedValue(draft);
+  jest.mocked(maintenance.saveDraft).mockResolvedValue(draft);
+  let confirm!: (record: maintenance.MaintenanceRequest) => void;
+  jest.mocked(maintenance.submitMaintenance).mockImplementation(
+    () =>
+      new Promise(resolve => {
+        confirm = resolve;
+      }),
+  );
+  await mount();
+  await act(async () =>
+    navigation.navigate('ReportMaintenance', { draftId: draft.id }),
+  );
+  const form = app.root.findByType(ReportMaintenanceScreen);
+  await press('Submit request', form);
+  expect(JSON.stringify(app.toJSON())).not.toContain('Request submitted');
+  await press('Submit request', form);
+  expect(maintenance.submitMaintenance).toHaveBeenCalledTimes(1);
+  await act(async () =>
+    confirm({
+      ...draft,
+      status: 'submitted',
+      submitted_at: '2026-11-18T12:00:00Z',
+    }),
+  );
+  expect(JSON.stringify(app.toJSON())).toContain('Request submitted');
 });
 it('validates availability and retains checked slots after preview', async () => {
   const alert = jest.spyOn(Alert, 'alert');

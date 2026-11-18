@@ -1,3 +1,4 @@
+import { SavedMaintenanceList, SavedMaintenanceDetail } from '../screens/landlord/SavedMaintenanceScreens';
 import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomNavigation from '../components/BottomNavigation';
@@ -31,6 +32,8 @@ function HomeStack() {
       }}>
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Dashboard" component={LandlordDashboardScreen} />
+      <Stack.Screen name="MaintenanceRequests" component={SavedMaintenanceList} />
+      <Stack.Screen name="SavedMaintenanceDetail" component={SavedMaintenanceDetail} />
       <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       <Stack.Screen
         name="ScheduleInspection"

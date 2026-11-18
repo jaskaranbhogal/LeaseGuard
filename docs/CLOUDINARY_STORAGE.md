@@ -1,4 +1,4 @@
-# Private inspection evidence storage
+# Private inspection and maintenance evidence storage
 
 New pairs use Cloudinary; MongoDB retains owner-scoped comparison records, storage
 references, content hashes, AI findings, timestamps and decision history. Existing
@@ -69,7 +69,7 @@ The URL stays inside the backend. The client receives JPEG bytes with
 `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`. Unknown
 IDs and other owners' photos both return 404; anonymous requests return 401.
 Landlord decisions still require landlord role and ownership (403 otherwise).
-No tenant-to-landlord sharing or property/unit permission expansion is included.
+Inspection comparisons remain owner-scoped. Maintenance requests separately use verified property/unit authorization; see [Sprint 3 maintenance](SPRINT3_MAINTENANCE.md).
 
 Before Gemini, the server reads both photos through the same owner-scoped storage
 path. Upload/retrieval failure returns 503 without invoking Gemini or reserving
@@ -193,3 +193,22 @@ Initial full-suite/migration attempts could not connect to local MongoDB; both
 were rerun successfully against the isolated replica set. No real Cloudinary
 upload, retrieval or deletion, production database inspection, or paid Gemini
 request was performed. Staging verification above remains required.
+
+
+## Maintenance evidence extension (2026-11-18)
+
+The shared helpers also accept server-generated
+`leaseguard/maintenance/{requestId}/{normalizedContentHash}` references. Maintenance
+uses the same authenticated upload, bounded private retrieval, and retention-safe
+deletion. `upload_or_recover` verifies existing provider metadata at a deterministic
+address before deciding whether an upload is needed. Draft upload leases and
+MongoDB revision checks prevent concurrent mutations; failed/removed intents remain
+in the embedded ledger until retention cleanup. No Gemini request occurs during
+maintenance uploads or submission.
+
+The existing cleanup command includes maintenance records, freezes expired media
+before deletion, and checkpoints successful deletes. It skips evidence with any
+unexpired/missing retention metadata or a request updated within 90 days. Existing
+inspection behavior and legacy GridFS compatibility remain unchanged. Complete
+API, authorization, retry and iOS procedures are in
+[the maintenance guide](SPRINT3_MAINTENANCE.md).

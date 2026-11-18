@@ -19,8 +19,16 @@ from django.contrib.auth import views as auth_views
 from accounts import views
 from inspections import views as inspection_views
 from django.urls import path
+from maintenance import views as maintenance_views
 
 urlpatterns = [
+    path('api/maintenance/units/', maintenance_views.assigned_units),
+    path('api/maintenance/', maintenance_views.requests),
+    path('api/maintenance/<str:request_id>/', maintenance_views.detail),
+    path('api/maintenance/<str:request_id>/photos/', maintenance_views.photos),
+    path('api/maintenance/<str:request_id>/photos/<str:photo_id>/', maintenance_views.photo_detail),
+    path('api/maintenance/<str:request_id>/submit/', maintenance_views.submit),
+    path('api/maintenance/<str:request_id>/status/', maintenance_views.status),
     path('api/inspections/compare/', inspection_views.compare_photo_view),
     path('api/inspections/recent/', inspection_views.recent_comparisons),
     path('api/inspections/<str:comparison_id>/photos/<str:kind>/', inspection_views.read_comparison_photo),

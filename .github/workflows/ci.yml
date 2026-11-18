@@ -324,7 +324,7 @@ jobs:
       - name: Package a backend release candidate
         run: |
           tar -czf "$RUNNER_TEMP/leaseguard-backend.tar.gz" \
-            manage.py requirements.txt backend accounts inspections
+            manage.py requirements.txt backend accounts inspections maintenance mongo_migrations
           echo "Backend release candidate packaged from commit $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload deployment candidate

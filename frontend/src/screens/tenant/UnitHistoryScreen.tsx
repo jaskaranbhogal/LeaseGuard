@@ -1,3 +1,4 @@
+import { MaintenanceRecords } from '../../components/MaintenanceRecords';
 import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
 import DemoNotice from '../../components/DemoNotice';
@@ -64,62 +65,61 @@ export default function UnitHistoryScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Header title={title} titleStyle={styles.title} />
+        <MaintenanceRecords
+          onOpen={id =>
+            navigation.navigate('MaintenanceDetail', { requestId: id })
+          }
+          onResume={id =>
+            navigation.navigate('ReportMaintenance', { draftId: id })
+          }
+        />
         <DemoNotice />
 
         <Text style={styles.subtitle}>{subtitle}</Text>
 
         <View style={styles.historyList}>
-          {entries.map(entry => {
-            const badgeColors = BADGE_COLORS[entry.type];
-            const isMaintenance = entry.type === 'maintenance';
+          {entries
+            .filter(entry => entry.type !== 'maintenance')
+            .map(entry => {
+              const badgeColors = BADGE_COLORS[entry.type];
 
-            return (
-              <Pressable
-                key={entry.id}
-                style={styles.historyCard}
-                disabled={!isMaintenance}
-                accessibilityRole={isMaintenance ? 'button' : undefined}
-                onPress={() => {
-                  if (entry.type === 'maintenance') {
-                    navigation.navigate('MaintenanceDetail', {
-                      requestId: entry.requestId,
-                    });
-                  }
-                }}
-              >
-                <View
-                  style={[
-                    styles.badge,
-                    {
-                      backgroundColor: badgeColors.background,
-                      width: badgeColors.width,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.badgeText, { color: badgeColors.text }]}>
-                    {entry.badge}
-                  </Text>
-                </View>
-
-                <View style={styles.historyDetails}>
-                  <Text style={styles.historyTitle}>{entry.title}</Text>
-
-                  <Text style={styles.historySubtitle}>{entry.details}</Text>
-
-                  {entry.status ? (
+              return (
+                <Pressable key={entry.id} style={styles.historyCard} disabled>
+                  <View
+                    style={[
+                      styles.badge,
+                      {
+                        backgroundColor: badgeColors.background,
+                        width: badgeColors.width,
+                      },
+                    ]}
+                  >
                     <Text
-                      style={[
-                        styles.statusText,
-                        { color: getStatusColor(entry.type) },
-                      ]}
+                      style={[styles.badgeText, { color: badgeColors.text }]}
                     >
-                      {entry.status}
+                      {entry.badge}
                     </Text>
-                  ) : null}
-                </View>
-              </Pressable>
-            );
-          })}
+                  </View>
+
+                  <View style={styles.historyDetails}>
+                    <Text style={styles.historyTitle}>{entry.title}</Text>
+
+                    <Text style={styles.historySubtitle}>{entry.details}</Text>
+
+                    {entry.status ? (
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: getStatusColor(entry.type) },
+                        ]}
+                      >
+                        {entry.status}
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })}
         </View>
 
         <View style={styles.comparisonCard}>

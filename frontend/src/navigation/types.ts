@@ -14,6 +14,8 @@ export type LandlordStackParamList = {
   AddProperty: undefined;
   ScheduleInspection: undefined;
   AIInspectionReview: undefined;
+  MaintenanceRequests: undefined;
+  SavedMaintenanceDetail: { requestId: string };
 };
 
 export type LandlordSettingsStackParamList = {
@@ -46,10 +48,10 @@ export type TenantStackParamList = {
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;
   GuidedInspection: undefined;
-  ReportMaintenance: undefined;
+  ReportMaintenance: { draftId?: string } | undefined;
   InspectionAvailability: undefined;
   MaintenanceDetail: {
-    requestId: import('../types/maintenance').MaintenanceRequestId;
+    requestId: string;
   };
   ReviewInspectionPhoto: { stepIndex: number };
   InspectionSubmitted: undefined;

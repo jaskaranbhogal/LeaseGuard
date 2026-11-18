@@ -76,5 +76,9 @@ class Command(BaseCommand):
                 self.stderr.write('Media deletion incomplete; references retained for retry.')
         self.stdout.write(f'Found {found} expired pairs; deleted {deleted}; failed {failed}'
                           + (' (dry run)' if not options['execute'] else ''))
+        from maintenance.cleanup import cleanup
+        maintenance_counts = cleanup(db, now, options['execute'], max(1, min(options['limit'], 1000)))
+        self.stdout.write('Maintenance: found %s; deleted %s; failed %s' % maintenance_counts)
+        failed += maintenance_counts[2]
         if failed:
             raise CommandError('Some media deletions require retry')
