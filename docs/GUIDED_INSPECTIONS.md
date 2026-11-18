@@ -131,8 +131,9 @@ at 500 events; hitting that limit requires operator support, not evidence deleti
 
 ## Local setup and checks
 
-Commands below use the isolated local instance created for this task. They do not
-load the repository's `.env` (its remote database was not classified as safe).
+Commands below use the isolated local instance created for this task. Django loads
+`.env`, but these explicit exports override its remote database and provider settings
+(the remote database was not classified as safe).
 
 ```bash
 cd /Users/jaskaranbhogal/CapstoneProjectGroup4

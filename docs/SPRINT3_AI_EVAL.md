@@ -106,3 +106,13 @@ See [full test results, security audit, provider status, API contracts, iOS acce
 steps and issue traceability](SPRINT3_FINALIZATION_REPORT.md). Codex assisted with the
 implementation, tests and documentation; no real-model performance claim is based on
 mocked results.
+
+
+## Subsequent approved smoke attempt
+
+After the initial offline verification, the user approved exactly one potentially
+billable synthetic comparison. The single attempt returned the unavailable/manual
+fallback and was persisted locally with a consumed shared budget reservation. No
+second attempt was made; validated live output and actual billing remain unverified.
+The running simulator backend has Gemini disabled to prevent further paid calls.
+See the finalization report's follow-up section for details.

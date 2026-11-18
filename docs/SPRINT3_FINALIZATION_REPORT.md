@@ -205,3 +205,32 @@ acceptance criteria have passed**. No issue was closed or PR merged.
 AI assistance: Codex assisted with implementation, test additions, review and this
 report. Tests use synthetic/mocked provider outputs; application flows use persisted
 records and never manufacture successful provider findings.
+
+
+## Follow-up: approved single-call smoke and Xcode launch
+
+The user explicitly approved **only one potentially billable Gemini call** after the
+initial report. One synthetic service attempt used `gemini-3.5-flash-lite` with SDK
+retries disabled. It returned the safe unavailable/manual-review fallback, empty
+findings, no damage classification or severity. A shared daily-budget reservation
+was consumed and the result was persisted in the isolated local database's
+`sprint3_provider_smokes` diagnostic collection. A durable unique claim prevents
+re-running that approved attempt. No second provider attempt was made. Provider
+billing and the precise failure reason were not established; a validated live
+comparison remains unverified. No Cloudinary or tenant images were sent.
+
+Result summary: `/tmp/leaseguard-gemini-smoke/result.json`. This was a synthetic
+service smoke test, not the stored Cloudinary-to-guided-inspection acceptance flow.
+
+Applied migrations only to `leaseguard_sprint3_local` on the local replica set.
+Started Django at `127.0.0.1:8000` with `GEMINI_API_KEY=''` to prevent further paid
+calls, and Metro at port 8081. Verified Django's CSRF endpoint responds HTTP 200,
+the unauthenticated session endpoint responds its expected HTTP 401, and Metro
+serves the current iOS bundle HTTP 200. Existing Atlas accounts/data were not copied.
+
+Used Xcode's Run action to replace its previous instance and launch the existing
+frontend workspace/scheme on the booted iPhone 18 Pro / iOS 27.0 simulator. Native
+computer-use inspection verified the actual LeaseGuard sign-in screen; screenshot
+saved at `/tmp/leaseguard-gemini-smoke/ios-running.png`. This verifies app launch and
+development-server connectivity, not a full signed-in capture/inspection test.
+The development servers were left running for the user.
