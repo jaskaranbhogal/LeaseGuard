@@ -8,6 +8,7 @@ from django.db import IntegrityError
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
+from accounts.models import AccountProfile
 from inspections import media
 from inspections.services import prepare_image, AIComparisonError
 from maintenance.models import Unit, UnitAssignment, MaintenanceRequest
@@ -66,7 +67,9 @@ def serialize(record, detail=True):
                       uploads=[photo_json(p) for p in record['photos'] if p['state'] in {'uploading', 'failed'} and not p.get('replaced_at')],
                       history=record['history'], baseline_available=compatible,
                       baseline_photos=[photo_json(p) for p in base['photos']] if compatible else [],
-                      comparisons=[{k: v for k, v in c.items() if k not in {'baseline_photo', 'current_photo'}} for c in record['comparisons']])
+                      comparisons=[{**{k: v for k, v in c.items() if k not in {'baseline_photo', 'current_photo'}},
+                                    'baseline_photo_id': c['baseline_photo']['id'], 'current_photo_id': c['current_photo']['id']}
+                                   for c in record['comparisons']])
     return result
 
 
@@ -114,9 +117,10 @@ def inspections(request):
         return missing()
     assignment = UnitAssignment.objects.filter(unit=unit, tenant_id=ObjectId(data['tenant_id']), active=True).first()
     template = InspectionTemplate.objects.filter(public_id=data['template_id'], owner=request.user, active=True).first()
-    if not assignment or not template or data.get('inspection_type') not in store.TYPES:
+    if not assignment or not template or not AccountProfile.objects.filter(user_id=assignment.tenant_id, role='tenant').exists() or data.get('inspection_type') not in store.TYPES:
         raise ValueError
     due = datetime.fromisoformat(data['due_at'].replace('Z', '+00:00'))
+    due = due.replace(microsecond=(due.microsecond // 1000) * 1000)  # MongoDB datetime precision
     recurrence = data.get('recurrence_days', 0)
     if timezone.is_naive(due) or type(recurrence) is not int or recurrence not in {0, 30, 90, 180, 365}:
         raise ValueError
@@ -124,6 +128,8 @@ def inspections(request):
     if not isinstance(key, str) or not re.fullmatch(r'[a-zA-Z0-9_-]{16,80}', key):
         raise ValueError
     creation_key = hashlib.sha256(f'{request.user.pk}:{key}'.encode()).hexdigest()
+    if due < timezone.now() and not GuidedInspection.objects.filter(creation_key=creation_key).exists():
+        raise ValueError('Due date must be in the future.')
     values = dict(unit=unit, tenant_id=assignment.tenant_id, landlord=request.user, template=template,
                   template_version=template.version, steps=store.validate_steps(template.steps), due_at=due,
                   inspection_type=data['inspection_type'], recurrence_days=recurrence,
@@ -196,15 +202,33 @@ def action(request, inspection_id, action):
     data = body(request)
     actor = request.user.pk
     landlord = role(request) == 'landlord'
-    if action == 'submit' and role(request) == 'tenant':
+    if action == 'maintenance-draft' and role(request) == 'tenant':
+        if record['status'] not in {'submitted', 'reviewed'}:
+            raise Conflict('Submit the inspection before creating maintenance follow-up.')
+        comparison = next((c for c in record['comparisons'] if c['id'] == data.get('comparison_id') and c.get('decision') == 'confirmed'), None)
+        if not comparison:
+            raise Conflict('A confirmed finding is required.')
+        key = hashlib.sha256(f"guided-maintenance:{record['public_id']}:{comparison['id']}".encode()).hexdigest()
+        # Reuse private references, preserving their original retention metadata.
+        # Deduplicate identical bytes to preserve maintenance photo semantics.
+        references = {p['ref']['sha256']: p for p in store.active(record)}
+        photos = [dict(id=digest, state='ready', ref=p['ref']) for digest, p in references.items()]
+        current = comparison['current_photo']
+        step = next(s for s in record['steps'] if s['id'] == current['step_id'])
+        draft, _ = MaintenanceRequest.objects.get_or_create(creation_key=key, defaults=dict(
+            tenant=request.user, unit_id=record['unit_id'], area=step['room'],
+            description='Follow-up for a confirmed inspection finding. Please describe the requested repair.',
+            photos=photos, history=[dict(action='inspection-follow-up', inspection_id=record['public_id'], comparison_id=comparison['id'], at=timezone.now().isoformat())]))
+        return JsonResponse({'maintenance_id': draft.public_id})
+    elif action == 'submit' and role(request) == 'tenant':
         if record['status'] not in {'submitted', 'reviewed'}:
             store.check_revision(record, data.get('revision'))
         record = store.submit(record, actor)
-        notify(record, 'An inspection is ready for review.', record['landlord_id'], f"submitted:{record['submitted_at']}")
+        notify(record, 'An inspection is ready for review.', record['landlord_id'], 'submitted-event:' + next(h['at'] for h in reversed(record['history']) if h['action'] == 'submitted'))
     elif landlord and action == 'approve-baseline':
         store.check_revision(record, data.get('revision'))
         record = store.approve(record, actor)
-        notify(record, 'Your move-in baseline has been approved.', record['tenant_id'], 'baseline-approved')
+        notify(record, 'Your move-in baseline has been approved.', record['tenant_id'], 'baseline-approved:' + next(h['at'] for h in reversed(record['history']) if h['action'] in {'baseline-approved', 'review-completed'}))
     elif landlord and action == 'compare':
         store.check_revision(record, data.get('revision'))
         record = store.compare(record, data.get('photo_id'), actor)
@@ -219,12 +243,12 @@ def action(request, inspection_id, action):
             if not 1 <= len(reason) <= 1000:
                 raise ValueError
             record = store.change(record, dict(status='retake', history=store.audit(record, 'retake-requested', actor, reason=reason)))
-            notify(record, 'A retake has been requested. Open the inspection for details.', record['tenant_id'], f"retake:{record['revision']}")
+            notify(record, 'A retake has been requested. Open the inspection for details.', record['tenant_id'], 'retake-requested:' + record['history'][-1]['at'])
         elif action == 'finalize':
             if any(c.get('decision') is None for c in record['comparisons']):
                 raise Conflict('Record a human decision for each analysis before finalizing.')
             record = store.change(record, dict(status='reviewed', reviewed_at=timezone.now(), history=store.audit(record, 'review-completed', actor)))
-            notify(record, 'Your inspection review is complete.', record['tenant_id'], 'review-completed')
+            notify(record, 'Your inspection review is complete.', record['tenant_id'], 'review-completed:' + record['history'][-1]['at'])
         else:
             comparison = next((c for c in record['comparisons'] if c['id'] == data.get('comparison_id')), None)
             if not comparison or comparison['status'] != 'completed':
@@ -250,9 +274,17 @@ def action(request, inspection_id, action):
 
 @endpoint(['GET', 'POST'])
 def notifications(request):
+    authorized = InspectionNotification.objects.filter(recipient=request.user,
+        inspection__unit_id__in=list(units(request).values_list('pk', flat=True)))
+    if role(request) == 'tenant':
+        authorized = authorized.filter(inspection__tenant=request.user)
     if request.method == 'POST':
         data = body(request)
-        InspectionNotification.objects.filter(recipient=request.user, event_key=data.get('id')).update(read_at=timezone.now())
-    records = InspectionNotification.objects.filter(recipient=request.user).order_by('-created_at')[:100]
+        target = authorized.filter(event_key=data.get('id')).first()
+        if target:
+            # MongoDB update cannot use a joined filter; authorize first, then
+            # update the recipient-scoped document by its primary key.
+            InspectionNotification.objects.filter(pk=target.pk, recipient=request.user).update(read_at=timezone.now())
+    records = authorized.order_by('-created_at')[:100]
     return JsonResponse({'notifications': [dict(id=n.event_key, inspection_id=n.inspection.public_id, message=n.message,
                                                 created_at=n.created_at.isoformat(), read=n.read_at is not None) for n in records]})

@@ -14,6 +14,7 @@ from pymongo.write_concern import WriteConcern
 
 from inspections import media, storage
 from inspections.services import compare_images_safe
+from inspections.prompts import PROMPT_VERSION
 from inspections.views import _manual_result
 from maintenance.store import Conflict
 from .models import GuidedInspection, UnitBaseline
@@ -111,7 +112,9 @@ def upload(record, step_id, slot, data, actor):
         uploaded_at=now.isoformat(), retain_until=(now + timedelta(days=90, minutes=5)).isoformat())
     intent = dict(id=key, step_id=step_id, slot=slot, state='uploading', ref=ref, token=token,
                   capture_at=now.isoformat(), lease_until=(now + timedelta(seconds=90)).isoformat())
-    record = change(record, {'photos': [p for p in record['photos'] if p['id'] != key] + [intent],
+    preserved = [{**p, 'replaced_at': now.isoformat()} if p['state'] == 'uploading' and p['step_id'] == step_id and p['slot'] == slot else p
+                 for p in record['photos'] if p['id'] != key]
+    record = change(record, {'photos': preserved + [intent],
                             'status': 'draft' if record['status'] == 'assigned' else record['status'],
                             'started_at': record.get('started_at') or now})
     try:
@@ -129,7 +132,7 @@ def finish_upload(record, key, token, ref, state, actor):
         current = collection().find_one({'_id': record['_id']})
         editable(current)
         intent = next((p for p in current['photos'] if p['id'] == key), None)
-        if not intent or intent.get('token') != token or intent['state'] != 'uploading':
+        if not intent or intent.get('replaced_at') or intent.get('token') != token or intent['state'] != 'uploading':
             raise Conflict('Upload changed. Refresh to recover.')
         photos = []
         for p in current['photos']:
@@ -176,21 +179,28 @@ def approve(record, actor):
     # Finalize evidence first: a concurrent retake cannot alter an approved snapshot.
     if record['status'] != 'reviewed':
         record = change(record, dict(status='reviewed', reviewed_at=timezone.now(),
-                                     history=audit(record, 'baseline-approved', actor)))
+                                     history=audit(record, 'baseline-approval-requested', actor)))
     UnitBaseline.objects.get_or_create(unit_id=record['unit_id'])
     for _ in range(5):
         head = collection(UnitBaseline).find_one({'unit_id': record['unit_id']})
         if any(b['inspection_id'] == record['public_id'] for b in head['versions']):
-            return record
+            return mark_approved(record, actor)
         snapshot = dict(id=uuid.uuid4().hex, inspection_id=record['public_id'],
                         template_id=str(record['template_id']), template_version=record['template_version'],
                         photos=active(record), approved_by=str(actor), approved_at=timezone.now().isoformat())
         try:
             change(head, {'versions': head['versions'] + [snapshot], 'active_id': snapshot['id']}, UnitBaseline)
-            return record
+            return mark_approved(record, actor)
         except Conflict:
             continue
     raise Conflict('Baseline changed. Refresh and retry approval.')
+
+
+def mark_approved(record, actor):
+    current = collection().find_one({'_id': record['_id']})
+    if any(h['action'] == 'baseline-approved' for h in current['history']):
+        return current
+    return change(current, {'history': audit(current, 'baseline-approved', actor)})
 
 
 def match(record, photo_id):
@@ -209,9 +219,12 @@ def match(record, photo_id):
 def compare(record, photo_id, actor):
     if record['status'] != 'submitted':
         raise Conflict('Only submitted inspections can be analyzed.')
+    pending = next((c for c in record['comparisons'] if c['photo_id'] == photo_id and c['status'] == 'pending'), None)
+    if pending:
+        return recover_comparison(record, pending)
     base, previous, current = match(record, photo_id)
     # Shared durable claim prevents duplicate provider calls, including across
-    # inspections and managers. Existing API uses the same content identity.
+    # inspections and managers, using the existing hash helper with a unit namespace.
     first, second = media.retrieve(previous['ref']), media.retrieve(current['ref'])
     step = next(s for s in record['steps'] if s['id'] == current['step_id'])
     key = storage._pair_id('guided-unit:' + str(record['unit_id']), first, second, step['room'], step['id'])
@@ -219,15 +232,10 @@ def compare(record, photo_id, actor):
     if existing:
         if existing['status'] == 'completed':
             return record
-        pair = storage.database().inspection_comparisons.find_one({'_id': key})
-        result = (pair or {}).get('result')
-        if not result and datetime.fromisoformat(existing['created_at']) + timedelta(seconds=90) > timezone.now():
-            raise Conflict('Analysis is still pending. Refresh after 90 seconds; it will not be retried.')
-        result = result or _manual_result('Analysis was interrupted. Review manually; no second paid call will be made.')
-        return change(record, {'comparisons': [{**c, 'status': 'completed', 'result': result} if c['id'] == key else c for c in record['comparisons']]})
+        return recover_comparison(record, existing)
     entry = dict(id=key, photo_id=photo_id, baseline_id=base['id'], baseline_photo=previous,
                  current_photo=current, status='pending', result=None, decision=None,
-                 model=settings.GEMINI_MODEL, prompt_version='image_comparison_v1', created_at=timezone.now().isoformat())
+                 model=settings.GEMINI_MODEL, prompt_version=PROMPT_VERSION, created_at=timezone.now().isoformat())
     record = change(record, {'comparisons': record['comparisons'] + [entry]})
     from pymongo.errors import DuplicateKeyError
     pairs = storage.database().inspection_comparisons
@@ -247,9 +255,20 @@ def compare(record, photo_id, actor):
         result = pair.get('result') or _manual_result('Previous analysis is pending or interrupted. Manual review required; no automatic retry.')
     for _ in range(5):
         current_record = collection().find_one({'_id': record['_id']})
+        if not any(c['id'] == key and c['status'] == 'pending' for c in current_record['comparisons']):
+            return current_record  # Never overwrite a recovered result or human decision.
         comparisons = [{**c, 'result': result, 'status': 'completed'} if c['id'] == key else c for c in current_record['comparisons']]
         try:
             return change(current_record, {'comparisons': comparisons})
         except Conflict:
             continue
     raise Conflict('Analysis saved. Refresh to view it.')
+
+
+def recover_comparison(record, entry):
+    pair = storage.database().inspection_comparisons.find_one({'_id': entry['id']})
+    result = (pair or {}).get('result')
+    if not result and datetime.fromisoformat(entry['created_at']) + timedelta(seconds=90) > timezone.now():
+        raise Conflict('Analysis is still pending. Refresh after 90 seconds; it will not be retried.')
+    result = result or _manual_result('Analysis was interrupted. Review manually; no second paid call will be made.')
+    return change(record, {'comparisons': [{**c, 'status': 'completed', 'result': result} if c['id'] == entry['id'] else c for c in record['comparisons']]})

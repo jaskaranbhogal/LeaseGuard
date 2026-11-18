@@ -10,13 +10,16 @@ from . import store
 
 def reconcile(limit=200):
     processed = 0
-    for record in store.collection().find({}).sort('_id', 1).limit(limit):
+    for record in store.collection().find({}).sort('_id', 1).batch_size(limit):
         notify(record, 'A photo inspection has been assigned.', record['tenant_id'], 'assigned')
         for event in record['history']:
             if event['action'] == 'submitted':
                 notify(record, 'An inspection is ready for review.', record['landlord_id'], 'submitted-event:'+event['at'])
             elif event['action'] in {'retake-requested', 'review-completed', 'baseline-approved'}:
                 notify(record, 'Inspection update: '+event['action']+'. Open the inspection for details.', record['tenant_id'], event['action']+':'+event['at'])
+        due = record['due_at']
+        if timezone.is_naive(due):
+            due = timezone.make_aware(due)
         days = record.get('recurrence_days', 0)
         if record['status'] == 'reviewed' and days and UnitAssignment.objects.filter(unit_id=record['unit_id'], tenant_id=record['tenant_id'], active=True).exists():
             # Reverify manager access before creating another assignment.
@@ -27,7 +30,7 @@ def reconcile(limit=200):
             GuidedInspection.objects.get_or_create(creation_key=key, defaults=dict(
                 unit_id=record['unit_id'], tenant_id=record['tenant_id'], landlord_id=record['landlord_id'],
                 template_id=record['template_id'], template_version=record['template_version'], steps=record['steps'],
-                due_at=record['due_at']+timedelta(days=days), inspection_type='periodic', recurrence_days=days,
+                due_at=due+timedelta(days=days), inspection_type='periodic', recurrence_days=days,
                 history=[dict(action='assigned', actor='scheduler', at=timezone.now().isoformat(), previous=record['public_id'])]))
         processed += 1
     return processed

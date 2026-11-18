@@ -52,7 +52,7 @@ class GuidedTests(TransactionTestCase):
 
     def action(self, name, **values):
         response = self.post(self.record['id']+'/'+name+'/', dict(revision=self.record['revision'], **values))
-        if response.status_code == 200:
+        if response.status_code == 200 and 'inspection' in response.json():
             self.record = response.json()['inspection']
         return response
 
@@ -90,6 +90,7 @@ class GuidedTests(TransactionTestCase):
         self.assertEqual(self.post('templates/', {'name': 'No'}).status_code, 404)
         self.assertEqual(self.action('approve-baseline').status_code, 404)
         UnitAssignment.objects.filter(tenant=self.tenant).update(active=False)
+        self.assertEqual(self.client.get(self.base+'notifications/').json()['notifications'], [])
         self.assertEqual(self.client.get(self.base+self.record['id']+'/').status_code, 404)
 
     def test_draft_resume_and_incomplete_submission(self):
@@ -155,3 +156,127 @@ class GuidedTests(TransactionTestCase):
             self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
             ai.assert_not_called()
         self.assertEqual(self.record['comparisons'][0]['result']['analysis_status'], 'unavailable')
+
+    def test_private_photo_proxy_and_wrong_user(self):
+        self.fill()
+        photo = self.record['photos'][0]['id']
+        url = self.base+self.record['id']+'/photos/'+photo+'/'
+        with patch('guided_inspections.views.media.retrieve', return_value=b'private-jpeg') as retrieve:
+            response = self.client.get(url)
+            self.assertEqual(response.content, b'private-jpeg')
+            self.assertIn('no-store', response['Cache-Control'])
+            self.client.force_login(self.other)
+            self.assertEqual(self.client.get(url).status_code, 404)
+            self.assertEqual(retrieve.call_count, 1)
+        self.client.force_login(self.landlord)
+        payload = json.dumps(self.refresh())
+        self.assertNotIn('cloudinary', payload)
+        self.assertNotIn('public_id', payload)
+        self.assertNotIn('asset_id', payload)
+
+    def test_concurrent_revisions_reject_lost_updates(self):
+        from maintenance.store import Conflict
+        record = store.collection().find_one({'public_id': self.record['id']})
+        store.change(record, {'status': 'draft'})
+        with self.assertRaises(Conflict):
+            store.change(record, {'status': 'submitted'})
+
+    def test_idempotent_assignment_and_invalid_input(self):
+        values = dict(unit_id=str(self.unit.pk), tenant_id=str(self.tenant.pk), template_id=self.template,
+                      due_at=(timezone.now()+timedelta(days=3)).isoformat(), inspection_type='periodic', idempotency_key='retry_assignment_0001')
+        first = self.post('', values)
+        second = self.post('', values)
+        self.assertEqual(first.json()['inspection']['id'], second.json()['inspection']['id'])
+        self.assertEqual(self.post('', {**values, 'inspection_type': 'move-out'}).status_code, 409)
+        self.assertEqual(self.post('', {}).status_code, 400)
+        self.assertEqual(self.post('', {**values, 'unit_id': 'invalid'}).status_code, 400)
+
+    def test_template_mismatch_never_matches_by_position(self):
+        self.fill(); self.client.force_login(self.landlord); self.action('approve-baseline')
+        self.template = self.post('templates/', dict(name='Different layout', steps=store.DEFAULT_STEPS)).json()['id']
+        self.record = self.create('periodic', 'layout_test_0001'); self.fill(); self.client.force_login(self.landlord)
+        with patch('guided_inspections.store.compare_images_safe') as ai:
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 409)
+            ai.assert_not_called()
+
+    def test_scheduler_and_notifications_are_idempotent(self):
+        from .operations import reconcile
+        GuidedInspection.objects.filter(public_id=self.record['id']).update(recurrence_days=30)
+        self.fill(); self.client.force_login(self.landlord); self.action('approve-baseline')
+        reconcile(); count = InspectionNotification.objects.count(); reconcile()
+        self.assertEqual(GuidedInspection.objects.count(), 2)
+        # Second pass publishes the newly-created assignment once.
+        self.assertEqual(InspectionNotification.objects.count(), count+1)
+        reconcile(); self.assertEqual(InspectionNotification.objects.count(), count+1)
+        self.client.force_login(self.tenant)
+        notifications = self.client.get(self.base+'notifications/').json()['notifications']
+        self.assertTrue(notifications)
+        self.assertEqual(self.post('notifications/', {'id': notifications[0]['id']}).status_code, 200)
+        self.assertIsNotNone(InspectionNotification.objects.get(event_key=notifications[0]['id']).read_at)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(self.base+'notifications/').json()['notifications'], [])
+
+    def test_tenant_maintenance_followup_reuses_evidence_and_keeps_retention(self):
+        from maintenance.models import MaintenanceRequest
+        from maintenance.cleanup import cleanup
+        self.fill(); self.client.force_login(self.landlord); self.action('approve-baseline')
+        self.record = self.create('periodic', 'maintenance_test_001'); self.fill(); self.client.force_login(self.landlord)
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=_manual_result()):
+            self.action('compare', photo_id=self.record['photos'][0]['id'])
+        comparison = self.record['comparisons'][0]['id']; self.action('decision', comparison_id=comparison, decision='confirmed')
+        self.client.force_login(self.tenant)
+        response = self.action('maintenance-draft', comparison_id=comparison)
+        self.assertEqual(response.status_code, 200, response.content)
+        maintenance_id = response.json()['maintenance_id']
+        self.assertEqual(self.action('maintenance-draft', comparison_id=comparison).json()['maintenance_id'], maintenance_id)
+        draft = MaintenanceRequest.objects.get(public_id=maintenance_id)
+        self.assertEqual(len(draft.photos), 5)
+        response = self.client.post('/api/maintenance/'+maintenance_id+'/submit/', '{}', content_type='application/json')
+        self.assertEqual(response.status_code, 200, response.content)
+        self.client.force_login(self.landlord)
+        self.assertEqual(self.action('maintenance', comparison_id=comparison, maintenance_id=maintenance_id).status_code, 200)
+        with patch('maintenance.cleanup.media.delete') as delete:
+            cleanup(storage.database(), timezone.now()+timedelta(days=365), True, 100)
+            delete.assert_not_called()
+
+    def test_shared_manager_dedup_and_interrupted_analysis_recovery(self):
+        self.fill(); self.client.force_login(self.landlord); self.action('approve-baseline')
+        self.record = self.create('periodic', 'manager_test_001'); self.fill(); self.client.force_login(self.landlord)
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=_manual_result()) as ai:
+            self.action('compare', photo_id=self.record['photos'][0]['id'])
+            self.unit.property.managers.add(self.other)
+            self.client.force_login(self.other)
+            self.action('compare', photo_id=self.record['photos'][0]['id'])
+            self.assertEqual(ai.call_count, 1)
+            record = store.collection().find_one({'public_id': self.record['id']})
+            entry = {**record['comparisons'][0], 'status': 'pending', 'result': None}
+            store.change(record, {'comparisons': [entry]}); self.refresh()
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+            self.assertEqual(self.record['comparisons'][0]['status'], 'completed')
+            self.assertEqual(ai.call_count, 1)
+
+    def test_late_upload_cannot_replace_newer_evidence(self):
+        from maintenance.store import Conflict
+        self.client.force_login(self.tenant)
+        self.client.post(self.base+self.record['id']+'/photos/', dict(photo=image(), step_id='entry-wide', slot=0, revision=0))
+        current = store.collection().find_one({'public_id': self.record['id']})
+        ready = current['photos'][0]
+        old = {**ready, 'id': 'd'*64, 'state': 'uploading', 'token': 'old', 'replaced_at': timezone.now().isoformat()}
+        updated = store.change(current, {'photos': [ready, old]})
+        with self.assertRaises(Conflict):
+            store.finish_upload(updated, old['id'], 'old', old['ref'], 'ready', self.tenant.pk)
+        self.assertEqual(store.active(store.collection().find_one({'_id': current['_id']})), [ready])
+
+    def test_late_ai_response_cannot_overwrite_a_recovered_human_decision(self):
+        self.fill(); self.client.force_login(self.landlord); self.action('approve-baseline')
+        self.record = self.create('periodic', 'late_result_test_001'); self.fill(); self.client.force_login(self.landlord)
+        def delayed_response(*args):
+            record = store.collection().find_one({'public_id': self.record['id']})
+            entry = {**record['comparisons'][0], 'status': 'completed', 'decision': 'manual-review',
+                     'result': _manual_result('Recovered for manual review.')}
+            store.change(record, {'comparisons': [entry]})
+            return _manual_result('Late provider response.')
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', side_effect=delayed_response):
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+        self.assertEqual(self.record['comparisons'][0]['result']['summary'], 'Recovered for manual review.')
+        self.assertEqual(self.record['comparisons'][0]['decision'], 'manual-review')

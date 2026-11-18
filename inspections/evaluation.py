@@ -1,6 +1,6 @@
 """Golden evaluation runner. Replay is deterministic CI regression, live tests Gemini.
 
-Live mode is intentionally opt-in and capped: 19 cases * 2 runs = 38 calls.
+Live mode is intentionally opt-in and capped: 20 cases * 2 runs = 40 calls.
 This harness never retries. Synthetic fixtures are not a clinical/legal validation.
 """
 import io
