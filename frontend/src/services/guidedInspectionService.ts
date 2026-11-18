@@ -29,6 +29,8 @@ export type GuidedInspection = {
   steps: Step[];
   photos: Photo[];
   uploads: Photo[];
+  active_baseline_id?: string;
+  baseline_source_id?: string;
   baseline_available: boolean;
   baseline_photos: Photo[];
   history: { action: string; at: string; reason?: string }[];
@@ -37,12 +39,13 @@ export type GuidedInspection = {
     photo_id: string;
     status: string;
     decision: string | null;
+    finding_decisions?: (string | null)[];
     result: {
       summary: string;
       classification: string;
       severity: string | null;
       confidence: string;
-      findings: unknown[];
+      findings: { description?: string; classification?: string }[];
     } | null;
     maintenance_id?: string;
     baseline_photo_id?: string;
@@ -54,6 +57,7 @@ export type AssignmentOptions = {
     id: string;
     label: string;
     property: string;
+    baseline_template_id?: string | null;
     tenants: { id: string; label: string }[];
   }[];
   templates: { id: string; name: string; version: number; steps: Step[] }[];

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Image,
   ScrollView,
   Text,
@@ -202,12 +203,79 @@ export default function AIInspectionReviewScreen({
                                 {c.result.severity || 'No severity'} ·
                                 Confidence: {c.result.confidence}
                               </Text>
-                              <Text>{JSON.stringify(c.result.findings)}</Text>
+                              {c.result.findings.map(
+                                (finding, findingIndex) => {
+                                  const status =
+                                    c.finding_decisions?.[findingIndex] ??
+                                    c.decision;
+                                  return (
+                                    <View
+                                      key={findingIndex}
+                                      style={styles.card}
+                                    >
+                                      <Text>
+                                        {finding.description} ·{' '}
+                                        {finding.classification}
+                                      </Text>
+                                      <Text>
+                                        Finding decision:{' '}
+                                        {status || 'Awaiting review'}
+                                      </Text>
+                                      {(record.status === 'submitted' ||
+                                        status === 'confirmed') &&
+                                        (record.status === 'submitted'
+                                          ? [
+                                              'confirmed',
+                                              'dismissed',
+                                              'manual-review',
+                                              ...(status === 'confirmed'
+                                                ? ['resolved']
+                                                : []),
+                                            ]
+                                          : ['resolved']
+                                        ).map(decision => (
+                                          <Button
+                                            key={decision}
+                                            title={`Finding ${
+                                              findingIndex + 1
+                                            }: ${decision}`}
+                                            disabled={busy}
+                                            onPress={() =>
+                                              action('decision', {
+                                                comparison_id: c.id,
+                                                finding_index: findingIndex,
+                                                decision,
+                                              })
+                                            }
+                                          />
+                                        ))}
+                                    </View>
+                                  );
+                                },
+                              )}
                             </>
                           )}
                           <Text>
-                            Decision: {c.decision || 'Awaiting review'}
+                            Pair decision:{' '}
+                            {c.decision ||
+                              (c.finding_decisions?.every(d => d) &&
+                              c.finding_decisions.length
+                                ? 'See individual finding decisions'
+                                : 'Awaiting review')}
                           </Text>
+                          {c.decision === 'confirmed' &&
+                            c.status === 'completed' && (
+                              <Button
+                                title="Mark resolved"
+                                disabled={busy}
+                                onPress={() =>
+                                  action('decision', {
+                                    comparison_id: c.id,
+                                    decision: 'resolved',
+                                  })
+                                }
+                              />
+                            )}
                           {record.status === 'submitted' &&
                             c.status === 'completed' && (
                               <>
@@ -331,7 +399,27 @@ export default function AIInspectionReviewScreen({
                     <Button
                       title="Approve move-in baseline"
                       disabled={busy}
-                      onPress={() => action('approve-baseline')}
+                      onPress={() => {
+                        if (
+                          record.active_baseline_id &&
+                          record.baseline_source_id !== record.id
+                        )
+                          Alert.alert(
+                            'Supersede approved baseline?',
+                            'The previous baseline and all historical analyses will be preserved.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Supersede and approve',
+                                onPress: () =>
+                                  action('approve-baseline', {
+                                    supersedes: record.active_baseline_id,
+                                  }),
+                              },
+                            ],
+                          );
+                        else action('approve-baseline');
+                      }}
                     />
                   )}
                 {record.status === 'submitted' && (

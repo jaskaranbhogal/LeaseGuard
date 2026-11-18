@@ -13,6 +13,7 @@ export type LandlordStackParamList = {
   Dashboard: undefined;
   AddProperty: undefined;
   ScheduleInspection: undefined;
+  MoveInBaseline: undefined;
   AIInspectionReview: { inspectionId: string } | undefined;
   MaintenanceRequests: undefined;
   SavedMaintenanceDetail: { requestId: string };

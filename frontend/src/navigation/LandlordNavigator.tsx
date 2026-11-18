@@ -5,6 +5,7 @@ import BottomNavigation from '../components/BottomNavigation';
 import PrivacySecurityScreen from '../screens/shared/PrivacySecurityScreen';
 import SettingsScreen from '../screens/shared/SettingsScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
+import MoveInBaselineScreen from '../screens/landlord/MoveInBaselineScreen';
 import AddPropertyScreen from '../screens/landlord/AddPropertyScreen';
 import AIInspectionReviewScreen from '../screens/landlord/AIInspectionReviewScreen';
 import ConditionHistoryScreen from '../screens/landlord/ConditionHistoryScreen';
@@ -31,6 +32,7 @@ function HomeStack() {
         headerShown: false,
       }}>
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="MoveInBaseline" component={MoveInBaselineScreen} />
       <Stack.Screen name="Dashboard" component={LandlordDashboardScreen} />
       <Stack.Screen name="MaintenanceRequests" component={SavedMaintenanceList} />
       <Stack.Screen name="SavedMaintenanceDetail" component={SavedMaintenanceDetail} />

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from bson import ObjectId
 from django.db import IntegrityError
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
@@ -15,7 +16,7 @@ from maintenance.models import Unit, UnitAssignment, MaintenanceRequest
 from maintenance.views import endpoint, role, units, body
 from maintenance.store import Conflict
 from . import store
-from .models import InspectionTemplate, GuidedInspection, InspectionNotification
+from .models import InspectionTemplate, GuidedInspection, InspectionNotification, UnitBaseline
 
 
 def missing():
@@ -63,7 +64,9 @@ def serialize(record, detail=True):
         base = store.baseline(record)
         compatible = bool(base and base['inspection_id'] != record['public_id'] and
                           base['template_id'] == str(record['template_id']) and base['template_version'] == record['template_version'])
-        result.update(photos=[photo_json(p) for p in store.active(record)],
+        result.update(active_baseline_id=base['id'] if base else '',
+                      baseline_source_id=base['inspection_id'] if base else '',
+                      photos=[photo_json(p) for p in store.active(record)],
                       uploads=[photo_json(p) for p in record['photos'] if p['state'] in {'uploading', 'failed'} and not p.get('replaced_at')],
                       history=record['history'], baseline_available=compatible,
                       baseline_photos=[photo_json(p) for p in base['photos']] if compatible else [],
@@ -73,15 +76,31 @@ def serialize(record, detail=True):
     return result
 
 
+def available_templates(request, unit=None):
+    """Saved active unit templates remain usable by the unit's current managers."""
+    if role(request) != 'landlord':
+        return InspectionTemplate.objects.none()
+    unit_ids = [unit.pk] if unit else list(units(request).values_list('pk', flat=True))
+    template_ids = []
+    for head in store.collection(UnitBaseline).find({'unit_id': {'$in': unit_ids}}):
+        base = next((b for b in head['versions'] if b['id'] == head['active_id']), None)
+        if base:
+            template_ids.append(ObjectId(base['template_id']))
+    return InspectionTemplate.objects.filter(Q(owner=request.user) | Q(pk__in=template_ids), active=True)
+
+
 @endpoint(['GET'])
 def options(request):
     eligible = []
     if role(request) == 'landlord':
         for unit in units(request).select_related('property')[:100]:
+            base = store.baseline({'unit_id': unit.pk})
+            saved = InspectionTemplate.objects.filter(pk=ObjectId(base['template_id'])).first() if base else None
             eligible.append(dict(id=str(unit.pk), label=unit.label, property=unit.property.name,
+                                 baseline_template_id=saved.public_id if saved else None,
                                  tenants=[dict(id=str(a.tenant_id), label=a.tenant.get_full_name() or a.tenant.get_username())
                                           for a in UnitAssignment.objects.filter(unit=unit, active=True).select_related('tenant')[:100]]))
-    templates = InspectionTemplate.objects.filter(owner=request.user, active=True) if role(request) == 'landlord' else InspectionTemplate.objects.none()
+    templates = available_templates(request)
     return JsonResponse({'units': eligible, 'templates': [dict(id=t.public_id, name=t.name, version=t.version, steps=t.steps) for t in templates[:100]],
                          'default_steps': store.DEFAULT_STEPS})
 
@@ -116,7 +135,7 @@ def inspections(request):
     if not unit:
         return missing()
     assignment = UnitAssignment.objects.filter(unit=unit, tenant_id=ObjectId(data['tenant_id']), active=True).first()
-    template = InspectionTemplate.objects.filter(public_id=data['template_id'], owner=request.user, active=True).first()
+    template = available_templates(request, unit).filter(public_id=data['template_id']).first()
     if not assignment or not template or not AccountProfile.objects.filter(user_id=assignment.tenant_id, role='tenant').exists() or data.get('inspection_type') not in store.TYPES:
         raise ValueError
     due = datetime.fromisoformat(data['due_at'].replace('Z', '+00:00'))
@@ -227,14 +246,15 @@ def action(request, inspection_id, action):
         notify(record, 'An inspection is ready for review.', record['landlord_id'], 'submitted-event:' + next(h['at'] for h in reversed(record['history']) if h['action'] == 'submitted'))
     elif landlord and action == 'approve-baseline':
         store.check_revision(record, data.get('revision'))
-        record = store.approve(record, actor)
+        record = store.approve(record, actor, data.get('supersedes', ''))
         notify(record, 'Your move-in baseline has been approved.', record['tenant_id'], 'baseline-approved:' + next(h['at'] for h in reversed(record['history']) if h['action'] in {'baseline-approved', 'review-completed'}))
     elif landlord and action == 'compare':
         store.check_revision(record, data.get('revision'))
         record = store.compare(record, data.get('photo_id'), actor)
+        notify_high_severity(record)
     elif landlord and action in {'retake', 'finalize', 'decision', 'maintenance'}:
         store.check_revision(record, data.get('revision'))
-        if record['status'] != 'submitted':
+        if record['status'] != 'submitted' and not (action == 'decision' and data.get('decision') == 'resolved' and record['status'] == 'reviewed'):
             raise Conflict('Review requires a submitted inspection.')
         if any(c['status'] == 'pending' for c in record['comparisons']) and action in {'retake', 'finalize'}:
             raise Conflict('Analysis is pending. Refresh before finalizing.')
@@ -245,7 +265,7 @@ def action(request, inspection_id, action):
             record = store.change(record, dict(status='retake', history=store.audit(record, 'retake-requested', actor, reason=reason)))
             notify(record, 'A retake has been requested. Open the inspection for details.', record['tenant_id'], 'retake-requested:' + record['history'][-1]['at'])
         elif action == 'finalize':
-            if any(c.get('decision') is None for c in record['comparisons']):
+            if any(not review_complete(c) for c in record['comparisons']):
                 raise Conflict('Record a human decision for each analysis before finalizing.')
             record = store.change(record, dict(status='reviewed', reviewed_at=timezone.now(), history=store.audit(record, 'review-completed', actor)))
             notify(record, 'Your inspection review is complete.', record['tenant_id'], 'review-completed:' + record['history'][-1]['at'])
@@ -255,10 +275,27 @@ def action(request, inspection_id, action):
                 raise Conflict('Completed comparison required.')
             if action == 'decision':
                 decision = data.get('decision')
-                if decision not in {'confirmed', 'dismissed', 'manual-review'}:
+                if decision not in {'confirmed', 'dismissed', 'manual-review', 'resolved'}:
                     raise ValueError
-                comparisons = [{**c, 'decision': decision} if c['id'] == comparison['id'] else c for c in record['comparisons']]
-                record = store.change(record, dict(comparisons=comparisons, history=store.audit(record, decision, actor, comparison_id=comparison['id'])))
+                count = len((comparison.get('result') or {}).get('findings', []))
+                decisions = comparison.get('finding_decisions', [comparison.get('decision')] * count)
+                index = data.get('finding_index')
+                if index is not None and (type(index) is not int or not 0 <= index < count):
+                    raise ValueError('Invalid finding index.')
+                previous = decisions[index] if index is not None else comparison.get('decision')
+                if decision == 'resolved' and previous not in {'confirmed', 'resolved'}:
+                    raise Conflict('Only a confirmed finding can be marked resolved.')
+                if index is None:
+                    decisions = [decision] * count
+                    aggregate = decision
+                else:
+                    decisions = list(decisions)
+                    decisions[index] = decision
+                    aggregate = decisions[0] if len(set(decisions)) == 1 else None
+                comparisons = [{**c, 'decision': aggregate, 'finding_decisions': decisions}
+                               if c['id'] == comparison['id'] else c for c in record['comparisons']]
+                record = store.change(record, dict(comparisons=comparisons, history=store.audit(
+                    record, decision, actor, comparison_id=comparison['id'], finding_index=index)))
             else:
                 # Link an existing tenant-submitted request; never bypass its
                 # ownership, submission validation or 5–20-photo requirement.
@@ -288,3 +325,24 @@ def notifications(request):
     records = authorized.order_by('-created_at')[:100]
     return JsonResponse({'notifications': [dict(id=n.event_key, inspection_id=n.inspection.public_id, message=n.message,
                                                 created_at=n.created_at.isoformat(), read=n.read_at is not None) for n in records]})
+
+
+def notify_high_severity(record):
+    for comparison in record['comparisons']:
+        result = comparison.get('result') or {}
+        if (comparison['status'] == 'completed' and result.get('analysis_status') == 'completed'
+                and result.get('classification') == 'damage' and result.get('severity') == 'high'
+                and result.get('confidence') in {'medium', 'high'} and result.get('same_area') is True
+                and result.get('photo_quality') == 'good'):
+            unit = Unit.objects.select_related('property').get(pk=record['unit_id'])
+            managers = unit.property.managers.filter(account_profile__role='landlord')
+            for manager in managers:
+                notify(record, 'Unverified high-severity AI finding requires landlord review.',
+                       manager.pk, 'ai-high:' + comparison['id'])
+
+
+def review_complete(comparison):
+    count = len((comparison.get('result') or {}).get('findings', []))
+    decisions = comparison.get('finding_decisions', [])
+    return comparison.get('decision') is not None or (
+        count > 0 and len(decisions) == count and all(d in {'confirmed', 'dismissed', 'manual-review', 'resolved'} for d in decisions))

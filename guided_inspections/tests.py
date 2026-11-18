@@ -17,6 +17,12 @@ from . import store
 @override_settings(CLOUDINARY_URL='cloudinary://test:test@fixture', GEMINI_API_KEY='')
 class GuidedTests(TransactionTestCase):
     def setUp(self):
+        # Raw provider ledgers are not Django model tables and are not flushed by
+        # TransactionTestCase. Isolate them between cases just like ORM records.
+        storage.database().inspection_ai_usage.delete_many({})
+        storage.database().inspection_comparisons.delete_many({})
+        self.addCleanup(lambda: storage.database().inspection_ai_usage.delete_many({}))
+        self.addCleanup(lambda: storage.database().inspection_comparisons.delete_many({}))
         User = get_user_model()
         self.landlord = User.objects.create_user(username='manager')
         self.tenant = User.objects.create_user(username='resident')
@@ -280,3 +286,246 @@ class GuidedTests(TransactionTestCase):
             self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
         self.assertEqual(self.record['comparisons'][0]['result']['summary'], 'Recovered for manual review.')
         self.assertEqual(self.record['comparisons'][0]['decision'], 'manual-review')
+
+    def baseline_draft(self):
+        self.client.force_login(self.landlord)
+        response = self.post(f'units/{self.unit.pk}/baselines/', {'template_id': self.template})
+        self.assertEqual(response.status_code, 200, response.content)
+        return response.json()['draft']
+
+    def fill_baseline(self, draft):
+        for i, step in enumerate(store.DEFAULT_STEPS):
+            response = self.client.post(self.base+f"baseline-drafts/{draft['id']}/photos/", dict(
+                photo=image(i), step_id=step['id'], slot=0, revision=draft['revision']))
+            self.assertEqual(response.status_code, 200, response.content)
+            draft = response.json()['draft']
+        return draft
+
+    def approve_draft(self, draft, **extra):
+        return self.post(f"baseline-drafts/{draft['id']}/", dict(revision=draft['revision'], **extra))
+
+    def test_landlord_baseline_without_tenant_and_future_matching(self):
+        # No tenant assignment is needed to create, capture, resume or approve.
+        UnitAssignment.objects.all().delete()
+        draft = self.baseline_draft()
+        self.assertEqual(self.baseline_draft()['id'], draft['id'])
+        self.assertEqual(self.approve_draft(draft).status_code, 409)
+        draft = self.fill_baseline(draft)
+        self.client.logout(); self.client.force_login(self.landlord)
+        url = self.base+f"baseline-drafts/{draft['id']}/"
+        self.assertEqual(self.client.get(url).json()['draft']['progress'], 5)
+        approved = self.approve_draft(draft)
+        self.assertEqual(approved.status_code, 200, approved.content)
+        self.assertEqual(self.approve_draft(draft).status_code, 200)  # lost-response retry
+        head = UnitBaseline.objects.get(unit=self.unit)
+        self.assertEqual(len(head.versions), 1)
+        self.assertEqual(head.versions[0]['source'], 'landlord')
+        UnitAssignment.objects.create(unit=self.unit, tenant=self.tenant, verified_by=self.landlord)
+        self.record = self.create('periodic', 'landlord_base_future_01'); self.fill()
+        self.client.force_login(self.landlord); self.refresh()
+        self.assertTrue(self.record['baseline_available'])
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=_manual_result()) as ai:
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+            ai.assert_called_once()
+        self.assertEqual(self.record['comparisons'][0]['baseline_id'], head.active_id)
+
+    def test_landlord_baseline_permissions_and_private_evidence(self):
+        draft = self.fill_baseline(self.baseline_draft())
+        self.assertEqual(self.approve_draft(draft).status_code, 200)
+        head = UnitBaseline.objects.get(unit=self.unit)
+        urls = [f"baseline-drafts/{draft['id']}/", f"baseline-drafts/{draft['id']}/photos/{draft['photos'][0]['id']}/",
+                f'units/{self.unit.pk}/baselines/', f"units/{self.unit.pk}/baselines/{head.active_id}/photos/{draft['photos'][0]['id']}/"]
+        for user in [self.tenant, self.other]:
+            self.client.force_login(user)
+            for url in urls:
+                self.assertEqual(self.client.get(self.base+url).status_code, 404)
+            self.assertEqual(self.approve_draft(draft).status_code, 404)
+        self.client.force_login(self.landlord)
+        with patch('guided_inspections.baselines.media.retrieve', return_value=b'private'):
+            response = self.client.get(self.base+urls[-1])
+            self.assertEqual(response.content, b'private')
+            self.assertIn('no-store', response['Cache-Control'])
+        content = self.client.get(self.base+urls[2]).content
+        for secret in [b'public_id', b'asset_id', b'cloudinary', b'api_key']:
+            self.assertNotIn(secret, content)
+
+    def test_explicit_supersession_immutability_and_pinned_analysis(self):
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        old = UnitBaseline.objects.get(unit=self.unit)
+        self.record = self.create('periodic', 'supersession_periodic_1'); self.fill(); self.client.force_login(self.landlord)
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=_manual_result()):
+            self.action('compare', photo_id=self.record['photos'][0]['id'])
+        pinned = self.record['comparisons'][0]
+        second = self.fill_baseline(self.baseline_draft())
+        self.assertEqual(self.approve_draft(second).status_code, 409)
+        self.assertEqual(self.approve_draft(second, supersedes=old.active_id).status_code, 200)
+        updated = UnitBaseline.objects.get(unit=self.unit)
+        self.assertEqual(updated.versions[0], old.versions[0])
+        self.assertEqual(len(updated.versions), 2)
+        with patch('guided_inspections.store.media.retrieve') as retrieve, patch('guided_inspections.store.compare_images_safe') as ai:
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+            retrieve.assert_not_called(); ai.assert_not_called()
+        self.assertEqual(self.record['comparisons'][0], pinned)
+        response = self.client.post(self.base+f"baseline-drafts/{draft['id']}/photos/", dict(photo=image(99), step_id='entry-wide', slot=0, revision=self.client.get(self.base+f"baseline-drafts/{draft['id']}/").json()['draft']['revision']))
+        self.assertEqual(response.status_code, 409)
+        with self.assertRaises(media.StorageError): media.delete(old.versions[0]['photos'][0]['ref'])
+
+    def test_baseline_concurrent_approval_requires_exact_head(self):
+        draft = self.fill_baseline(self.baseline_draft())
+        self.fill(); self.client.force_login(self.landlord)
+        self.assertEqual(self.action('approve-baseline').status_code, 200)
+        self.assertEqual(self.approve_draft(draft).status_code, 409)
+        self.assertEqual(len(UnitBaseline.objects.get(unit=self.unit).versions), 1)
+
+    def test_baseline_upload_failure_recovery_replacement_and_revision(self):
+        draft = self.baseline_draft()
+        url = self.base+f"baseline-drafts/{draft['id']}/photos/"
+        def upload(d, value=0):
+            return self.client.post(url, dict(photo=image(value), step_id='entry-wide', slot=0, revision=d['revision']))
+        with patch('guided_inspections.store.media.upload_or_recover', side_effect=media.StorageError('timeout')):
+            self.assertEqual(upload(draft).status_code, 503)
+        draft = self.client.get(self.base+f"baseline-drafts/{draft['id']}/").json()['draft']
+        self.assertEqual(draft['progress'], 0)
+        ready = upload(draft).json()['draft']
+        self.assertEqual(upload(draft, 1).status_code, 409)
+        self.assertEqual(upload(ready).json()['draft']['progress'], 1)
+        new = upload(ready, 9).json()['draft']
+        self.assertNotEqual(new['photos'][0]['id'], ready['photos'][0]['id'])
+        from .models import LandlordBaselineDraft
+        self.assertEqual(len(LandlordBaselineDraft.objects.get(public_id=draft['id']).photos), 2)
+
+    def test_high_severity_alert_is_unverified_scoped_and_idempotent(self):
+        from inspections.tests.test_services import DAMAGE_RESPONSE
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        self.record = self.create('periodic', 'high_severity_alert_01'); self.fill(); self.client.force_login(self.landlord)
+        self.unit.property.managers.add(self.other)
+        result = {**DAMAGE_RESPONSE, 'severity': 'high', 'analysis_status': 'completed', 'requires_manual_review': True}
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=result):
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+        alerts = InspectionNotification.objects.filter(message__startswith='Unverified')
+        self.assertEqual(alerts.count(), 2)
+        self.assertEqual(set(alerts.values_list('recipient_id', flat=True)), {self.landlord.pk, self.other.pk})
+        self.assertIsNone(self.record['comparisons'][0]['decision'])
+        self.unit.property.managers.remove(self.other)
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.get(self.base+'notifications/').json()['notifications'], [])
+
+    def test_unavailable_or_uncertain_analysis_never_alerts(self):
+        from .views import notify_high_severity
+        from inspections.tests.test_services import DAMAGE_RESPONSE
+        record = store.collection().find_one({'public_id': self.record['id']})
+        for result in [_manual_result(), {**DAMAGE_RESPONSE, 'analysis_status': 'completed', 'severity': 'high', 'confidence': 'low'}]:
+            notify_high_severity({**record, 'comparisons': [dict(id='fixture', status='completed', result=result)]})
+        self.assertFalse(InspectionNotification.objects.filter(message__startswith='Unverified').exists())
+
+    def test_resolved_decision_requires_confirmation_and_retains_audit(self):
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        self.record = self.create('periodic', 'resolved_review_test_1'); self.fill(); self.client.force_login(self.landlord)
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=_manual_result()):
+            self.action('compare', photo_id=self.record['photos'][0]['id'])
+        key = self.record['comparisons'][0]['id']
+        self.assertEqual(self.action('decision', comparison_id=key, decision='resolved').status_code, 409)
+        self.assertEqual(self.action('decision', comparison_id=key, decision='confirmed').status_code, 200)
+        self.assertEqual(self.action('finalize').status_code, 200)
+        self.assertEqual(self.action('decision', comparison_id=key, decision='resolved').status_code, 200)
+        self.assertEqual(self.record['comparisons'][0]['decision'], 'resolved')
+        self.assertIn('confirmed', [h['action'] for h in self.record['history']])
+        self.assertIn('resolved', [h['action'] for h in self.record['history']])
+
+    def test_local_ai_quotas_are_atomic_across_concurrent_requests(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            reservations = list(pool.map(lambda _: storage.consume_daily_call('concurrent-account'), range(12)))
+        self.assertEqual(sum(reservations), 3)
+        storage.database().inspection_ai_usage.delete_many({})  # isolated test DB only
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            reservations = list(pool.map(lambda i: storage.consume_daily_call(f'account-{i}'), range(42)))
+        self.assertEqual(sum(reservations), 30)
+
+    def test_cross_unit_baselines_and_incompatible_templates_never_compare(self):
+        from .models import LandlordBaselineDraft
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        other_unit = Unit.objects.create(property=self.unit.property, label='202')
+        UnitAssignment.objects.create(unit=other_unit, tenant=self.tenant, verified_by=self.landlord)
+        GuidedInspection.objects.filter(public_id=self.record['id']).update(unit=other_unit)
+        self.fill(); self.client.force_login(self.landlord)
+        self.assertFalse(self.refresh()['baseline_available'])
+        with patch('guided_inspections.store.media.retrieve') as retrieve:
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 409)
+            retrieve.assert_not_called()
+        source = LandlordBaselineDraft.objects.get(public_id=draft['id'])
+        self.assertEqual(source.unit_id, self.unit.pk)
+
+    def test_interrupted_baseline_publication_remains_resumable(self):
+        draft = self.fill_baseline(self.baseline_draft())
+        from .models import LandlordBaselineDraft
+        record = store.collection(LandlordBaselineDraft).find_one({'public_id': draft['id']})
+        frozen = store.change(store.submit(record, self.landlord.pk), {'status': 'reviewed'})
+        history = self.client.get(self.base+f'units/{self.unit.pk}/baselines/').json()
+        self.assertEqual(history['drafts'][0]['id'], draft['id'])
+        self.assertEqual(self.approve_draft({**draft, 'revision': frozen['revision']}).status_code, 200)
+        self.assertEqual(len(UnitBaseline.objects.get(unit=self.unit).versions), 1)
+
+    def test_private_retrieval_failure_persists_manual_fallback_without_budget(self):
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        self.record = self.create('periodic', 'retrieval_failure_test'); self.fill(); self.client.force_login(self.landlord)
+        with patch('guided_inspections.store.media.retrieve', side_effect=media.StorageError('private failure')), patch('guided_inspections.store.compare_images_safe') as ai, patch('guided_inspections.store.storage.consume_daily_call') as budget:
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+            self.assertEqual(self.action('compare', photo_id=self.record['photos'][0]['id']).status_code, 200)
+            ai.assert_not_called(); budget.assert_not_called()
+        self.assertEqual(self.record['comparisons'][0]['result']['analysis_status'], 'unavailable')
+        self.assertEqual(self.record['comparisons'][0]['result']['findings'], [])
+
+    def test_current_manager_can_reuse_units_saved_baseline_template(self):
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        self.unit.property.managers.add(self.other)
+        self.client.force_login(self.other)
+        choices = self.client.get(self.base+'options/').json()
+        self.assertEqual(choices['units'][0]['baseline_template_id'], self.template)
+        self.assertIn(self.template, [t['id'] for t in choices['templates']])
+        values = dict(unit_id=str(self.unit.pk), tenant_id=str(self.tenant.pk), template_id=self.template,
+                      due_at=(timezone.now()+timedelta(days=3)).isoformat(), inspection_type='periodic', idempotency_key='other_manager_layout_1')
+        self.assertEqual(self.post('', values).status_code, 200)
+
+    def test_individual_findings_have_independent_decisions_and_audit(self):
+        from inspections.tests.test_services import DAMAGE_RESPONSE
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        self.record = self.create('periodic', 'individual_findings_01'); self.fill(); self.client.force_login(self.landlord)
+        result = {**DAMAGE_RESPONSE, 'analysis_status': 'completed', 'findings': DAMAGE_RESPONSE['findings'] * 2}
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', return_value=result):
+            self.action('compare', photo_id=self.record['photos'][0]['id'])
+        key = self.record['comparisons'][0]['id']
+        self.assertEqual(self.action('decision', comparison_id=key, finding_index=99, decision='confirmed').status_code, 400)
+        self.assertEqual(self.action('decision', comparison_id=key, finding_index=0, decision='confirmed').status_code, 200)
+        self.assertEqual(self.action('finalize').status_code, 409)
+        self.assertEqual(self.action('decision', comparison_id=key, finding_index=1, decision='dismissed').status_code, 200)
+        self.assertEqual(self.record['comparisons'][0]['finding_decisions'], ['confirmed', 'dismissed'])
+        self.assertEqual(self.action('finalize').status_code, 200)
+        self.assertEqual(self.action('decision', comparison_id=key, finding_index=0, decision='resolved').status_code, 200)
+        self.assertEqual(self.record['comparisons'][0]['finding_decisions'], ['resolved', 'dismissed'])
+        self.assertEqual(self.record['history'][-1]['finding_index'], 0)
+
+    def test_concurrent_comparisons_make_one_bounded_provider_call(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Event
+        from maintenance.store import Conflict
+        draft = self.fill_baseline(self.baseline_draft()); self.approve_draft(draft)
+        self.record = self.create('periodic', 'concurrent_pair_test_1'); self.fill(); self.client.force_login(self.landlord)
+        record = store.collection().find_one({'public_id': self.record['id']})
+        photo = self.record['photos'][0]['id']
+        started, release = Event(), Event()
+        def provider(*args):
+            started.set()
+            self.assertTrue(release.wait(5))
+            return _manual_result()
+        with patch('guided_inspections.store.media.retrieve', return_value=b'photo'), patch('guided_inspections.store.compare_images_safe', side_effect=provider) as ai, ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(store.compare, record, photo, self.landlord.pk)
+            self.assertTrue(started.wait(5))
+            try:
+                with self.assertRaises(Conflict):
+                    store.compare(record, photo, self.landlord.pk)
+            finally:
+                release.set()
+            self.assertEqual(first.result(timeout=10)['comparisons'][0]['status'], 'completed')
+            self.assertEqual(ai.call_count, 1)

@@ -1,3 +1,7 @@
+import * as baselines from '../src/services/baselineService';
+import MoveInBaselineScreen from '../src/screens/landlord/MoveInBaselineScreen';
+import PhotoReview from '../src/components/PhotoReview';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import NotificationsScreen from '../src/screens/shared/NotificationsScreen';
 import * as guided from '../src/services/guidedInspectionService';
 import { guidedFixture, assignmentOptions } from '../testFixtures/guided';
@@ -39,6 +43,7 @@ import {
 } from '../src/utils/landlordValidation';
 
 jest.mock('../src/services/authService');
+jest.mock('../src/services/baselineService');
 jest.mock('../src/services/guidedInspectionService');
 const landlord: User = {
   id: '000000000000000000000002',
@@ -371,19 +376,17 @@ describe('landlord numeric and calendar validation', () => {
 it.each([landlord, tenant])(
   'opens persisted Notifications from the $role bell',
   async user => {
-    jest
-      .mocked(guided.guidedNotifications)
-      .mockResolvedValue({
-        notifications: [
-          {
-            id: 'notice',
-            inspection_id: guidedFixture.id,
-            message: 'An inspection is ready.',
-            read: false,
-            created_at: '2026-11-18T12:00:00Z',
-          },
-        ],
-      });
+    jest.mocked(guided.guidedNotifications).mockResolvedValue({
+      notifications: [
+        {
+          id: 'notice',
+          inspection_id: guidedFixture.id,
+          message: 'An inspection is ready.',
+          read: false,
+          created_at: '2026-11-18T12:00:00Z',
+        },
+      ],
+    });
     await mount(user);
     await act(async () =>
       app.root.findByType(NotificationBell).props.onPress(),
@@ -399,3 +402,265 @@ it.each([landlord, tenant])(
     );
   },
 );
+
+const baselineDraft: baselines.BaselineDraft = {
+  id: 'd'.repeat(32),
+  unit_id: guidedFixture.unit_id,
+  status: 'draft',
+  revision: 0,
+  expected_active_id: '',
+  template_id: 'template',
+  template_version: 1,
+  steps: guidedFixture.steps,
+  progress: 0,
+  required: 5,
+  photos: [],
+  uploads: [],
+  history: [],
+};
+const baselineHistory: baselines.BaselineHistory = {
+  active_id: '',
+  status: 'missing',
+  drafts: [],
+  versions: [],
+};
+async function openBaseline() {
+  jest.mocked(baselines.getBaselines).mockResolvedValue(baselineHistory);
+  jest.mocked(baselines.createBaseline).mockResolvedValue(baselineDraft);
+  await mount();
+  await press('Create Move-In Baseline');
+  await press('Verified property · 101');
+}
+it('creates a baseline from a real unit and accepts or discards camera/gallery photos', async () => {
+  await openBaseline();
+  expect(
+    app.root
+      .findByType(MoveInBaselineScreen)
+      .findAllByType(Text)
+      .some(
+        t =>
+          [t.props.children].flat(Infinity).join('') ===
+          'Baseline status: missing',
+      ),
+  ).toBe(true);
+  await press('Apartment · v1');
+  expect(baselines.createBaseline).toHaveBeenCalledWith(
+    guidedFixture.unit_id,
+    'template',
+  );
+  jest.mocked(launchCamera).mockResolvedValue({
+    assets: [{ uri: 'file:///camera.jpg', type: 'image/jpeg' }],
+  });
+  await press('Take photo');
+  expect(app.root.findByType(PhotoReview).props.asset.uri).toBe(
+    'file:///camera.jpg',
+  );
+  await act(async () => app.root.findByType(PhotoReview).props.onDiscard());
+  expect(baselines.uploadBaseline).not.toHaveBeenCalled();
+  jest.mocked(launchImageLibrary).mockResolvedValue({
+    assets: [{ uri: 'file:///gallery.jpg', type: 'image/jpeg' }],
+  });
+  jest
+    .mocked(baselines.uploadBaseline)
+    .mockImplementation(async (_d, _s, _slot, _a, progress) => {
+      progress(100);
+      return {
+        ...baselineDraft,
+        revision: 2,
+        progress: 1,
+        photos: [{ id: 'photo', step_id: 'step-0', slot: 0, state: 'ready' }],
+      };
+    });
+  await press('Choose from gallery');
+  await act(async () => app.root.findByType(PhotoReview).props.onAccept());
+  expect(baselines.uploadBaseline).toHaveBeenCalledWith(
+    baselineDraft,
+    'step-0',
+    0,
+    expect.objectContaining({ uri: 'file:///gallery.jpg' }),
+    expect.any(Function),
+  );
+  expect(
+    app.root
+      .findByType(MoveInBaselineScreen)
+      .findAllByType(Text)
+      .some(t => [t.props.children].flat(Infinity).join('').includes('1/5')),
+  ).toBe(true);
+});
+it('resumes a stored baseline and reviews every photo before approval', async () => {
+  await openBaseline();
+  const complete = {
+    ...baselineDraft,
+    revision: 10,
+    progress: 5,
+    photos: baselineDraft.steps.map(s => ({
+      id: s.id,
+      step_id: s.id,
+      slot: 0,
+      state: 'ready',
+    })),
+  };
+  jest.mocked(baselines.getBaselines).mockResolvedValue({
+    ...baselineHistory,
+    status: 'draft',
+    drafts: [complete],
+  });
+  jest.mocked(baselines.getBaselineDraft).mockResolvedValue(complete);
+  await press('Verified property · 101 ✓');
+  await press('Resume draft · 5/5');
+  await press('Review full baseline');
+  expect(
+    app.root.findByType(MoveInBaselineScreen).findAllByType(Image),
+  ).toHaveLength(5);
+  jest.mocked(baselines.approveBaseline).mockResolvedValue({
+    ...complete,
+    status: 'reviewed',
+    history: [{ action: 'baseline-approved', at: '2026-11-18' }],
+  });
+  await press('Approve and Save Baseline');
+  expect(baselines.approveBaseline).toHaveBeenCalledWith(complete);
+  expect(json()).toContain('reviewed');
+});
+it('requires explicit supersession confirmation and preserves history', async () => {
+  await openBaseline();
+  const draft = { ...baselineDraft, expected_active_id: 'old', progress: 5 };
+  jest.mocked(baselines.createBaseline).mockResolvedValue(draft);
+  await press('Apartment · v1');
+  await press('Review full baseline');
+  await press('Approve and Save Baseline');
+  expect(alert).toHaveBeenCalledWith(
+    'Supersede approved baseline?',
+    expect.any(String),
+    expect.any(Array),
+  );
+  expect(baselines.approveBaseline).not.toHaveBeenCalled();
+});
+it('shows network/session errors and clears a prior unit draft on a failed unit change', async () => {
+  await openBaseline();
+  await press('Apartment · v1');
+  jest
+    .mocked(baselines.getBaselines)
+    .mockRejectedValue(new ApiError('Sign in again', 401));
+  await press('Verified property · 101 ✓');
+  expect(json()).toContain('Sign in again');
+  expect(json()).not.toContain('Take photo');
+});
+it('keeps upload progress separate from secure storage confirmation and permits recovery', async () => {
+  await openBaseline();
+  await press('Apartment · v1');
+  jest
+    .mocked(launchImageLibrary)
+    .mockResolvedValue({ assets: [{ uri: 'file:///gallery.jpg' }] });
+  let reject!: (e: Error) => void;
+  jest
+    .mocked(baselines.uploadBaseline)
+    .mockImplementation((_d, _s, _slot, _a, progress) => {
+      progress(100);
+      return new Promise((_resolve, fail) => {
+        reject = fail;
+      });
+    });
+  await press('Choose from gallery');
+  await act(async () => {
+    app.root.findByType(PhotoReview).props.onAccept();
+  });
+  expect(json()).toContain('Waiting for secure storage confirmation');
+  expect(
+    app.root
+      .findByType(MoveInBaselineScreen)
+      .findAllByType(Text)
+      .some(t => [t.props.children].flat(Infinity).join('').includes('0/5')),
+  ).toBe(true);
+  await act(async () => reject(new ApiError('Storage interrupted')));
+  expect(json()).toContain('Storage interrupted');
+  expect(json()).toContain('Retry same photo');
+});
+it('opens an unverified high-severity notification in authorized inspection review', async () => {
+  jest.mocked(guided.guidedNotifications).mockResolvedValue({
+    notifications: [
+      {
+        id: 'alert',
+        inspection_id: guidedFixture.id,
+        message:
+          'Unverified high-severity AI finding requires landlord review.',
+        read: false,
+        created_at: '2026-11-18',
+      },
+    ],
+  });
+  await mount();
+  await act(async () => app.root.findByType(NotificationBell).props.onPress());
+  await press('Open inspection', app.root.findByType(NotificationsScreen));
+  expect(navigation.getCurrentRoute()?.name).toBe('AIInspectionReview');
+  expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
+});
+it('allows a confirmed finding to be resolved after final review', async () => {
+  const record = {
+    ...guidedFixture,
+    status: 'reviewed',
+    photos: [{ id: 'p', step_id: 'step-0', slot: 0, state: 'ready' }],
+    comparisons: [
+      {
+        id: 'c',
+        photo_id: 'p',
+        status: 'completed',
+        decision: 'confirmed',
+        result: null,
+      },
+    ],
+  };
+  jest.mocked(guided.getGuided).mockResolvedValue(record);
+  jest.mocked(guided.guidedAction).mockResolvedValue(record);
+  await mount();
+  await press('Open move-in inspection');
+  await press('Mark resolved');
+  expect(guided.guidedAction).toHaveBeenCalledWith(record, 'decision', {
+    comparison_id: 'c',
+    decision: 'resolved',
+  });
+});
+
+it('records an individual finding decision using its saved result index', async () => {
+  const record = {
+    ...guidedFixture,
+    status: 'submitted',
+    photos: [{ id: 'p', step_id: 'step-0', slot: 0, state: 'ready' }],
+    comparisons: [
+      {
+        id: 'c',
+        photo_id: 'p',
+        status: 'completed',
+        decision: null,
+        result: {
+          summary: 'Two visible changes.',
+          classification: 'damage',
+          severity: 'medium',
+          confidence: 'high',
+          findings: [
+            { description: 'Wall hole.', classification: 'damage' },
+            { description: 'Small scuff.', classification: 'normal_wear' },
+          ],
+        },
+      },
+    ],
+  };
+  jest.mocked(guided.getGuided).mockResolvedValue(record);
+  jest
+    .mocked(guided.guidedAction)
+    .mockResolvedValue({
+      ...record,
+      comparisons: [
+        { ...record.comparisons[0], finding_decisions: ['confirmed', null] },
+      ],
+    });
+  await mount();
+  await press('Open move-in inspection');
+  await press('Finding 1: confirmed');
+  expect(guided.guidedAction).toHaveBeenCalledWith(record, 'decision', {
+    comparison_id: 'c',
+    finding_index: 0,
+    decision: 'confirmed',
+  });
+  expect(json()).toContain('Wall hole.');
+  expect(json()).toContain('Small scuff.');
+});

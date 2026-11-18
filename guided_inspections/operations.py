@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.utils import timezone
 from maintenance.models import UnitAssignment
 from .models import GuidedInspection
-from .views import notify
+from .views import notify, notify_high_severity
 from . import store
 
 
@@ -17,6 +17,7 @@ def reconcile(limit=200):
                 notify(record, 'An inspection is ready for review.', record['landlord_id'], 'submitted-event:'+event['at'])
             elif event['action'] in {'retake-requested', 'review-completed', 'baseline-approved'}:
                 notify(record, 'Inspection update: '+event['action']+'. Open the inspection for details.', record['tenant_id'], event['action']+':'+event['at'])
+        notify_high_severity(record)
         due = record['due_at']
         if timezone.is_naive(due):
             due = timezone.make_aware(due)

@@ -40,6 +40,7 @@ export default function LandlordDashboardScreen({ navigation }: Props) {
 
       <Button title="View saved maintenance requests" onPress={() => navigation.navigate('MaintenanceRequests')} />
       <GuidedRecords onOpen={inspectionId => navigation.navigate('AIInspectionReview', { inspectionId })} />
+      <Button title="Create Move-In Baseline" onPress={() => navigation.navigate('MoveInBaseline')} />
       <Button title="Assign photo inspection" onPress={() => navigation.navigate('ScheduleInspection')} />
       <DemoNotice />
       <Button title="Review inspections" onPress={() => navigation.navigate('AIInspectionReview')} />

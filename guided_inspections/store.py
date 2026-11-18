@@ -17,7 +17,7 @@ from inspections.services import compare_images_safe
 from inspections.prompts import PROMPT_VERSION
 from inspections.views import _manual_result
 from maintenance.store import Conflict
-from .models import GuidedInspection, UnitBaseline
+from .models import GuidedInspection, UnitBaseline, LandlordBaselineDraft
 
 TYPES = {'move-in', 'periodic', 'move-out', 'follow-up'}
 EDITABLE = {'assigned', 'draft', 'retake'}
@@ -55,8 +55,12 @@ def collection(model=GuidedInspection):
     return storage.database()[model._meta.db_table].with_options(write_concern=WriteConcern(w='majority', wtimeout=5000))
 
 
-def change(record, values, model=GuidedInspection):
-    result = collection(model).find_one_and_update(
+def record_collection(record):
+    return collection(LandlordBaselineDraft if record.get("workflow") == "landlord-baseline" else GuidedInspection)
+
+
+def change(record, values, model=None):
+    result = (collection(model) if model else record_collection(record)).find_one_and_update(
         {'_id': record['_id'], 'revision': record['revision']},
         {'$set': {**values, 'updated_at': timezone.now()}, '$inc': {'revision': 1}},
         return_document=ReturnDocument.AFTER)
@@ -129,7 +133,7 @@ def upload(record, step_id, slot, data, actor):
 
 def finish_upload(record, key, token, ref, state, actor):
     for _ in range(5):
-        current = collection().find_one({'_id': record['_id']})
+        current = record_collection(record).find_one({'_id': record['_id']})
         editable(current)
         intent = next((p for p in current['photos'] if p['id'] == key), None)
         if not intent or intent.get('replaced_at') or intent.get('token') != token or intent['state'] != 'uploading':
@@ -173,31 +177,40 @@ def baseline(record):
     return next((b for b in head['versions'] if b['id'] == head['active_id']), None)
 
 
-def approve(record, actor):
-    if record['inspection_type'] != 'move-in' or record['status'] not in {'submitted', 'reviewed'}:
+def approve(record, actor, supersedes=''):
+    authored = record.get('workflow') == 'landlord-baseline'
+    if not authored and (record['inspection_type'] != 'move-in' or record['status'] not in {'submitted', 'reviewed'}):
         raise Conflict('Only submitted move-in inspections can become baselines.')
-    # Finalize evidence first: a concurrent retake cannot alter an approved snapshot.
+    UnitBaseline.objects.get_or_create(unit_id=record['unit_id'])
+    head = collection(UnitBaseline).find_one({'unit_id': record['unit_id']})
+    if any(b['inspection_id'] == record['public_id'] for b in head['versions']):
+        return mark_approved(record, actor)
+    expected = record['expected_active_id'] if authored else supersedes
+    if head['active_id'] != expected or (expected and supersedes != expected):
+        raise Conflict('Baseline changed or already exists. Explicitly confirm the active version to supersede it.')
+    if authored:
+        record = submit(record, actor)  # Completeness and confirmed storage, then freeze.
     if record['status'] != 'reviewed':
         record = change(record, dict(status='reviewed', reviewed_at=timezone.now(),
                                      history=audit(record, 'baseline-approval-requested', actor)))
-    UnitBaseline.objects.get_or_create(unit_id=record['unit_id'])
-    for _ in range(5):
-        head = collection(UnitBaseline).find_one({'unit_id': record['unit_id']})
-        if any(b['inspection_id'] == record['public_id'] for b in head['versions']):
-            return mark_approved(record, actor)
-        snapshot = dict(id=uuid.uuid4().hex, inspection_id=record['public_id'],
-                        template_id=str(record['template_id']), template_version=record['template_version'],
-                        photos=active(record), approved_by=str(actor), approved_at=timezone.now().isoformat())
-        try:
-            change(head, {'versions': head['versions'] + [snapshot], 'active_id': snapshot['id']}, UnitBaseline)
-            return mark_approved(record, actor)
-        except Conflict:
-            continue
-    raise Conflict('Baseline changed. Refresh and retry approval.')
+    snapshot = dict(id=record['public_id'], inspection_id=record['public_id'],
+                    source='landlord' if authored else 'tenant',
+                    template_id=str(record['template_id']), template_version=record['template_version'],
+                    photos=active(record), approved_by=str(actor), approved_at=timezone.now().isoformat(),
+                    supersedes=expected)
+    # A single CAS publishes the immutable version and head together. Never retry
+    # against a different head: concurrent approvals require a new explicit decision.
+    try:
+        change(head, {'versions': head['versions'] + [snapshot], 'active_id': snapshot['id']}, UnitBaseline)
+    except Conflict:
+        latest = collection(UnitBaseline).find_one({'unit_id': record['unit_id']})
+        if not any(b['inspection_id'] == record['public_id'] for b in latest['versions']):
+            raise
+    return mark_approved(record, actor)
 
 
 def mark_approved(record, actor):
-    current = collection().find_one({'_id': record['_id']})
+    current = record_collection(record).find_one({'_id': record['_id']})
     if any(h['action'] == 'baseline-approved' for h in current['history']):
         return current
     return change(current, {'history': audit(current, 'baseline-approved', actor)})
@@ -222,10 +235,22 @@ def compare(record, photo_id, actor):
     pending = next((c for c in record['comparisons'] if c['photo_id'] == photo_id and c['status'] == 'pending'), None)
     if pending:
         return recover_comparison(record, pending)
+    if any(c['photo_id'] == photo_id and c['status'] == 'completed' for c in record['comparisons']):
+        return record
     base, previous, current = match(record, photo_id)
     # Shared durable claim prevents duplicate provider calls, including across
     # inspections and managers, using the existing hash helper with a unit namespace.
-    first, second = media.retrieve(previous['ref']), media.retrieve(current['ref'])
+    try:
+        first, second = media.retrieve(previous['ref']), media.retrieve(current['ref'])
+    except media.StorageError:
+        key = hashlib.sha256(f"unavailable:{record['unit_id']}:{previous['id']}:{current['id']}".encode()).hexdigest()
+        entry = dict(id=key, photo_id=photo_id, baseline_id=base['id'], baseline_photo=previous,
+                     current_photo=current, status='completed',
+                     result=_manual_result('Private photo retrieval unavailable. Review manually; no AI call was made.'),
+                     decision=None, model=settings.GEMINI_MODEL, prompt_version=PROMPT_VERSION,
+                     created_at=timezone.now().isoformat(), completed_at=timezone.now().isoformat())
+        return change(record, {'comparisons': record['comparisons'] + [entry],
+                               'history': audit(record, 'analysis-unavailable', actor, comparison_id=key)})
     step = next(s for s in record['steps'] if s['id'] == current['step_id'])
     key = storage._pair_id('guided-unit:' + str(record['unit_id']), first, second, step['room'], step['id'])
     existing = next((c for c in record['comparisons'] if c['id'] == key), None)
@@ -257,9 +282,9 @@ def compare(record, photo_id, actor):
         current_record = collection().find_one({'_id': record['_id']})
         if not any(c['id'] == key and c['status'] == 'pending' for c in current_record['comparisons']):
             return current_record  # Never overwrite a recovered result or human decision.
-        comparisons = [{**c, 'result': result, 'status': 'completed'} if c['id'] == key else c for c in current_record['comparisons']]
+        comparisons = [{**c, 'result': result, 'status': 'completed', 'completed_at': timezone.now().isoformat()} if c['id'] == key else c for c in current_record['comparisons']]
         try:
-            return change(current_record, {'comparisons': comparisons})
+            return change(current_record, {'comparisons': comparisons, 'history': audit(current_record, 'analysis-completed', actor, comparison_id=key)})
         except Conflict:
             continue
     raise Conflict('Analysis saved. Refresh to view it.')

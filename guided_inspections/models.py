@@ -54,3 +54,28 @@ class InspectionNotification(models.Model):
     read_at = models.DateTimeField(null=True)
     class Meta:
         indexes = [models.Index(fields=['recipient', 'created_at'])]
+
+
+class LandlordBaselineDraft(models.Model):
+    """A manager-authored evidence ledger, never a tenant assignment."""
+    public_id = models.CharField(max_length=32, unique=True, default=request_id)
+    creation_key = models.CharField(max_length=64, unique=True)
+    workflow = models.CharField(max_length=24, default='landlord-baseline')
+    unit = models.ForeignKey('maintenance.Unit', on_delete=models.PROTECT)
+    landlord = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    template = models.ForeignKey(InspectionTemplate, on_delete=models.PROTECT)
+    template_version = models.PositiveIntegerField()
+    steps = models.JSONField(default=list)
+    expected_active_id = models.CharField(max_length=32, default='')
+    status = models.CharField(max_length=20, default='draft')
+    photos = models.JSONField(default=list)
+    history = models.JSONField(default=list)
+    revision = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True)
+    submitted_at = models.DateTimeField(null=True)
+    reviewed_at = models.DateTimeField(null=True)
+
+    class Meta:
+        indexes = [models.Index(fields=['unit', 'status'])]

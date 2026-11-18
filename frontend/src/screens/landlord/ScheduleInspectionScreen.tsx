@@ -130,6 +130,7 @@ export default function ScheduleInspectionScreen({
                 onPress={() => {
                   setUnitId(u.id);
                   setTenantId('');
+                  setTemplateId(u.baseline_template_id || '');
                 }}
               />
             ))}
