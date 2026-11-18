@@ -1,249 +1,297 @@
-import Header from '../../components/Header';
-import { colors } from '../../theme/colors';
-import React from 'react';
-import { useInspection } from '../../context/InspectionContext';
-import DemoNotice from '../../components/DemoNotice';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-
+import {
+  launchCamera,
+  launchImageLibrary,
+  Asset,
+} from 'react-native-image-picker';
 import type { TenantStackParamList } from '../../navigation/types';
-import { guidedInspectionMockData } from '../../data/guidedInspectionMockData';
-
-type Props = NativeStackScreenProps<TenantStackParamList, 'GuidedInspection'>;
-
-const COLORS = {
-  background: colors.background,
-  primary: '#1459EB',
-  primaryLight: '#EBF2FF',
-  text: '#131824',
-  muted: '#5E6B80',
-  border: '#D6DEEB',
-  white: colors.white,
-  track: '#EBEDF2',
-  camera: '#333B4A',
-  guide: '#CCD9EB',
-};
-
-export default function GuidedInspectionScreen({ navigation }: Props) {
-  const { currentStepIndex, totalSteps } = useInspection();
-
-  const step = guidedInspectionMockData.steps[currentStepIndex];
-
-  function handleCapture() {
-    navigation.navigate('ReviewInspectionPhoto', {
-      stepIndex: currentStepIndex,
-    });
+import Button from '../../components/Button';
+import PhotoReview from '../../components/PhotoReview';
+import GuidedRecords from '../../components/GuidedRecords';
+import {
+  createGuidedMaintenance,
+  getGuided,
+  guidedAction,
+  guidedPhotoUrl,
+  uploadGuided,
+  GuidedInspection,
+} from '../../services/guidedInspectionService';
+export default function GuidedInspectionScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<TenantStackParamList, 'GuidedInspection'>) {
+  const id = route.params?.inspectionId;
+  const [record, setRecord] = useState<GuidedInspection>();
+  const [index, setIndex] = useState(0);
+  const [asset, setAsset] = useState<Asset>();
+  const [retryAsset, setRetryAsset] = useState<Asset>();
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
+  const refresh = useCallback(async () => {
+    if (id) {
+      try {
+        setRecord(await getGuided(id));
+        setError('');
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    }
+  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
+  const slots =
+    record?.steps.flatMap(s =>
+      Array.from({ length: s.count }, (_, slot) => ({ ...s, slot })),
+    ) || [];
+  const step = slots[index];
+  const photo = record?.photos.find(
+    p => p.step_id === step?.id && p.slot === step?.slot,
+  );
+  const editable =
+    record && ['assigned', 'draft', 'retake'].includes(record.status);
+  async function pick(camera: boolean) {
+    try {
+      const result = await (camera ? launchCamera : launchImageLibrary)({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        assetRepresentationMode: 'compatible',
+        quality: 0.8,
+      });
+      if (result.errorCode)
+        throw new Error(
+          result.errorMessage ||
+            'Camera or gallery unavailable. Check permissions.',
+        );
+      if (result.assets?.[0]) setAsset(result.assets[0]);
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
-
-  function handleCancel() {
-    Alert.alert(
-      'Cancel inspection?',
-      'Leave this demo? Your step progress stays available until you log out or close the app.',
-      [
-        { text: 'Keep inspecting', style: 'cancel' },
-        {
-          text: 'Leave inspection',
-          style: 'destructive',
-          onPress: () => navigation.popTo('TenantTabs'),
-        },
-      ],
-    );
+  async function accept(selected: Asset | undefined) {
+    if (!record || !step || !selected || busy) return;
+    setBusy(true);
+    setAsset(undefined);
+    setRetryAsset(selected);
+    setProgress(0);
+    setError('');
+    try {
+      const saved = await uploadGuided(
+        record,
+        step.id,
+        step.slot,
+        selected,
+        setProgress,
+      );
+      setRecord(saved);
+      setRetryAsset(undefined);
+      setIndex(i => Math.min(i + 1, slots.length - 1));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
-
+  async function submit() {
+    if (!record) return;
+    setBusy(true);
+    setError('');
+    try {
+      const saved = await guidedAction(record, 'submit');
+      setRecord(saved);
+      navigation.navigate('InspectionSubmitted', { inspectionId: saved.id });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <DemoNotice />
-        <Header
-          title={guidedInspectionMockData.title}
-          titleStyle={styles.title}
+    <SafeAreaView style={styles.root}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Button
+          title="Back"
+          variant="outline"
+          disabled={busy}
+          onPress={() => navigation.goBack()}
         />
-
-        <Text style={styles.subtitle}>
-          Step {currentStepIndex + 1} of {totalSteps} • {step.area}
-        </Text>
-
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${((currentStepIndex + 1) / totalSteps) * 100}%`,
-              },
-            ]}
+        {!id ? (
+          <GuidedRecords
+            onOpen={inspectionId => navigation.setParams({ inspectionId })}
           />
-        </View>
-
-        <View style={styles.instructionsCard}>
-          <View style={styles.guideBadge}>
-            <Text style={styles.guideBadgeText}>PHOTO GUIDE</Text>
-          </View>
-
-          <Text style={styles.instructionTitle}>{step.instruction}</Text>
-
-          <Text style={styles.instructionDescription}>{step.description}</Text>
-        </View>
-
-        <View style={styles.cameraPreview}>
-          <Text style={styles.cameraTitle}>DEMO PLACEHOLDER</Text>
-
-          <View style={styles.cameraGuide} />
-
-          <Text style={styles.cameraHint}>{step.cameraHint}</Text>
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          style={styles.captureButton}
-          onPress={handleCapture}
-        >
-          <Text style={styles.captureButtonText}>Review placeholder photo</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          style={styles.cancelButton}
-          onPress={handleCancel}
-        >
-          <Text style={styles.cancelButtonText}>Cancel inspection</Text>
-        </Pressable>
+        ) : (
+          <>
+            <Text style={styles.title}>Guided photo inspection</Text>
+            {!!error && <Text accessibilityRole="alert">{error}</Text>}
+            <Button
+              title="Refresh saved progress"
+              disabled={busy}
+              variant="outline"
+              onPress={refresh}
+            />
+            {record && (
+              <>
+                <Text>
+                  {record.property} · {record.unit} · {record.inspection_type}
+                </Text>
+                <Text>
+                  Due {new Date(record.due_at).toLocaleDateString()} ·{' '}
+                  {record.status}
+                </Text>
+                <Text>
+                  {record.progress}/{record.required} photos securely saved
+                </Text>
+                {record.history
+                  .filter(h => h.reason)
+                  .map((h, i) => (
+                    <Text key={i}>Retake request: {h.reason}</Text>
+                  ))}
+                {step && (
+                  <>
+                    <Text style={styles.title}>
+                      {index + 1}. {step.room} · Photo {step.slot + 1}
+                    </Text>
+                    <Text>{step.instructions}</Text>
+                    {photo && (
+                      <Image
+                        accessibilityLabel="Saved inspection photo"
+                        source={{ uri: guidedPhotoUrl(record.id, photo.id) }}
+                        style={styles.photo}
+                      />
+                    )}
+                    {busy && (
+                      <Text>
+                        {progress < 100
+                          ? `Transferring ${progress}%`
+                          : 'Waiting for secure storage confirmation…'}
+                      </Text>
+                    )}
+                    {editable && (
+                      <>
+                        <Button
+                          title={
+                            photo ? 'Replace with camera photo' : 'Take photo'
+                          }
+                          disabled={busy}
+                          onPress={() => pick(true)}
+                        />
+                        <Button
+                          title="Choose from gallery"
+                          disabled={busy}
+                          onPress={() => pick(false)}
+                        />
+                        {retryAsset && (
+                          <Button
+                            title="Retry same photo"
+                            disabled={busy}
+                            onPress={() => accept(retryAsset)}
+                          />
+                        )}
+                      </>
+                    )}
+                    <View style={styles.row}>
+                      <Button
+                        title="Previous"
+                        disabled={busy || index === 0}
+                        onPress={() => {
+                          setIndex(index - 1);
+                          setRetryAsset(undefined);
+                        }}
+                      />
+                      <Button
+                        title="Next"
+                        disabled={busy || index === slots.length - 1}
+                        onPress={() => {
+                          setIndex(index + 1);
+                          setRetryAsset(undefined);
+                        }}
+                      />
+                    </View>
+                  </>
+                )}
+                {!!record.uploads.length && (
+                  <Text>
+                    Some uploads need recovery. Re-select the same photo and
+                    retry after the upload lease expires.
+                  </Text>
+                )}
+                {editable && (
+                  <Button
+                    title="Submit inspection"
+                    disabled={busy || record.progress !== record.required}
+                    onPress={submit}
+                  />
+                )}
+                {record.comparisons
+                  .filter(c => c.decision === 'confirmed')
+                  .map(c => (
+                    <Button
+                      key={c.id}
+                      title="Create maintenance follow-up"
+                      disabled={busy}
+                      onPress={async () => {
+                        setBusy(true);
+                        try {
+                          const draft = await createGuidedMaintenance(
+                            record.id,
+                            c.id,
+                          );
+                          navigation.navigate('ReportMaintenance', {
+                            draftId: draft.maintenance_id,
+                          });
+                        } catch (e) {
+                          setError((e as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    />
+                  ))}
+                {record.comparisons.map(c => (
+                  <Text key={c.id}>
+                    Advisory finding: {c.result?.summary || 'Pending'} ·
+                    Landlord decision: {c.decision || 'Pending'}
+                  </Text>
+                ))}
+                {record.history.map((h, i) => (
+                  <Text key={i}>
+                    {new Date(h.at).toLocaleString()} · {h.action}
+                  </Text>
+                ))}
+                {record.status === 'retake' && (
+                  <Button
+                    title="Report maintenance follow-up"
+                    onPress={() => navigation.navigate('ReportMaintenance')}
+                  />
+                )}
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
+      <PhotoReview
+        asset={asset}
+        remaining={Math.max(
+          0,
+          (record?.required || 0) - (record?.progress || 0),
+        )}
+        onDiscard={() => setAsset(undefined)}
+        onAccept={() => accept(asset)}
+      />
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 36,
-    paddingBottom: 36,
-  },
-  title: {
-    fontSize: 25,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 13,
-    color: COLORS.muted,
-  },
-  progressTrack: {
-    height: 8,
-    backgroundColor: COLORS.track,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginTop: 20,
-  },
-  progressFill: {
-    height: 8,
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
-  },
-  instructionsCard: {
-    marginTop: 26,
-    minHeight: 158,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-    padding: 15,
-  },
-  guideBadge: {
-    alignSelf: 'flex-start',
-    height: 26,
-    paddingHorizontal: 12,
-    borderRadius: 13,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guideBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  instructionTitle: {
-    marginTop: 14,
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  instructionDescription: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 17,
-    color: COLORS.muted,
-  },
-  cameraPreview: {
-    height: 296,
-    marginTop: 20,
-    borderRadius: 20,
-    backgroundColor: COLORS.camera,
-    alignItems: 'center',
-    paddingTop: 24,
-    paddingBottom: 28,
-  },
-  cameraTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  cameraGuide: {
-    width: '68%',
-    height: 136,
-    borderWidth: 2,
-    borderColor: COLORS.guide,
-    marginTop: 38,
-  },
-  cameraHint: {
-    marginTop: 26,
-    fontSize: 12,
-    fontWeight: '500',
-    color: COLORS.white,
-    textAlign: 'center',
-  },
-  captureButton: {
-    height: 50,
-    borderRadius: 14,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 26,
-  },
-  captureButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  cancelButton: {
-    height: 42,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 14,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
+  root: { flex: 1, backgroundColor: '#F5F7FB' },
+  content: { padding: 24, gap: 16 },
+  title: { fontSize: 24, fontWeight: '700', color: '#131824' },
+  photo: { width: '100%', height: 260, resizeMode: 'contain' },
+  row: { flexDirection: 'row', justifyContent: 'space-between' },
 });

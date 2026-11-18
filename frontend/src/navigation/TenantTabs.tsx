@@ -1,6 +1,4 @@
 import React from 'react';
-import Header from '../components/Header';
-import { StyleSheet } from 'react-native';
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
@@ -14,11 +12,8 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import SettingsScreen from '../screens/shared/SettingsScreen';
-import Button from '../components/Button';
 import ScreenContainer from '../components/ScreenContainer';
-import DemoNotice from '../components/DemoNotice';
-import { useInspection } from '../context/InspectionContext';
-import { colors } from '../theme/colors';
+import GuidedRecords from '../components/GuidedRecords';
 
 const Tab = createBottomTabNavigator<TenantTabParamList>();
 
@@ -28,30 +23,8 @@ function InspectionsScreen({
   BottomTabScreenProps<TenantTabParamList, 'Inspections'>,
   NativeStackScreenProps<TenantStackParamList>
 >) {
-  const inspection = useInspection();
-  return (
-    <ScreenContainer style={styles.container}>
-      <Header title="Inspections" titleStyle={styles.title} />
-      <DemoNotice />
-      <Button
-        title={
-          inspection.complete
-            ? 'Start another demo'
-            : 'Continue inspection demo'
-        }
-        onPress={() => {
-          if (inspection.complete) {
-            inspection.restart();
-          }
-          navigation.navigate('GuidedInspection');
-        }}
-      />
-      <Button
-        title="Choose demo availability"
-        onPress={() => navigation.navigate('InspectionAvailability')}
-      />
-    </ScreenContainer>
-  );
+  return <ScreenContainer><GuidedRecords onOpen={inspectionId => navigation.navigate('GuidedInspection', { inspectionId })} /></ScreenContainer>;
+
 }
 function TenantSettingsScreen({
   navigation,
@@ -86,23 +59,3 @@ export default function TenantTabs() {
     </Tab.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    padding: 24,
-    gap: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#131824',
-  },
-  subtitle: {
-    marginTop: 10,
-    fontSize: 14,
-    color: '#5E6B80',
-  },
-});

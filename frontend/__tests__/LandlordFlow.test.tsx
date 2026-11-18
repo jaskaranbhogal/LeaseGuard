@@ -1,3 +1,6 @@
+import NotificationsScreen from '../src/screens/shared/NotificationsScreen';
+import * as guided from '../src/services/guidedInspectionService';
+import { guidedFixture, assignmentOptions } from '../testFixtures/guided';
 import React from 'react';
 import {
   act,
@@ -22,23 +25,21 @@ import Header from '../src/components/Header';
 import BackButton from '../src/components/BackButton';
 import NotificationBell from '../src/components/NotificationBell';
 import BottomNavigation from '../src/components/BottomNavigation';
-import UnitChip from '../src/components/UnitChip';
 import LoginScreen from '../src/screens/auth/LoginScreen';
 import LandlordDashboardScreen from '../src/screens/landlord/LandlordDashboardScreen';
 import AddPropertyScreen from '../src/screens/landlord/AddPropertyScreen';
 import ScheduleInspectionScreen from '../src/screens/landlord/ScheduleInspectionScreen';
 import AIInspectionReviewScreen from '../src/screens/landlord/AIInspectionReviewScreen';
 import ConditionHistoryScreen from '../src/screens/landlord/ConditionHistoryScreen';
-import NotificationsScreen from '../src/screens/shared/NotificationsScreen';
 import SettingsScreen from '../src/screens/shared/SettingsScreen';
 import {
   bedroomCountError,
   bathroomCountError,
   inspectionDateError,
-  formatLocalDate,
 } from '../src/utils/landlordValidation';
 
 jest.mock('../src/services/authService');
+jest.mock('../src/services/guidedInspectionService');
 const landlord: User = {
   id: '000000000000000000000002',
   name: 'Alex Owner',
@@ -59,6 +60,14 @@ let alert: jest.SpyInstance;
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  jest
+    .mocked(guided.listGuided)
+    .mockResolvedValue({ inspections: [guidedFixture], next: null });
+  jest.mocked(guided.getGuided).mockResolvedValue(guidedFixture);
+  jest.mocked(guided.getAssignmentOptions).mockResolvedValue(assignmentOptions);
+  jest
+    .mocked(guided.guidedNotifications)
+    .mockResolvedValue({ notifications: [] });
   jest.mocked(auth.getSession).mockReset();
   jest.mocked(auth.logout).mockReset().mockResolvedValue(undefined);
   navigation = createNavigationContainerRef<LandlordStackParamList>();
@@ -99,7 +108,9 @@ async function press(label: string, scope: ReactTestInstance = app.root) {
           .some(t => [t.props.children].flat(Infinity).join('') === label),
     );
   expect(target).toBeDefined();
-  await act(async () => { target!.props.onPress(); });
+  await act(async () => {
+    target!.props.onPress();
+  });
 }
 async function fill(scope: ReactTestInstance, values: Record<string, string>) {
   await act(async () => {
@@ -207,105 +218,72 @@ it('requires a valid tenant email only when assignment is enabled', async () => 
     expect.stringContaining('no tenant was assigned'),
   );
 });
-it('validates dates, remote areas, and distinct in-person demo behavior', async () => {
+it('reviews a verified assignment and creates it through Django', async () => {
+  jest.mocked(guided.createAssignment).mockResolvedValue(guidedFixture);
   await mount();
-  await press('Schedule inspection');
+  await press('Assign photo inspection');
   const form = app.root.findByType(ScheduleInspectionScreen);
-  await fill(form, { 'Due date (YYYY-MM-DD)': '2027-02-30' });
-  await press('Preview demo inspection', form);
-  expect(json()).toContain('valid calendar date');
-  await fill(form, { 'Due date (YYYY-MM-DD)': '2000-01-01' });
-  await press('Preview demo inspection', form);
-  expect(json()).toContain('today or a future date');
-  const future = new Date();
-  future.setDate(future.getDate() + 7);
-  await fill(form, { 'Due date (YYYY-MM-DD)': formatLocalDate(future) });
-  const areas = form.findAll(
-    n =>
-      n.props.accessibilityRole === 'checkbox' &&
-      typeof n.props.onPress === 'function',
+  await press('Verified property · 101', form);
+  await press('Resident', form);
+  await press('Apartment v1', form);
+  await fill(form, { 'Due date': '2027-12-01' });
+  await press('Review assignment', form);
+  await press('Confirm assignment', form);
+  expect(guided.createAssignment).toHaveBeenCalledWith(
+    expect.objectContaining({
+      unit_id: guidedFixture.unit_id,
+      template_id: 'template',
+      inspection_type: 'move-in',
+    }),
   );
-  // Composite/host duplicates share handlers; invoke each area only once.
-  const handlers = [...new Set(areas.map(n => n.props.onPress))];
-  await act(async () => handlers.forEach(fn => fn()));
-  await press('Preview demo inspection', form);
-  expect(json()).toContain('Pick at least one area');
-  expect(alert).not.toHaveBeenCalled();
-  await press('In person', form);
-  await press('Preview demo inspection', form);
-  expect(alert).toHaveBeenLastCalledWith(
-    'Demo inspection preview',
-    expect.stringContaining('no tenant was notified'),
-  );
-  expect(navigation.getCurrentRoute()?.name).toBe('ScheduleInspection');
-  await press('Back', form);
-  expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
+  expect(navigation.getCurrentRoute()?.name).toBe('AIInspectionReview');
 });
-it('gives distinct AI demo decisions, opens History, and returns through the nested stack', async () => {
+
+it('shows stored photos side by side and saves a human decision', async () => {
+  const photo = { id: 'photo', step_id: 'step-0', slot: 0, state: 'ready' };
+  const record = {
+    ...guidedFixture,
+    status: 'submitted',
+    photos: [photo],
+    baseline_available: true,
+    baseline_photos: [{ ...photo, id: 'baseline' }],
+    comparisons: [
+      {
+        id: 'comparison',
+        photo_id: 'photo',
+        status: 'completed',
+        decision: null,
+        result: {
+          summary: 'Review a visible change.',
+          classification: 'possible_damage',
+          severity: 'low',
+          confidence: 'medium',
+          findings: [],
+        },
+      },
+    ],
+  };
+  jest.mocked(guided.getGuided).mockResolvedValue(record);
+  jest.mocked(guided.guidedAction).mockResolvedValue({
+    ...record,
+    comparisons: [{ ...record.comparisons[0], decision: 'confirmed' }],
+  });
   await mount();
-  await press('2 items need review');
+  await press('Open move-in inspection');
   const screen = app.root.findByType(AIInspectionReviewScreen);
-  expect(json()).toContain('PLACEHOLDER');
-  expect(json()).toContain('sample findings');
-  for (const [label, feedback] of [
-    ['Confirm damage', 'Damage confirmation preview'],
-    ['Dismiss', 'Dismissal preview'],
-    ['Resolved', 'Resolution preview'],
-  ]) {
-    await press(label, screen);
-    expect(alert).toHaveBeenLastCalledWith(
-      feedback,
-      expect.stringContaining('No decision was saved'),
-    );
-    expect(navigation.getCurrentRoute()?.name).toBe('AIInspectionReview');
-  }
-  await press('Open unit history', screen);
-  expect(navigation.getCurrentRoute()?.name).toBe('History');
-  const history = app.root.findByType(ConditionHistoryScreen);
-  expect(
-    history
-      .findAllByType(UnitChip)
-      .every(
-        chip =>
-          chip.findAll(n => typeof n.props.onPress === 'function').length === 0,
-      ),
-  ).toBe(true);
-  await press('Back to dashboard', history);
-  expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
+  expect(screen.findAllByType(Image)).toHaveLength(2);
+  expect(json()).toContain('Review a visible change.');
+  expect(json()).not.toContain('PLACEHOLDER');
+  await press('confirmed', screen);
+  expect(guided.guidedAction).toHaveBeenCalledWith(record, 'decision', {
+    comparison_id: 'comparison',
+    decision: 'confirmed',
+  });
+  await press('Back', screen);
+  await press('History');
+  expect(app.root.findAllByType(ConditionHistoryScreen)).toHaveLength(1);
 });
-it.each([landlord, tenant])(
-  'opens shared Notifications from the $role bell and returns correctly',
-  async user => {
-    await mount(user);
-    const bell = app.root.findByType(NotificationBell);
-    if (user.role === 'tenant')
-      expect(bell.props.unreadCount).toBeGreaterThan(0);
-    await act(async () => bell.props.onPress());
-    expect(navigation.getCurrentRoute()?.name).toBe('Notifications');
-    const screen = app.root.findByType(NotificationsScreen);
-    expect(
-      screen
-        .findAll(n => n.props.testID === 'notification-1')
-        .some(n => n.props.accessibilityValue?.text === 'Unread'),
-    ).toBe(true);
-    expect(
-      screen
-        .findAll(n => n.props.testID === 'notification-1')
-        .every(n => n.props.onPress === undefined),
-    ).toBe(true);
-    await press('Mark all as read', screen);
-    for (const id of ['1', '2', '3', '4'])
-      expect(
-        screen
-          .findAll(n => n.props.testID === `notification-${id}`)
-          .every(n => n.props.accessibilityValue.text === 'Read'),
-      ).toBe(true);
-    await press('Go back', screen);
-    expect(navigation.getCurrentRoute()?.name).toBe(
-      user.role === 'landlord' ? 'Dashboard' : 'Home',
-    );
-  },
-);
+
 it('keeps settings switches local, marks unsupported rows unavailable, and handles failed logout', async () => {
   await mount();
   await press('Settings');
@@ -346,8 +324,8 @@ it('keeps settings switches local, marks unsupported rows unavailable, and handl
 });
 it('shared Header back button returns from inspection results', async () => {
   await mount();
-  await press('2 items need review');
-  await press('Go back', app.root.findByType(AIInspectionReviewScreen));
+  await press('Review inspections');
+  await press('Back', app.root.findByType(AIInspectionReviewScreen));
   expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
 });
 it('disables Manage Unit Details instead of advertising a working destination', async () => {
@@ -389,3 +367,35 @@ describe('landlord numeric and calendar validation', () => {
       expect(inspectionDateError(value, new Date(2026, 9, 17))).toBeUndefined(),
   );
 });
+
+it.each([landlord, tenant])(
+  'opens persisted Notifications from the $role bell',
+  async user => {
+    jest
+      .mocked(guided.guidedNotifications)
+      .mockResolvedValue({
+        notifications: [
+          {
+            id: 'notice',
+            inspection_id: guidedFixture.id,
+            message: 'An inspection is ready.',
+            read: false,
+            created_at: '2026-11-18T12:00:00Z',
+          },
+        ],
+      });
+    await mount(user);
+    await act(async () =>
+      app.root.findByType(NotificationBell).props.onPress(),
+    );
+    expect(navigation.getCurrentRoute()?.name).toBe('Notifications');
+    const screen = app.root.findByType(NotificationsScreen);
+    expect(json()).toContain('An inspection is ready.');
+    await press('Mark read', screen);
+    expect(guided.readNotification).toHaveBeenCalledWith('notice');
+    await press('Back', screen);
+    expect(navigation.getCurrentRoute()?.name).toBe(
+      user.role === 'landlord' ? 'Dashboard' : 'Home',
+    );
+  },
+);

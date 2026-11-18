@@ -14,13 +14,12 @@ import ReviewInspectionPhotoScreen from '../screens/tenant/ReviewInspectionPhoto
 import InspectionSubmittedScreen from '../screens/tenant/InspectionSubmittedScreen';
 
 import type { TenantStackParamList } from './types';
-import { InspectionProvider } from '../context/InspectionContext';
 
 const Stack = createNativeStackNavigator<TenantStackParamList>();
 
 export default function TenantNavigator() {
   return (
-    <InspectionProvider>
+    <>
       <Stack.Navigator>
         <Stack.Screen
           name="TenantTabs"
@@ -89,6 +88,6 @@ export default function TenantNavigator() {
           options={{ headerShown: false }}
         />
       </Stack.Navigator>
-    </InspectionProvider>
+    </>
   );
 }

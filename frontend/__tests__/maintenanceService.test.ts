@@ -1,3 +1,8 @@
+import {
+  uploadGuided,
+  guidedAction,
+} from '../src/services/guidedInspectionService';
+import { guidedFixture } from '../testFixtures/guided';
 import { ApiError, request } from '../src/services/api';
 import {
   createDraft,
@@ -131,4 +136,46 @@ it('normalizes the native iOS image/jpg MIME before multipart upload', async () 
   } finally {
     append.mockRestore();
   }
+});
+
+it('includes stable guided step, slot and revision and waits for server confirmation', async () => {
+  const append = jest.spyOn(FormData.prototype, 'append');
+  const confirmed = jest.fn();
+  try {
+    const result = uploadGuided(
+      guidedFixture,
+      'step-0',
+      0,
+      { uri: 'file:///photo.jpg' },
+      jest.fn(),
+    );
+    result.then(confirmed);
+    await Promise.resolve();
+    expect(append).toHaveBeenCalledWith('step_id', 'step-0');
+    expect(append).toHaveBeenCalledWith('revision', '0');
+    expect(append).toHaveBeenCalledWith('slot', '0');
+    xhr.upload.onprogress!({ lengthComputable: true, loaded: 10, total: 10 });
+    expect(confirmed).not.toHaveBeenCalled();
+    xhr.responseText = JSON.stringify({
+      inspection: { ...guidedFixture, progress: 1 },
+    });
+    xhr.onload!();
+    await expect(result).resolves.toEqual(
+      expect.objectContaining({ progress: 1 }),
+    );
+  } finally {
+    append.mockRestore();
+  }
+});
+it('sends revision with explicit comparison actions and never retries them', async () => {
+  const { authPost } = jest.requireMock('../src/services/api');
+  authPost.mockRejectedValueOnce(new ApiError('Interrupted'));
+  await expect(
+    guidedAction(guidedFixture, 'compare', { photo_id: 'photo' }),
+  ).rejects.toThrow('Interrupted');
+  expect(authPost).toHaveBeenCalledTimes(1);
+  expect(authPost).toHaveBeenCalledWith(expect.stringContaining('/compare/'), {
+    revision: 0,
+    photo_id: 'photo',
+  });
 });
