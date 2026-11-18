@@ -136,12 +136,18 @@ Android requires SDK installation/configuration.
 **GitHub:** PR #68 was read and remains open, draft, unmerged, targeting `main` from
 `ai-image-comparison`. No guided-branch PR exists at inspection time. The guided PR
 should target `ai-image-comparison`, then be retargeted after its parent merges.
-The classic Branches settings page displayed no existing classic protection rule;
-repository ruleset details were not verified. Owner action: verify/create a rule
-covering `main` that requires the exact **Eval** check alongside **Test** and the
-team's review requirements. No rules or protections were changed. Workflow source
+The public effective-rules API verified repository ruleset **24912861** covers
+`main` and requires **React Native Checks**, **Django Checks**, **Test**, and **Eval**,
+with strict up-to-date checks and one approving review. Deletion and non-fast-forward
+updates are prohibited. No owner configuration change is needed for Eval enforcement.
+No rules or protections were changed. Workflow source
 already makes Deploy depend on both Test and Eval and deploys only on main pushes.
-Fresh pushed-commit CI results must be checked separately from these local results.
+GitHub Actions [run 44364115079](https://github.com/jaskaranbhogal/LeaseGuard/actions/runs/44364115079)
+for pushed commit `a1e101c` passed Setup, Dependencies, Django Checks, React Native
+Checks, Test, Eval and Deploy (all seven jobs succeeded). Deploy is the
+feature-branch artifact packaging path; its
+production hook is guarded to main pushes and was not invoked. Subsequent
+documentation-only commits do not change that tested application code.
 
 ## Exact iOS acceptance walkthrough
 

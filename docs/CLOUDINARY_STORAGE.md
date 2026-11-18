@@ -10,12 +10,10 @@ inventory has not been inspected; do not assume it is empty.
 
 Install `requirements.txt` in your Python virtual environment. Set `MONGODB_URI`
 and `MONGODB_DB_NAME` for your own development MongoDB replica set. Copy
-`.env.example` to the ignored `.env`, enter credentials privately, and export it:
+`.env.example` to the ignored `.env` and enter credentials privately. Django loads
+it automatically without overriding exported process settings:
 
 ```sh
-set -a
-source .env
-set +a
 python manage.py check
 python manage.py makemigrations --check --dry-run
 python manage.py test
@@ -30,7 +28,7 @@ Gemini and need neither secret. Do not inject these secrets into PR checks.
 `python manage.py test inspections` runs the offline inspection regression tests
 without needing a database server (settings still require a local MongoDB URI).
 The full account suite needs an isolated local replica set; settings reject a
-remote database for tests. The default evaluator replays 19 golden cases with
+remote database for tests. The default evaluator replays 21 golden cases with
 zero provider calls. Do not run `--live` without explicit paid-call authorization.
 
 Missing or malformed Cloudinary configuration is checked when a media operation

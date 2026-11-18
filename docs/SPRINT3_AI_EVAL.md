@@ -91,8 +91,9 @@ existing Notifications screen supports read status and opening the authorized re
 Setup → Dependencies → Django/React Native checks → Test → Eval → Deploy remains
 intact. Deploy needs both Test and Eval and performs a live deployment only on a main
 push; this feature-branch work does not deploy. Branch required-status enforcement is
-a separate repository setting: verify **Eval** is required in the applicable main
-ruleset. No rule was changed. Post-push Actions results must be distinguished from
+a separate repository setting: the effective main rules API verified **Eval**,
+**Test**, **Django Checks** and **React Native Checks** are required in ruleset
+24912861, with one approving review and strict up-to-date checks. No rule was changed. Post-push Actions results must be distinguished from
 local test results.
 
 Prompt instructions are an imperfect defense. Tenant notes and photographed text

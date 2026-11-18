@@ -97,12 +97,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `MONGODB_URI` and `MONGODB_DB_NAME` in the ignored `.env` file. Django reads **process environment variables**, so export them before running commands:
+Set `MONGODB_URI` and `MONGODB_DB_NAME` for an authorized development database in
+the ignored `.env`. Django loads it automatically; exported settings take precedence.
 
 ```bash
-set -a
-source .env
-set +a
 python manage.py migrate
 python manage.py runserver 127.0.0.1:8000
 ```
@@ -184,16 +182,22 @@ All four members participate in planning, implementation, testing, and peer revi
 
 ## Sprint 3 — AI Image Comparison and Golden Evals
 
-The `ai-image-comparison` branch adds a server-side Gemini image comparison proof of concept. The audit-friendly system prompt is in [`inspections/prompts/image_comparison_v1.txt`](inspections/prompts/image_comparison_v1.txt); never commit API keys. Use `GEMINI_API_KEY` in your ignored local `.env` and configure it as a GitHub Actions **repository secret** for trusted manual live evaluation. An experimental landlord comparison panel now supports camera/library selection, a secure Django endpoint, authenticated Cloudinary photo storage with legacy GridFS reads, and saved human-review decisions. Full tenant-to-landlord sharing and property/unit authorization are still planned and the original inspection/maintenance prototypes remain incomplete.
+Guided and standalone comparisons share the existing Gemini service, versioned
+prompt, strict structured schema, manual fallback and daily 3/account + 30/global
+budgets. Stored findings remain advisory; landlords record individual or pair
+confirmation, dismissal, manual review and resolution. Eligible high-severity results
+create unverified in-app alerts. Provider keys remain backend-only.
 
-- **Fallback:** Invalid photos, provider timeout, invalid response, or missing API key must not produce a damage finding. `compare_images_safe` marks the comparison unavailable and requires human review. No automatic retry; provider timeout is 20 seconds. Gemini calls are limited to 3 per account and 30 globally per UTC day.
-- **Golden dataset:** [19 labeled synthetic baseline/current cases](inspections/evals/golden_cases.json). Checks include zero false damage classifications on non-damage cases (hallucination rate ≤ 0), ≥95% agreement across two runs (consistency), and ≥80% match to expected photo quality/classification. All checks must pass.
-- **One-command PR evaluation:** `python manage.py run_ai_evals`. CI's **Eval** job executes safe mocked replay on PRs to main; it never consumes paid model credits. `python manage.py run_ai_evals --live` makes at most 38 one-shot calls and requires a configured private key; only run live mode deliberately on the trusted default branch. Replay alone **cannot** detect a model update tomorrow.
-- **Prompt-injection risk:** User-entered notes or text in photos may instruct Gemini to misreport damage. These are untrusted inputs, not higher-priority rules. Threat identified for Sprint 4 adversarial hardening; do not treat current prompt guidance as a proven defense.
-- **AI-use statement:** AI assistance helped draft the fallback implementation, test cases, workflow changes, and documentation. We identified the original exception-only fallback and absence of a golden evaluation gate through repository review and added tests/checks for those gaps. Do not claim any real-provider evaluation passed until a live run is executed and reviewed.
+`python manage.py run_ai_evals` replays **21 synthetic cases with zero provider calls**.
+Thresholds are 0% hallucination, at least 95% consistency and 80% expected matching.
+Replay does not measure model accuracy or prompt-injection resistance. Paid live
+checks require explicit approval; the trusted manual suite accepts 15–20 selected
+cases under its 40-call ceiling. Never start that suite as an ordinary PR test.
 
-For usage, thresholds, limitations and example cases see [Sprint 3 evaluation details](docs/SPRINT3_AI_EVAL.md). The AI epic and end-to-end landlord/tenant story acceptance criteria must remain open until they are fully implemented and manually tested.
-
+See [evaluation details](docs/SPRINT3_AI_EVAL.md) and [the finalization report](docs/SPRINT3_FINALIZATION_REPORT.md)
+for executed tests, live-service/device gaps, security mitigations and AI assistance
+disclosure. Keep the related issues open until review, integration and manual
+acceptance are complete.
 
 New inspection photos use backend-only **authenticated Cloudinary** storage;
 MongoDB stores references, AI findings and review history. The existing owner-only

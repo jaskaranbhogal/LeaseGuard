@@ -27,5 +27,6 @@ The additive `0002_landlordbaselinedraft` migration must be applied only to an
 explicitly authorized environment. No shared data migration or provider deletion ran.
 
 Related: #9, #10, #11, #12, #13, #14, #47, #51, #52. Keep issues open pending teammate
-review, integration and the remaining acceptance gates. Verify Eval is required by
-branch rules; no branch protection was modified. Codex assisted with code/tests/docs.
+review, integration and the remaining acceptance gates. Effective main ruleset
+24912861 requires Eval and the other CI checks plus one approval; no branch
+protection was modified. Codex assisted with code/tests/docs.
