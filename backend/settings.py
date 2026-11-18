@@ -20,6 +20,12 @@ from django.core.exceptions import ImproperlyConfigured
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Local development configuration only. Exported process values (including blank
+# provider keys in CI/tests) always win; interpolation cannot expand other secrets.
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env', override=False, interpolate=False)
+
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
