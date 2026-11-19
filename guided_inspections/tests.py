@@ -88,6 +88,71 @@ class GuidedTests(TransactionTestCase):
         self.assertEqual(self.record['status'], 'reviewed')
         self.assertGreater(InspectionNotification.objects.count(), 0)
 
+    def test_landlord_baseline_through_guided_sdk_analysis_and_final_review(self):
+        """Exercise the real SDK serialization across the complete guided API flow."""
+        try:
+            import httpx
+        except ImportError:
+            import httpx2 as httpx
+        from google import genai
+        from google.genai import types
+        from inspections.tests.test_services import DAMAGE_RESPONSE
+
+        draft = self.fill_baseline(self.baseline_draft())
+        self.assertEqual(self.approve_draft(draft).status_code, 200)
+        baseline_id = UnitBaseline.objects.get(unit=self.unit).active_id
+        self.record = self.create('periodic', 'guided_sdk_lifecycle_01')
+        self.client.force_login(self.tenant)
+        self.assertEqual(self.refresh()['status'], 'assigned')
+        self.fill()
+        self.client.logout()
+        self.client.force_login(self.tenant)
+        self.assertEqual(self.refresh()['status'], 'submitted')
+        self.client.force_login(self.landlord)
+        self.refresh()
+        requests = []
+
+        def respond(request):
+            payload = json.loads(request.content)
+            requests.append(payload)
+            config = payload['generationConfig']
+            self.assertNotIn('responseSchema', config)
+            self.assertIs(config['responseJsonSchema']['additionalProperties'], False)
+            self.assertNotIn('additional_properties', json.dumps(payload))
+            return httpx.Response(200, json={'candidates': [{'content': {
+                'parts': [{'text': json.dumps(DAMAGE_RESPONSE)}], 'role': 'model',
+            }}]})
+
+        def offline_client():
+            return genai.Client(api_key='test-key', http_options=types.HttpOptions(
+                client_args={'transport': httpx.MockTransport(respond)},
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ))
+
+        # Five steps in this fixture; production's three-call daily limit is unchanged.
+        with patch('guided_inspections.store.media.retrieve', return_value=image().read()), \
+                patch('inspections.services._get_client', side_effect=offline_client), \
+                patch('inspections.storage.DAILY_AI_CALLS_PER_USER', 5):
+            for photo in self.record['photos']:
+                self.assertEqual(self.action('compare', photo_id=photo['id']).status_code, 200)
+                self.assertEqual(self.action('compare', photo_id=photo['id']).status_code, 200)
+        self.assertEqual(len(requests), 5)  # repeat actions never charge again
+        self.assertEqual(len(self.record['comparisons']), 5)
+        self.assertEqual(self.action('finalize').status_code, 409)
+        for comparison in self.record['comparisons']:
+            self.assertEqual(comparison['baseline_id'], baseline_id)
+            self.assertEqual(comparison['result']['analysis_status'], 'completed')
+            self.assertEqual(comparison['result']['classification'], 'damage')
+            self.assertEqual(self.action('decision', comparison_id=comparison['id'],
+                                         decision='confirmed').status_code, 200)
+        self.assertEqual(self.action('finalize').status_code, 200)
+        self.client.logout()
+        self.client.force_login(self.landlord)
+        self.assertEqual(self.refresh()['status'], 'reviewed')
+        self.assertTrue(all(c['decision'] == 'confirmed' for c in self.record['comparisons']))
+        self.client.force_login(self.tenant)
+        self.assertEqual(self.refresh()['status'], 'reviewed')
+
     def test_assignment_cross_account_and_role_boundaries(self):
         self.client.force_login(self.other)
         self.assertEqual(self.client.get(self.base+self.record['id']+'/').status_code, 404)

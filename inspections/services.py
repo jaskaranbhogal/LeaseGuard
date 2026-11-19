@@ -70,7 +70,9 @@ def compare_images(baseline, current, room, area, landlord_notes=None, known_iss
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         response_mime_type="application/json",
-        response_schema=InspectionResult,
+        # Send JSON Schema directly: the SDK's legacy response_schema conversion
+        # emits additional_properties, which Gemini rejects for extra="forbid".
+        response_json_schema=InspectionResult.model_json_schema(),
         temperature=0.2,
         thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
     )

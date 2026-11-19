@@ -234,3 +234,35 @@ computer-use inspection verified the actual LeaseGuard sign-in screen; screensho
 saved at `/tmp/leaseguard-gemini-smoke/ios-running.png`. This verifies app launch and
 development-server connectivity, not a full signed-in capture/inspection test.
 The development servers were left running for the user.
+
+## Follow-up: Gemini schema fix and guided workflow verification — 19 November 2026
+
+Subsequent individually authorized attempts exposed the provider error: the SDK's
+legacy `response_schema` conversion sent `additional_properties` fields that
+Gemini rejected with HTTP 400 `INVALID_ARGUMENT`. The service now sends the
+Pydantic model's JSON Schema through `response_json_schema`; strict local output
+validation, one-attempt transport, timeout and daily budgets remain unchanged.
+
+One separately authorized retry reused the local preview account's saved synthetic
+photos and successfully returned a validated damage finding (medium severity, high
+confidence). The result was persisted and loaded into the iOS simulator. This was
+the standalone stored-photo comparison, not a live tenant guided inspection.
+The previous unavailable result remains in the local retry audit. No keys or
+provider credentials are included in this report or commit.
+
+The new guided lifecycle regression uses an isolated MongoDB test database,
+mocked private storage, the real Google SDK serializer and an HTTP mock transport.
+It verifies landlord baseline capture/approval; tenant assignment, five-step capture,
+submission and session reload; five successful guided analyses pinned to the
+approved baseline; duplicate-analysis suppression; required human decisions;
+finalization and persisted reviewed state visible to both landlord and tenant.
+The five-call allowance exists only inside this test; production limits are unchanged.
+A separate SDK request regression checks the root and nested strict JSON schemas
+and rejects the legacy serialized field. No additional Gemini calls were made
+during this verification. Physical-device acceptance and live-provider guided
+workflow acceptance remain separate from this automated coverage.
+
+Verification results: **128 Django tests passed**, **103 Jest tests passed** across
+six suites, TypeScript passed, migration consistency reported no changes, and
+`git diff --check` passed. The user's existing Xcode project changes and untracked
+`tmp/` files are excluded from this fix.
