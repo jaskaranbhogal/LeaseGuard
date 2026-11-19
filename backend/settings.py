@@ -20,6 +20,12 @@ from django.core.exceptions import ImproperlyConfigured
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Local development configuration only. Exported process values (including blank
+# provider keys in CI/tests) always win; interpolation cannot expand other secrets.
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env', override=False, interpolate=False)
+
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -49,6 +55,9 @@ ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1
 
 INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
+    'inspections.apps.InspectionsConfig',
+    'maintenance.apps.MaintenanceConfig',
+    'guided_inspections.apps.GuidedInspectionsConfig',
     'backend.apps.MongoAdminConfig',
     'backend.apps.MongoAuthConfig',
     'backend.apps.MongoContentTypesConfig',
@@ -131,6 +140,10 @@ MIGRATION_MODULES = {
 }
 
 
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash-lite').strip() or 'gemini-3.5-flash-lite'
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -204,3 +217,17 @@ PASSWORD_RESET_DELIVERY = (
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+
+# Backend only; validate lazily so offline tests need no provider credentials.
+CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '').strip()
+
+# Stream large uploads to temporary files; endpoints bound file bytes and count.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 64 * 1024
+DATA_UPLOAD_MAX_NUMBER_FILES = 2
+
+FILE_UPLOAD_HANDLERS = [
+    'maintenance.upload_handlers.BoundedImageUploadHandler',
+    'django.core.files.uploadhandler.MemoryFileUploadHandler',
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]

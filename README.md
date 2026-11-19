@@ -8,6 +8,22 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 
 **Project links:** [Figma prototype](https://www.figma.com/design/28N5do1M7uUQwJWH3uKGSb/LeaseGuard-%E2%80%93-Sprint-Prototype) · [GitHub Kanban board](https://github.com/users/jaskaranbhogal/projects/1/views/1) · [User stories and acceptance criteria](USER_STORIES.md) · [GitHub Actions](https://github.com/jaskaranbhogal/LeaseGuard/actions)
 
+## Guided photo inspections
+
+Verified landlords can create and resume private move-in baselines for individual
+units without a tenant, and assign customizable move-in, periodic, move-out and follow-up
+inspections. Tenants capture/review real photos, resume saved drafts and submit through
+Django. Landlords approve immutable unit baselines, explicitly request Gemini analysis,
+record individual finding decisions (including resolution), receive unverified
+high-severity alerts, and link maintenance follow-ups. Images stay in authenticated
+Cloudinary storage; MongoDB persists the workflow and in-app notifications. Shared AI
+limits remain 3/account/day and 30 globally/day.
+
+See [architecture, API, retention, local setup and demonstration](docs/GUIDED_INSPECTIONS.md)
+and the [Sprint 3 finalization report](docs/SPRINT3_FINALIZATION_REPORT.md).
+Provider/dashboard and physical-device verification remain separate from local tests.
+Property setup and availability demos remain labeled prototypes.
+
 ## Sprint 0 — Project Scope and Backlog
 
 | Implemented / prototype | Planned or in progress |
@@ -17,7 +33,23 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 | Guided inspection, maintenance, history, notifications, and settings **prototypes** | Image storage, baseline comparisons, and AI-assisted damage findings |
 | Django authentication backed by MongoDB, automated tests, and CI | Verify live MongoDB Atlas connection and production deployment |
 
-**Scope:** Screens for properties, inspections, maintenance, and history are largely prototypes; completing a screen does not complete its full user story. Details and priorities are tracked on the [project board](https://github.com/users/jaskaranbhogal/projects/1/views/1). The initial backlog and acceptance criteria are in [USER_STORIES.md](USER_STORIES.md).
+**Original Sprint 0 scope:** Screens for properties, inspections, maintenance, and history were prototypes; completing a screen does not complete its full user story. Details and priorities are tracked on the [project board](https://github.com/users/jaskaranbhogal/projects/1/views/1). The initial backlog and acceptance criteria are in [USER_STORIES.md](USER_STORIES.md).
+
+## Sprint 3 — Maintenance workflow
+
+Tenants with verified unit assignments can save drafts, review camera/gallery
+photos individually, submit **5–20** private photos, and retrieve real maintenance
+history. Authorized property managers can view requests/photos and advance status.
+MongoDB persists housing relationships, drafts, photo references and review history;
+Cloudinary stores authenticated images with at least 90-day retention. Maintenance
+does not call Gemini; guided inspections now provide approved unit baselines and explicit comparisons.
+
+Run `python manage.py migrate` on your development database and provision verified
+relationships using the operator-only `assign_maintenance_unit` command. See
+[maintenance API, setup, recovery and iOS testing](docs/SPRINT3_MAINTENANCE.md) and
+[Cloudinary retention](docs/CLOUDINARY_STORAGE.md). Other sample screens remain
+prototypes. Live upload/private-delivery spot checks passed; physical-device validation remains
+required. See the [security review and remaining dependency advisory](docs/SECURITY_REVIEW.md).
 
 ## Prototype (Sprint 1)
 
@@ -37,18 +69,18 @@ LeaseGuard uses a **client–server architecture**:
 - **Frontend:** React Native and TypeScript for iOS/Android screens, navigation, forms, and HTTP/JSON requests.
 - **Backend:** Python 3.12 and Django 5.2 for authentication, sessions, API logic, and data access.
 - **Database:** MongoDB using the official Django MongoDB Backend. Automated CI tests use an isolated replica set; the team's hosted Atlas connection still needs verification.
-- **Planned integration:** Secure photo storage and AI-assisted comparisons between baseline and later inspection images, with findings reviewed by landlords.
+- **Integrations:** Authenticated Cloudinary storage and explicit Gemini comparisons between approved baseline and later inspection images, with findings reviewed by landlords.
 
 ```mermaid
 flowchart TD
     A[Landlord / Tenant] --> B[React Native App]
     B -->|HTTP / JSON| C[Django Backend]
     C --> D[(MongoDB)]
-    C -. Planned .-> E[Photo Storage + AI Analysis]
-    C -. Planned .-> F[Notifications]
+    C --> E[Private Photo Storage + Explicit AI Analysis]
+    C --> F[Persisted In-app Notifications]
 ```
 
-The React Native app never connects directly to MongoDB or stores database credentials. The dashed diagram connections represent planned functionality.
+The React Native app never connects directly to MongoDB or stores database credentials. Email and push notification delivery are not configured.
 
 ## Getting Started
 
@@ -65,12 +97,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `MONGODB_URI` and `MONGODB_DB_NAME` in the ignored `.env` file. Django reads **process environment variables**, so export them before running commands:
+Set `MONGODB_URI` and `MONGODB_DB_NAME` for an authorized development database in
+the ignored `.env`. Django loads it automatically; exported settings take precedence.
 
 ```bash
-set -a
-source .env
-set +a
 python manage.py migrate
 python manage.py runserver 127.0.0.1:8000
 ```
@@ -149,3 +179,30 @@ For full pipeline stages, branch-protection settings, deployment setup, and assi
 | Dev Mondal | Tenant workflows and media features |
 
 All four members participate in planning, implementation, testing, and peer review.
+
+## Sprint 3 — AI Image Comparison and Golden Evals
+
+Guided and standalone comparisons share the existing Gemini service, versioned
+prompt, strict structured schema, manual fallback and daily 3/account + 30/global
+budgets. Stored findings remain advisory; landlords record individual or pair
+confirmation, dismissal, manual review and resolution. Eligible high-severity results
+create unverified in-app alerts. Provider keys remain backend-only.
+
+`python manage.py run_ai_evals` replays **21 synthetic cases with zero provider calls**.
+Thresholds are 0% hallucination, at least 95% consistency and 80% expected matching.
+Replay does not measure model accuracy or prompt-injection resistance. Paid live
+checks require explicit approval; the trusted manual suite accepts 15–20 selected
+cases under its 40-call ceiling. Never start that suite as an ordinary PR test.
+
+See [evaluation details](docs/SPRINT3_AI_EVAL.md) and [the finalization report](docs/SPRINT3_FINALIZATION_REPORT.md)
+for executed tests, live-service/device gaps, security mitigations and AI assistance
+disclosure. Keep the related issues open until review, integration and manual
+acceptance are complete.
+
+New inspection photos use backend-only **authenticated Cloudinary** storage;
+MongoDB stores references, AI findings and review history. The existing owner-only
+photo endpoint proxies private bytes. Both photos are retained for at least 90
+days; cleanup is dry-run unless `--execute` is specified. Configure
+`CLOUDINARY_URL` in the local Django process or hosting environment, separately
+from GitHub Secrets. See [storage configuration, failure recovery, cleanup,
+GridFS transition and manual verification](docs/CLOUDINARY_STORAGE.md).

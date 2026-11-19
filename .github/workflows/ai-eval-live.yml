@@ -1,0 +1,52 @@
+name: AI Live Evaluation (trusted/manual only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      case_ids:
+        description: '15–20 reviewed golden case IDs, comma-separated (two calls each)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  live-eval:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    env:
+      DJANGO_DEBUG: "true"
+      DJANGO_SECRET_KEY: ephemeral-evaluation-only
+      MONGODB_URI: mongodb://127.0.0.1:27017/
+      MONGODB_DB_NAME: leaseguard_ci
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Checkout reviewed main only
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          ref: main
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Require a private API key
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::Configure the GEMINI_API_KEY repository secret."
+            exit 1
+          fi
+      - name: Run opt-in live evaluation (hard maximum 40 requests, no retry)
+        env:
+          EVAL_CASE_IDS: ${{ inputs.case_ids }}
+        run: |
+          python - <<'PYCODE'
+          import os, subprocess, sys
+          selected = [value.strip() for value in os.environ['EVAL_CASE_IDS'].split(',') if value.strip()]
+          subprocess.run([sys.executable, 'manage.py', 'run_ai_evals', '--live',
+                          *['--case=' + value for value in selected]], check=True)
+          PYCODE
