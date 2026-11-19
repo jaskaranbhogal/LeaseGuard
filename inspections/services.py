@@ -27,7 +27,7 @@ def _get_client():
         raise AIComparisonError("Gemini comparison is not configured")
     return genai.Client(
         api_key=api_key,
-        http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS),
+        http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1)),
     )
 
 
@@ -58,7 +58,10 @@ def compare_images(baseline, current, room, area, landlord_notes=None, known_iss
     """Low-level operation. Exactly one call, no automatic retries or loops."""
     # Validate input before constructing a client or spending provider credits.
     images = [prepare_image(baseline), prepare_image(current)]
-    client = _get_client()
+    try:
+        client = _get_client()
+    except Exception as exc:
+        raise AIComparisonError("Gemini comparison is not configured") from exc
     contents = [
         types.Part.from_bytes(data=images[0], mime_type="image/jpeg"),
         types.Part.from_bytes(data=images[1], mime_type="image/jpeg"),
@@ -67,7 +70,9 @@ def compare_images(baseline, current, room, area, landlord_notes=None, known_iss
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         response_mime_type="application/json",
-        response_schema=InspectionResult,
+        # Send JSON Schema directly: the SDK's legacy response_schema conversion
+        # emits additional_properties, which Gemini rejects for extra="forbid".
+        response_json_schema=InspectionResult.model_json_schema(),
         temperature=0.2,
         thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
     )
@@ -81,6 +86,8 @@ def compare_images(baseline, current, room, area, landlord_notes=None, known_iss
         # Do not include provider exception bodies in user-facing responses;
         # provider messages may contain sensitive request information.
         raise AIComparisonError("Gemini request failed") from exc
+    finally:
+        client.close()
     try:
         return InspectionResult.model_validate_json(response.text or "").model_dump()
     except (ValidationError, ValueError) as exc:

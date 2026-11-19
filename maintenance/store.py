@@ -130,4 +130,4 @@ def submit(record, actor):
         raise Conflict('Area and description are required.')
     now = timezone.now()
     return change(record, {'status': 'submitted', 'submitted_at': now,
-                          'history': [{'status': 'submitted', 'at': now.isoformat(), 'actor': actor}]})
+                          'history': record['history'] + [{'status': 'submitted', 'at': now.isoformat(), 'actor': actor}]})

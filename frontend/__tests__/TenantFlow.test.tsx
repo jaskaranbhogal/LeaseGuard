@@ -1,3 +1,5 @@
+import * as guided from '../src/services/guidedInspectionService';
+import { guidedFixture } from '../testFixtures/guided';
 import React from 'react';
 import {
   act,
@@ -18,7 +20,6 @@ import type { TenantStackParamList } from '../src/navigation/types';
 import LandlordDashboardScreen from '../src/screens/landlord/LandlordDashboardScreen';
 import TenantDashboardScreen from '../src/screens/tenant/TenantDashboardScreen';
 import GuidedInspectionScreen from '../src/screens/tenant/GuidedInspectionScreen';
-import ReviewInspectionPhotoScreen from '../src/screens/tenant/ReviewInspectionPhotoScreen';
 import InspectionSubmittedScreen from '../src/screens/tenant/InspectionSubmittedScreen';
 import MaintenanceDetailScreen from '../src/screens/tenant/MaintenanceDetailScreen';
 import InspectionAvailabilityScreen from '../src/screens/tenant/InspectionAvailabilityScreen';
@@ -35,6 +36,7 @@ import type { User } from '../src/types/user';
 import type { MaintenanceRequestId } from '../src/types/maintenance';
 
 jest.mock('../src/services/authService');
+jest.mock('../src/services/guidedInspectionService');
 jest.mock('../src/services/maintenanceService');
 const savedRequest: maintenance.MaintenanceRequest = {
   id: 'a'.repeat(32),
@@ -73,6 +75,13 @@ let navigation: ReturnType<
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  jest
+    .mocked(guided.listGuided)
+    .mockResolvedValue({ inspections: [guidedFixture], next: null });
+  jest.mocked(guided.getGuided).mockResolvedValue(guidedFixture);
+  jest
+    .mocked(guided.guidedNotifications)
+    .mockResolvedValue({ notifications: [] });
   jest
     .mocked(maintenance.listMaintenance)
     .mockResolvedValue({ requests: [savedRequest], next: null });
@@ -157,38 +166,57 @@ it.each([tenant, landlord])(
     }
   },
 );
-it('routes repeated logins, clears logout history, and does not leak demo progress', async () => {
+it('routes repeated logins and clears private inspection screens on logout', async () => {
   await mount(null);
-  expect(app.root.findAllByType(TenantDashboardScreen)).toHaveLength(0);
   await signIn(tenant);
-  await press('Start inspection demo');
-  await press(
-    'Review placeholder photo',
-    app.root.findByType(GuidedInspectionScreen),
-  );
-  await press(
-    'Use placeholder and continue',
-    app.root.findByType(ReviewInspectionPhotoScreen),
-  );
+  await press('Start guided inspection');
+  expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
   await act(async () => navigation.dispatch(StackActions.popTo('TenantTabs')));
   await press('Settings');
   await press('Log out');
-  expect(auth.logout).toHaveBeenCalledTimes(1);
-  expect(app.root.findAllByType(TenantDashboardScreen)).toHaveLength(0);
+  expect(app.root.findAllByType(GuidedInspectionScreen)).toHaveLength(0);
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
   expect(navigation.canGoBack()).toBe(false);
   await signIn(landlord);
-  expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
   await press('Settings');
   await press('Log out');
   await signIn(tenant);
-  expect(navigation.getCurrentRoute()?.name).toBe('Home');
-  await press('Start inspection demo');
-  await press(
-    'Review placeholder photo',
-    app.root.findByType(GuidedInspectionScreen),
+  await press('Start guided inspection');
+  expect(navigation.getCurrentRoute()?.params).toEqual({
+    inspectionId: guidedFixture.id,
+  });
+});
+
+it('explains an empty inspection list and offers maintenance without an inspection', async () => {
+  jest
+    .mocked(guided.listGuided)
+    .mockResolvedValue({ inspections: [], next: null });
+  await mount();
+  await press('Inspections');
+  expect(JSON.stringify(app.toJSON())).toContain(
+    'Your landlord needs to assign',
   );
-  expect(navigation.getCurrentRoute()?.params).toEqual({ stepIndex: 0 });
+  expect(
+    app.root
+      .findAllByType(Button)
+      .filter(b => b.props.title === 'Start guided inspection'),
+  ).toHaveLength(0);
+  await press('Report maintenance');
+  expect(navigation.getCurrentRoute()?.name).toBe('ReportMaintenance');
+});
+it('resumes an assigned draft from its saved inspection record', async () => {
+  jest
+    .mocked(guided.listGuided)
+    .mockResolvedValue({
+      inspections: [{ ...guidedFixture, status: 'draft', progress: 1 }],
+      next: null,
+    });
+  await mount();
+  await press('Resume guided inspection');
+  expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
+  expect(navigation.getCurrentRoute()?.params).toEqual({
+    inspectionId: guidedFixture.id,
+  });
 });
 it('shows logout failures and permits a retry', async () => {
   await mount(landlord);
@@ -221,46 +249,58 @@ it('recovers from network failures and removes expired dashboard sessions', asyn
   expect(navigation.canGoBack()).toBe(false);
   expect(app.root.findAllByType(TenantDashboardScreen)).toHaveLength(0);
 });
-it('progresses through four steps, supports retake/back, and clears review history on completion', async () => {
+it('captures five real photos, discards previews, waits for uploads and submits', async () => {
+  let saved = { ...guidedFixture, photos: [...guidedFixture.photos] };
+  jest.mocked(guided.getGuided).mockImplementation(async () => saved);
+  jest
+    .mocked(guided.uploadGuided)
+    .mockImplementation(async (_record, step, slot) => {
+      saved = {
+        ...saved,
+        revision: saved.revision + 1,
+        progress: saved.progress + 1,
+        photos: [
+          ...saved.photos,
+          { id: step, step_id: step, slot, state: 'ready' },
+        ],
+      };
+      return saved;
+    });
+  jest.mocked(guided.guidedAction).mockImplementation(async () => {
+    saved = { ...saved, status: 'submitted' };
+    return saved;
+  });
+  jest.mocked(launchCamera).mockResolvedValue({
+    assets: [{ uri: 'file:///camera.jpg', type: 'image/jpeg' }],
+  });
+  jest.mocked(launchImageLibrary).mockResolvedValue({
+    assets: [{ uri: 'file:///gallery.jpg', type: 'image/jpeg' }],
+  });
   await mount();
-  await press('Inspections');
-  await press('Continue inspection demo');
-  for (let index = 0; index < 4; index++) {
+  await press('Start guided inspection');
+  await press('Take photo', app.root.findByType(GuidedInspectionScreen));
+  await act(async () => app.root.findByType(PhotoReview).props.onDiscard());
+  expect(guided.uploadGuided).not.toHaveBeenCalled();
+  for (let i = 0; i < 5; i++) {
     await press(
-      'Review placeholder photo',
+      i % 2 ? 'Choose from gallery' : 'Take photo',
       app.root.findByType(GuidedInspectionScreen),
     );
-    expect(navigation.getCurrentRoute()?.params).toEqual({ stepIndex: index });
-    await press(
-      'Retake demo photo',
-      app.root.findByType(ReviewInspectionPhotoScreen),
-    );
-    expect(navigation.getCurrentRoute()?.name).toBe('GuidedInspection');
-    await press(
-      'Review placeholder photo',
-      app.root.findByType(GuidedInspectionScreen),
-    );
-    await press(
-      index === 3 ? 'Complete demo' : 'Use placeholder and continue',
-      app.root.findByType(ReviewInspectionPhotoScreen),
-    );
-    if (index === 0) {
-      await act(async () => navigation.goBack());
-      await press('Home');
-      await press('Resume inspection demo');
-    }
+    await act(async () => app.root.findByType(PhotoReview).props.onAccept());
   }
+  expect(guided.uploadGuided).toHaveBeenCalledTimes(5);
+  await press('Previous', app.root.findByType(GuidedInspectionScreen));
+  await press('Next', app.root.findByType(GuidedInspectionScreen));
+  await press('Submit inspection', app.root.findByType(GuidedInspectionScreen));
   expect(navigation.getCurrentRoute()?.name).toBe('InspectionSubmitted');
-  expect(app.root.findAllByType(ReviewInspectionPhotoScreen)).toHaveLength(0);
-  expect(JSON.stringify(app.toJSON())).toContain('Inspection demo complete');
-  expect(JSON.stringify(app.toJSON())).toContain('No photos were captured');
+  expect(JSON.stringify(app.toJSON())).toContain('Inspection submitted');
   await press(
     'Back to dashboard',
     app.root.findByType(InspectionSubmittedScreen),
   );
   expect(navigation.getCurrentRoute()?.name).toBe('Home');
-  expect(navigation.canGoBack()).toBe(false);
 });
+
 it('opens persisted maintenance records from dashboard and history', async () => {
   await mount();
   await press('Kitchen sink leak', app.root.findByType(TenantDashboardScreen));
@@ -558,39 +598,21 @@ it('validates availability and retains checked slots after preview', async () =>
   expect(slots()[0].props.accessibilityState.checked).toBe(false);
 });
 
-it('keeps inspection progress during session revalidation', async () => {
+it('reloads persisted inspection progress during session revalidation', async () => {
   const listener = jest.spyOn(AppState, 'addEventListener');
+  const saved = { ...guidedFixture, progress: 1, status: 'draft' };
+  jest.mocked(guided.getGuided).mockResolvedValue(saved);
   await mount();
-  await press('Start inspection demo');
-  await press(
-    'Review placeholder photo',
-    app.root.findByType(GuidedInspectionScreen),
-  );
-  await press(
-    'Use placeholder and continue',
-    app.root.findByType(ReviewInspectionPhotoScreen),
-  );
-  let resolve!: (user: User | null) => void;
-  jest.mocked(auth.getSession).mockImplementationOnce(
-    () =>
-      new Promise(accept => {
-        resolve = accept;
-      }),
-  );
+  await press('Start guided inspection');
+  jest.mocked(auth.getSession).mockResolvedValueOnce(tenant);
   await act(async () =>
     listener.mock.calls[listener.mock.calls.length - 1][1]('active'),
   );
-  expect(JSON.stringify(app.toJSON())).toContain('Checking your session');
-  await act(async () => resolve(tenant));
-  await press(
-    'Review placeholder photo',
-    app.root.findByType(GuidedInspectionScreen),
-  );
-  expect(navigation.getCurrentRoute()?.params).toEqual({ stepIndex: 1 });
-  await act(async () => navigation.dispatch(StackActions.popTo('TenantTabs')));
-  await press('Settings');
-  await press('Log out');
-  expect(navigation.getCurrentRoute()?.name).toBe('Login');
+  expect(navigation.getCurrentRoute()?.params).toEqual({
+    inspectionId: guidedFixture.id,
+  });
+  expect(JSON.stringify(app.toJSON())).toContain('photos securely saved');
+  expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
 });
 
 it('does not restore a session while logout is pending', async () => {

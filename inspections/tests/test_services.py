@@ -2,6 +2,12 @@ import io
 import json
 from unittest.mock import MagicMock, patch
 
+try:
+    import httpx
+except ImportError:
+    import httpx2 as httpx
+from google import genai
+from google.genai import types
 from django.test import SimpleTestCase, override_settings
 from PIL import Image
 
@@ -42,6 +48,30 @@ def mock_client(response_text):
 
 @override_settings(GEMINI_API_KEY="test-key", GEMINI_MODEL="gemini-test")
 class CompareImagesTests(SimpleTestCase):
+
+    def test_sdk_wire_payload_uses_json_schema_without_legacy_fields(self):
+        requests = []
+
+        def respond(request):
+            requests.append(json.loads(request.content))
+            return httpx.Response(200, json={"candidates": [{"content": {
+                "parts": [{"text": json.dumps(DAMAGE_RESPONSE)}], "role": "model",
+            }}]})
+
+        client = genai.Client(api_key="test-key", http_options=types.HttpOptions(
+            client_args={"transport": httpx.MockTransport(respond)},
+        ))
+        with patch("inspections.services._get_client", return_value=client):
+            result = compare_images(make_image(), make_image(), "Kitchen", "Oven wall")
+
+        self.assertEqual(result["classification"], "damage")
+        self.assertEqual(len(requests), 1)
+        config = requests[0]["generationConfig"]
+        self.assertNotIn("responseSchema", config)
+        schema = config["responseJsonSchema"]
+        self.assertIs(schema["additionalProperties"], False)
+        self.assertIs(schema["$defs"]["Finding"]["additionalProperties"], False)
+        self.assertNotIn("additional_properties", json.dumps(requests[0]))
 
     def test_returns_parsed_result(self):
         client = mock_client(json.dumps(DAMAGE_RESPONSE))

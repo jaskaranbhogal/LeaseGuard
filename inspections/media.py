@@ -31,7 +31,7 @@ def configuration():
 def _options(ref):
     if (ref.get('provider') != 'cloudinary' or ref.get('resource_type') != 'image'
             or ref.get('delivery_type') != 'authenticated'
-            or not re.fullmatch(r'leaseguard/(?:inspections/[a-f0-9]{32}/(?:baseline|current)|maintenance/[a-f0-9]{32}/[a-f0-9]{64})', ref.get('public_id', ''))):
+            or not re.fullmatch(r'leaseguard/(?:inspections/[a-f0-9]{32}/(?:baseline|current)|maintenance/[a-f0-9]{32}/[a-f0-9]{64}|guided/[a-f0-9]{32}/[a-f0-9]{64})', ref.get('public_id', ''))):
         raise StorageError('Invalid image reference')
     return dict(configuration(), resource_type='image', type='authenticated')
 
@@ -82,6 +82,8 @@ def retrieve(ref):
 
 
 def delete(ref):
+    if ref.get('public_id', '').startswith('leaseguard/guided/'):
+        raise StorageError('Guided evidence requires an explicit retention review')
     options = _options(ref)
     try:
         import cloudinary.uploader

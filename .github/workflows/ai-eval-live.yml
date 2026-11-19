@@ -2,6 +2,11 @@ name: AI Live Evaluation (trusted/manual only)
 
 on:
   workflow_dispatch:
+    inputs:
+      case_ids:
+        description: '15–20 reviewed golden case IDs, comma-separated (two calls each)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -35,5 +40,13 @@ jobs:
             echo "::error::Configure the GEMINI_API_KEY repository secret."
             exit 1
           fi
-      - name: Run opt-in 19-case live evaluation (maximum 38 requests, no retry)
-        run: python manage.py run_ai_evals --live
+      - name: Run opt-in live evaluation (hard maximum 40 requests, no retry)
+        env:
+          EVAL_CASE_IDS: ${{ inputs.case_ids }}
+        run: |
+          python - <<'PYCODE'
+          import os, subprocess, sys
+          selected = [value.strip() for value in os.environ['EVAL_CASE_IDS'].split(',') if value.strip()]
+          subprocess.run([sys.executable, 'manage.py', 'run_ai_evals', '--live',
+                          *['--case=' + value for value in selected]], check=True)
+          PYCODE

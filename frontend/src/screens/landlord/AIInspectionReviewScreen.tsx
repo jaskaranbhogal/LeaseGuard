@@ -1,198 +1,475 @@
-import DemoNotice from '../../components/DemoNotice';
-import LiveComparisonPanel from '../../components/LiveComparisonPanel';
-import Header from '../../components/Header';
-import { Alert, StyleSheet, Text, View } from 'react-native';
-import type { CompositeScreenProps } from '@react-navigation/native';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import React, { useCallback, useState } from 'react';
+import {
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  StyleSheet,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LandlordStackParamList } from '../../navigation/types';
 import Button from '../../components/Button';
-import Card from '../../components/Card';
-import ScreenContainer from '../../components/ScreenContainer';
-import type {
-  LandlordStackParamList,
-  LandlordTabParamList,
-} from '../../navigation/types';
-import UnitChip from '../../components/UnitChip';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
-
-type Props = CompositeScreenProps<
-  NativeStackScreenProps<LandlordStackParamList, 'AIInspectionReview'>,
-  BottomTabScreenProps<LandlordTabParamList, 'HomeStack'>
->;
-
-const unitLabel = '18 Cedar Ave • Unit 1A';
-const area = 'Bathroom ceiling';
-const observation = 'Visible discoloration near ceiling corner';
-const severity = 'HIGH SEVERITY';
-const category = 'Potential damage';
-const finding = 'Possible moisture / water staining detected.';
-
-export default function AIInspectionReviewScreen({ navigation }: Props) {
+import GuidedRecords from '../../components/GuidedRecords';
+import LiveComparisonPanel from '../../components/LiveComparisonPanel';
+import {
+  comparisonPhotoUrl,
+  getGuided,
+  guidedAction,
+  guidedPhotoUrl,
+  GuidedInspection,
+} from '../../services/guidedInspectionService';
+export default function AIInspectionReviewScreen({
+  route,
+  navigation,
+}: NativeStackScreenProps<LandlordStackParamList, 'AIInspectionReview'>) {
+  const id = route.params?.inspectionId;
+  const [record, setRecord] = useState<GuidedInspection>();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState('');
+  const [maintenance, setMaintenance] = useState('');
+  const refresh = useCallback(async () => {
+    if (id) {
+      try {
+        setRecord(await getGuided(id));
+        setError('');
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    }
+  }, [id]);
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
+  async function action(name: string, data = {}) {
+    if (!record || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      setRecord(await guidedAction(record, name, data));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <ScreenContainer style={styles.content}>
-      <Header
-        onBack={() => navigation.goBack()}
-        title="Inspection results"
-        style={styles.header}
-      >
-        <UnitChip label={unitLabel} />
-      </Header>
-
-      <DemoNotice />
-      <View style={styles.status}>
-        <Text style={styles.statusText}>
-          Sample AI comparison — no analysis performed
-        </Text>
-      </View>
-
-      <Card style={styles.areaCard}>
-        <Text style={styles.areaTitle}>{area}</Text>
-        <View style={styles.photos}>
-          <View style={[styles.photo, styles.photoBaseline]}>
-            <Text style={styles.photoLabel}>PLACEHOLDER{'\n'}BASELINE</Text>
-          </View>
-          <View style={[styles.photo, styles.photoCurrent]}>
-            <Text style={styles.photoLabel}>PLACEHOLDER{'\n'}CURRENT</Text>
-          </View>
-        </View>
-        <Text style={styles.observation}>{observation}</Text>
-      </Card>
-
-      <Card style={styles.findingCard}>
-        <View style={styles.tags}>
-          <View style={[styles.pill, styles.pillError]}>
-            <Text style={[styles.pillText, styles.pillTextError]}>
-              {severity}
-            </Text>
-          </View>
-          <View style={[styles.pill, styles.pillWarning]}>
-            <Text style={[styles.pillText, styles.pillTextWarning]}>
-              {category}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.finding}>{finding}</Text>
-        <Text style={styles.advisory}>
-          Example AI output only. These are sample findings, not an analysis of
-          your property.
-        </Text>
-      </Card>
-
-      <View style={styles.decisions}>
+    <SafeAreaView style={styles.root}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Button
-          title="Confirm damage"
-          onPress={() =>
-            Alert.alert(
-              'Damage confirmation preview',
-              'Demo only. No decision was saved or sent.',
-            )
-          }
-          style={[styles.decision, styles.confirm]}
-        />
-        <Button
-          title="Dismiss"
+          title="Back"
           variant="outline"
-          onPress={() =>
-            Alert.alert(
-              'Dismissal preview',
-              'Demo only. No decision was saved or sent.',
-            )
-          }
-          style={styles.decision}
+          onPress={() => navigation.goBack()}
         />
-        <Button
-          title="Resolved"
-          variant="outline"
-          onPress={() =>
-            Alert.alert(
-              'Resolution preview',
-              'Demo only. No decision was saved or sent.',
-            )
-          }
-          style={styles.decision}
-        />
-      </View>
-      <LiveComparisonPanel />
-      <Button
-        title="Open unit history"
-        variant="outline"
-        onPress={() => navigation.navigate('History')}
-      />
-    </ScreenContainer>
+        <Text style={styles.title}>Inspection review</Text>
+        {!!error && <Text accessibilityRole="alert">{error}</Text>}
+        {!id ? (
+          <>
+            <GuidedRecords
+              onOpen={inspectionId => navigation.setParams({ inspectionId })}
+            />
+            <Text>Standalone photo comparison</Text>
+            <LiveComparisonPanel />
+          </>
+        ) : (
+          <>
+            <Button
+              title="Refresh inspection"
+              disabled={busy}
+              onPress={refresh}
+            />
+            {record && (
+              <>
+                <Text>
+                  {record.property} · {record.unit} · {record.inspection_type} ·{' '}
+                  {record.status}
+                </Text>
+                <Text>
+                  Due {new Date(record.due_at).toLocaleDateString()} ·{' '}
+                  {record.progress}/{record.required} photos
+                </Text>
+                {!record.baseline_available && (
+                  <Text>No compatible approved baseline. Review manually.</Text>
+                )}
+                {record.photos.map(p => {
+                  const previous = record.baseline_photos.find(
+                    b => b.step_id === p.step_id && b.slot === p.slot,
+                  );
+                  const comparisons = record.comparisons.filter(
+                    c => c.photo_id === p.id,
+                  );
+                  return (
+                    <View key={p.id} style={styles.card}>
+                      <Text style={styles.title}>
+                        {record.steps.find(s => s.id === p.step_id)?.room} ·{' '}
+                        {p.slot + 1}
+                      </Text>
+                      <View style={styles.pair}>
+                        {previous && (
+                          <View style={styles.half}>
+                            <Text>Approved baseline</Text>
+                            <Image
+                              accessibilityLabel="Approved baseline photo"
+                              style={styles.photo}
+                              source={{
+                                uri: guidedPhotoUrl(
+                                  record.id,
+                                  previous.id,
+                                  true,
+                                ),
+                              }}
+                            />
+                          </View>
+                        )}
+                        <View style={styles.half}>
+                          <Text>Current evidence</Text>
+                          <Image
+                            accessibilityLabel="Current inspection photo"
+                            style={styles.photo}
+                            source={{ uri: guidedPhotoUrl(record.id, p.id) }}
+                          />
+                        </View>
+                      </View>
+                      {previous && record.status === 'submitted' && (
+                        <Button
+                          title="Analyze with Gemini"
+                          disabled={busy}
+                          onPress={() => action('compare', { photo_id: p.id })}
+                        />
+                      )}
+                      {comparisons.map(c => (
+                        <View key={c.id} style={styles.card}>
+                          <Text>
+                            AI advisory · Human review required · {c.status}
+                          </Text>
+                          <Text>
+                            {c.result?.summary ||
+                              'Analysis pending. Refresh to recover its result.'}
+                          </Text>
+                          {c.baseline_photo_id && c.current_photo_id && (
+                            <View style={styles.pair}>
+                              <View style={styles.half}>
+                                <Text>Baseline used for this analysis</Text>
+                                <Image
+                                  accessibilityLabel="Analyzed baseline"
+                                  style={styles.photo}
+                                  source={{
+                                    uri: comparisonPhotoUrl(
+                                      record.id,
+                                      c.baseline_photo_id,
+                                      c.id,
+                                    ),
+                                  }}
+                                />
+                              </View>
+                              <View style={styles.half}>
+                                <Text>
+                                  Current photo used for this analysis
+                                </Text>
+                                <Image
+                                  accessibilityLabel="Analyzed current photo"
+                                  style={styles.photo}
+                                  source={{
+                                    uri: comparisonPhotoUrl(
+                                      record.id,
+                                      c.current_photo_id,
+                                      c.id,
+                                    ),
+                                  }}
+                                />
+                              </View>
+                            </View>
+                          )}
+                          {c.status === 'pending' &&
+                            record.status === 'submitted' && (
+                              <Button
+                                title="Recover pending analysis"
+                                disabled={busy}
+                                onPress={() =>
+                                  action('compare', { photo_id: c.photo_id })
+                                }
+                              />
+                            )}
+                          {c.result && (
+                            <>
+                              <Text>
+                                {c.result.classification} ·{' '}
+                                {c.result.severity || 'No severity'} ·
+                                Confidence: {c.result.confidence}
+                              </Text>
+                              {c.result.findings.map(
+                                (finding, findingIndex) => {
+                                  const status =
+                                    c.finding_decisions?.[findingIndex] ??
+                                    c.decision;
+                                  return (
+                                    <View
+                                      key={findingIndex}
+                                      style={styles.card}
+                                    >
+                                      <Text>
+                                        {finding.description} ·{' '}
+                                        {finding.classification}
+                                      </Text>
+                                      <Text>
+                                        Finding decision:{' '}
+                                        {status || 'Awaiting review'}
+                                      </Text>
+                                      {(record.status === 'submitted' ||
+                                        status === 'confirmed') &&
+                                        (record.status === 'submitted'
+                                          ? [
+                                              'confirmed',
+                                              'dismissed',
+                                              'manual-review',
+                                              ...(status === 'confirmed'
+                                                ? ['resolved']
+                                                : []),
+                                            ]
+                                          : ['resolved']
+                                        ).map(decision => (
+                                          <Button
+                                            key={decision}
+                                            title={`Finding ${
+                                              findingIndex + 1
+                                            }: ${decision}`}
+                                            disabled={busy}
+                                            onPress={() =>
+                                              action('decision', {
+                                                comparison_id: c.id,
+                                                finding_index: findingIndex,
+                                                decision,
+                                              })
+                                            }
+                                          />
+                                        ))}
+                                    </View>
+                                  );
+                                },
+                              )}
+                            </>
+                          )}
+                          <Text>
+                            Pair decision:{' '}
+                            {c.decision ||
+                              (c.finding_decisions?.every(d => d) &&
+                              c.finding_decisions.length
+                                ? 'See individual finding decisions'
+                                : 'Awaiting review')}
+                          </Text>
+                          {c.decision === 'confirmed' &&
+                            c.status === 'completed' && (
+                              <Button
+                                title="Mark resolved"
+                                disabled={busy}
+                                onPress={() =>
+                                  action('decision', {
+                                    comparison_id: c.id,
+                                    decision: 'resolved',
+                                  })
+                                }
+                              />
+                            )}
+                          {record.status === 'submitted' &&
+                            c.status === 'completed' && (
+                              <>
+                                {[
+                                  'confirmed',
+                                  'dismissed',
+                                  'manual-review',
+                                ].map(decision => (
+                                  <Button
+                                    key={decision}
+                                    title={decision}
+                                    disabled={busy}
+                                    onPress={() =>
+                                      action('decision', {
+                                        comparison_id: c.id,
+                                        decision,
+                                      })
+                                    }
+                                  />
+                                ))}
+                                {c.decision === 'confirmed' && (
+                                  <>
+                                    <TextInput
+                                      style={styles.input}
+                                      accessibilityLabel="Submitted maintenance request ID"
+                                      placeholder="Submitted maintenance request ID"
+                                      value={maintenance}
+                                      onChangeText={setMaintenance}
+                                    />
+                                    <Button
+                                      title="Link maintenance follow-up"
+                                      disabled={busy || !maintenance}
+                                      onPress={() =>
+                                        action('maintenance', {
+                                          comparison_id: c.id,
+                                          maintenance_id: maintenance,
+                                        })
+                                      }
+                                    />
+                                  </>
+                                )}
+                              </>
+                            )}
+                          {!!c.maintenance_id && (
+                            <Button
+                              title="Open linked maintenance"
+                              onPress={() =>
+                                navigation.navigate('SavedMaintenanceDetail', {
+                                  requestId: c.maintenance_id!,
+                                })
+                              }
+                            />
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })}
+                {record.comparisons
+                  .filter(c => !record.photos.some(p => p.id === c.photo_id))
+                  .map(c => (
+                    <View key={c.id} style={styles.card}>
+                      <Text style={styles.title}>
+                        Historical analysis · replaced evidence
+                      </Text>
+                      <Text>
+                        {c.result?.summary || 'Analysis pending'} ·{' '}
+                        {c.decision || 'Awaiting human review'}
+                      </Text>
+                      {c.baseline_photo_id && c.current_photo_id && (
+                        <View style={styles.pair}>
+                          <View style={styles.half}>
+                            <Text>Baseline used</Text>
+                            <Image
+                              style={styles.photo}
+                              source={{
+                                uri: comparisonPhotoUrl(
+                                  record.id,
+                                  c.baseline_photo_id,
+                                  c.id,
+                                ),
+                              }}
+                            />
+                          </View>
+                          <View style={styles.half}>
+                            <Text>Previous evidence</Text>
+                            <Image
+                              style={styles.photo}
+                              source={{
+                                uri: comparisonPhotoUrl(
+                                  record.id,
+                                  c.current_photo_id,
+                                  c.id,
+                                ),
+                              }}
+                            />
+                          </View>
+                        </View>
+                      )}
+                      {record.status === 'submitted' &&
+                        c.status === 'completed' &&
+                        ['confirmed', 'dismissed', 'manual-review'].map(
+                          decision => (
+                            <Button
+                              key={decision}
+                              title={`Historical: ${decision}`}
+                              disabled={busy}
+                              onPress={() =>
+                                action('decision', {
+                                  comparison_id: c.id,
+                                  decision,
+                                })
+                              }
+                            />
+                          ),
+                        )}
+                    </View>
+                  ))}
+                {record.inspection_type === 'move-in' &&
+                  ['submitted', 'reviewed'].includes(record.status) && (
+                    <Button
+                      title="Approve move-in baseline"
+                      disabled={busy}
+                      onPress={() => {
+                        if (
+                          record.active_baseline_id &&
+                          record.baseline_source_id !== record.id
+                        )
+                          Alert.alert(
+                            'Supersede approved baseline?',
+                            'The previous baseline and all historical analyses will be preserved.',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Supersede and approve',
+                                onPress: () =>
+                                  action('approve-baseline', {
+                                    supersedes: record.active_baseline_id,
+                                  }),
+                              },
+                            ],
+                          );
+                        else action('approve-baseline');
+                      }}
+                    />
+                  )}
+                {record.status === 'submitted' && (
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      accessibilityLabel="Retake reason"
+                      placeholder="Clarification or retake instructions"
+                      value={reason}
+                      onChangeText={setReason}
+                    />
+                    <Button
+                      title="Request retake"
+                      disabled={busy || !reason.trim()}
+                      onPress={() => action('retake', { reason })}
+                    />
+                    <Button
+                      title="Finalize review"
+                      disabled={busy}
+                      onPress={() => action('finalize')}
+                    />
+                  </>
+                )}
+                <Text style={styles.title}>Decision and evidence history</Text>
+                {record.history.map((h, i) => (
+                  <Text key={i}>
+                    {new Date(h.at).toLocaleString()} · {h.action}
+                    {h.reason ? ` · ${h.reason}` : ''}
+                  </Text>
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
+  root: { flex: 1, backgroundColor: '#F5F7FB' },
+  content: { padding: 24, gap: 16 },
+  title: { fontSize: 22, fontWeight: '700' },
+  card: { backgroundColor: 'white', borderRadius: 16, padding: 12, gap: 12 },
+  pair: { flexDirection: 'row', gap: 8 },
+  half: { flex: 1 },
+  photo: { width: '100%', height: 220, resizeMode: 'contain' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#D6DEEB',
+    padding: 12,
+    borderRadius: 12,
   },
-  header: { gap: spacing.sm },
-  title: {
-    fontSize: 32,
-    fontWeight: typography.bold,
-    color: colors.headerNavy,
-  },
-  status: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: '#E4F6EB',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: typography.semibold,
-    color: colors.success,
-  },
-  areaCard: { gap: spacing.md },
-  areaTitle: {
-    fontSize: 20,
-    fontWeight: typography.bold,
-    color: colors.headerNavy,
-  },
-  photos: { flexDirection: 'row', gap: spacing.md },
-  photo: {
-    flex: 1,
-    height: 112,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoBaseline: { backgroundColor: '#E0E7EF' },
-  photoCurrent: { backgroundColor: '#CCD6E0' },
-  photoLabel: {
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: typography.bold,
-    textAlign: 'center',
-    color: colors.textSecondary,
-  },
-  observation: { fontSize: 16, color: colors.textSecondary },
-  findingCard: { gap: spacing.md, paddingVertical: 20 },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  pill: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-  },
-  pillError: { backgroundColor: '#FDECEC' },
-  pillWarning: { backgroundColor: '#FDF0DC' },
-  pillText: { fontSize: 14, fontWeight: typography.semibold },
-  pillTextError: { color: colors.error },
-  pillTextWarning: { color: '#B45309' },
-  finding: {
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: typography.bold,
-    color: colors.text,
-  },
-  advisory: { fontSize: 16, lineHeight: 22, color: colors.textSecondary },
-  decisions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  decision: { flexGrow: 1, flexBasis: 100, paddingHorizontal: 8 },
-  confirm: { backgroundColor: colors.error },
 });

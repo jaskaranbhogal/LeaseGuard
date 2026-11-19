@@ -10,12 +10,10 @@ inventory has not been inspected; do not assume it is empty.
 
 Install `requirements.txt` in your Python virtual environment. Set `MONGODB_URI`
 and `MONGODB_DB_NAME` for your own development MongoDB replica set. Copy
-`.env.example` to the ignored `.env`, enter credentials privately, and export it:
+`.env.example` to the ignored `.env` and enter credentials privately. Django loads
+it automatically without overriding exported process settings:
 
 ```sh
-set -a
-source .env
-set +a
 python manage.py check
 python manage.py makemigrations --check --dry-run
 python manage.py test
@@ -30,7 +28,7 @@ Gemini and need neither secret. Do not inject these secrets into PR checks.
 `python manage.py test inspections` runs the offline inspection regression tests
 without needing a database server (settings still require a local MongoDB URI).
 The full account suite needs an isolated local replica set; settings reject a
-remote database for tests. The default evaluator replays 19 golden cases with
+remote database for tests. The default evaluator replays 21 golden cases with
 zero provider calls. Do not run `--live` without explicit paid-call authorization.
 
 Missing or malformed Cloudinary configuration is checked when a media operation
@@ -212,3 +210,28 @@ unexpired/missing retention metadata or a request updated within 90 days. Existi
 inspection behavior and legacy GridFS compatibility remain unchanged. Complete
 API, authorization, retry and iOS procedures are in
 [the maintenance guide](SPRINT3_MAINTENANCE.md).
+
+## Guided inspection evidence
+
+The guided workflow reuses authenticated uploads, normalization, recovery and Django
+proxy delivery at `leaseguard/guided/<inspection-id>/<intent-id>`. Guided references
+and maintenance records sharing them are excluded from destructive cleanup. All
+guided evidence is under an indefinite hold; minimum timestamps alone do not permit
+deletion. See [guided storage and retention](GUIDED_INSPECTIONS.md#storage-recovery-and-retention).
+Live provider checks for this namespace remain pending.
+
+
+## Landlord baseline extension — 18 November 2026
+
+Landlord drafts reuse the `leaseguard/guided/<draft-id>/<content-location-id>`
+authenticated namespace, JPEG/PNG normalization, EXIF removal, size/pixel bounds,
+private upload confirmation and interrupted-upload recovery. No second storage
+framework or public image URLs were introduced. Every draft/photo/history route
+rechecks current property-manager membership and exact unit scope. Approved versions
+and shared references remain under the existing indefinite guided-evidence hold,
+which also protects active baselines beyond 90 days. Supersession never deletes assets.
+
+The browser's `leaseguard (Test)` Usage Reports page was accessible in this run;
+64 assets / 161.44 MB were visible. No synthetic upload or asset access experiment
+was performed, and local credential-to-environment correspondence remains pending.
+See [current verification boundaries](SPRINT3_FINALIZATION_REPORT.md).

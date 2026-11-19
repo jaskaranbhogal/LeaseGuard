@@ -1,10 +1,7 @@
+import GuidedRecords from '../../components/GuidedRecords';
 import { useAuth } from '../../context/AuthContext';
 import DemoNotice from '../../components/DemoNotice';
-import {
-  properties,
-  reviewCount,
-  highSeverityCount,
-} from '../../data/landlordMockData';
+import { properties } from '../../data/landlordMockData';
 import Header from '../../components/Header';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -29,17 +26,12 @@ function greeting() {
 export default function LandlordDashboardScreen({ navigation }: Props) {
   const { user } = useAuth();
   const landlordName = user?.name?.trim() || user?.email || 'Landlord';
-  const totalUnits = properties.reduce((sum, p) => sum + p.unitCount, 0);
-  const findingLabel =
-    highSeverityCount === 1
-      ? '1 high-severity inspection finding'
-      : `${highSeverityCount} high-severity inspection findings`;
 
   return (
     <ScreenContainer style={styles.content}>
       <Header
         title={`${greeting()}, ${landlordName}`}
-        subtitle={`${totalUnits} units across ${properties.length} properties`}
+        subtitle="Saved inspections and maintenance for your managed units"
         titleStyle={styles.greeting}
         subtitleStyle={styles.subtitle}
         style={styles.header}
@@ -47,26 +39,11 @@ export default function LandlordDashboardScreen({ navigation }: Props) {
       />
 
       <Button title="View saved maintenance requests" onPress={() => navigation.navigate('MaintenanceRequests')} />
+      <GuidedRecords onOpen={inspectionId => navigation.navigate('AIInspectionReview', { inspectionId })} />
+      <Button title="Create Move-In Baseline" onPress={() => navigation.navigate('MoveInBaseline')} />
+      <Button title="Assign photo inspection" onPress={() => navigation.navigate('ScheduleInspection')} />
       <DemoNotice />
-      {reviewCount > 0 && (
-        <Card
-          onPress={() => navigation.navigate('AIInspectionReview')}
-          style={styles.banner}
-        >
-          <View style={styles.alertBadge}>
-            <Text style={styles.alertMark}>!</Text>
-          </View>
-          <View style={styles.bannerText}>
-            <Text style={styles.bannerTitle}>
-              {reviewCount} items need review
-            </Text>
-            {highSeverityCount > 0 && (
-              <Text style={styles.bannerSubtitle}>{findingLabel}</Text>
-            )}
-          </View>
-        </Card>
-      )}
-
+      <Button title="Review inspections" onPress={() => navigation.navigate('AIInspectionReview')} />
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Properties</Text>
         <Pressable

@@ -1,6 +1,6 @@
 import type { Asset } from 'react-native-image-picker';
 import { API_BASE_URL, ApiError, authPost, request } from './api';
-import { normalizePhotoAsset } from './photoAsset';
+import { privatePhotoUpload } from './privatePhotoUpload';
 
 export type MaintenancePhoto = {
   id: string;
@@ -102,60 +102,16 @@ export const maintenancePhotoUrl = (id: string, photo: string) =>
     id,
   )}/photos/${encodeURIComponent(photo)}/`;
 
-export async function uploadMaintenancePhoto(
+export function uploadMaintenancePhoto(
   id: string,
   asset: Asset,
   progress: (value: number) => void,
 ): Promise<MaintenanceRequest> {
-  if (!asset.uri || (!__DEV__ && !API_BASE_URL.startsWith('https://')))
-    throw new ApiError('A valid photo and secure server are required.');
-  const { csrfToken } = await request<{ csrfToken: string }>('/auth/csrf/');
-  if (!csrfToken) throw new ApiError('Cannot verify your secure session.');
-  const normalized = normalizePhotoAsset(asset);
-  const form = new FormData();
-  form.append('photo', {
-    uri: normalized.uri,
-    type: normalized.type || 'image/jpeg',
-    name: normalized.fileName || 'photo.jpg',
-  } as unknown as Blob);
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open(
-      'POST',
-      `${API_BASE_URL}/maintenance/${encodeURIComponent(id)}/photos/`,
-    );
-    xhr.withCredentials = true;
-    xhr.timeout = 65000;
-    xhr.setRequestHeader('X-CSRFToken', csrfToken);
-    xhr.setRequestHeader('Accept', 'application/json');
-    xhr.upload.onprogress = event => {
-      if (event.lengthComputable)
-        progress(Math.round((event.loaded / event.total) * 100));
-    };
-    xhr.onload = () => {
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status >= 200 && xhr.status < 300 && data.request)
-          resolve(data.request);
-        else
-          reject(
-            new ApiError(
-              data.detail || 'Photo could not be saved. Refresh and retry.',
-              xhr.status,
-            ),
-          );
-      } catch {
-        reject(
-          new ApiError('Unexpected upload response. Refresh before retrying.'),
-        );
-      }
-    };
-    xhr.onerror = xhr.ontimeout = () =>
-      reject(
-        new ApiError(
-          'Upload interrupted. Refresh; retry the same photo after a minute if needed.',
-        ),
-      );
-    xhr.send(form);
-  });
+  return privatePhotoUpload(
+    `/maintenance/${encodeURIComponent(id)}/photos/`,
+    asset,
+    {},
+    'request',
+    progress,
+  );
 }

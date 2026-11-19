@@ -8,6 +8,22 @@ LeaseGuard is a mobile application that helps landlords and tenants document ren
 
 **Project links:** [Figma prototype](https://www.figma.com/design/28N5do1M7uUQwJWH3uKGSb/LeaseGuard-%E2%80%93-Sprint-Prototype) · [GitHub Kanban board](https://github.com/users/jaskaranbhogal/projects/1/views/1) · [User stories and acceptance criteria](USER_STORIES.md) · [GitHub Actions](https://github.com/jaskaranbhogal/LeaseGuard/actions)
 
+## Guided photo inspections
+
+Verified landlords can create and resume private move-in baselines for individual
+units without a tenant, and assign customizable move-in, periodic, move-out and follow-up
+inspections. Tenants capture/review real photos, resume saved drafts and submit through
+Django. Landlords approve immutable unit baselines, explicitly request Gemini analysis,
+record individual finding decisions (including resolution), receive unverified
+high-severity alerts, and link maintenance follow-ups. Images stay in authenticated
+Cloudinary storage; MongoDB persists the workflow and in-app notifications. Shared AI
+limits remain 3/account/day and 30 globally/day.
+
+See [architecture, API, retention, local setup and demonstration](docs/GUIDED_INSPECTIONS.md)
+and the [Sprint 3 finalization report](docs/SPRINT3_FINALIZATION_REPORT.md).
+Provider/dashboard and physical-device verification remain separate from local tests.
+Property setup and availability demos remain labeled prototypes.
+
 ## Sprint 0 — Project Scope and Backlog
 
 | Implemented / prototype | Planned or in progress |
@@ -26,7 +42,7 @@ photos individually, submit **5–20** private photos, and retrieve real mainten
 history. Authorized property managers can view requests/photos and advance status.
 MongoDB persists housing relationships, drafts, photo references and review history;
 Cloudinary stores authenticated images with at least 90-day retention. Maintenance
-does not call Gemini; unit-linked comparison awaits a verified baseline workflow.
+does not call Gemini; guided inspections now provide approved unit baselines and explicit comparisons.
 
 Run `python manage.py migrate` on your development database and provision verified
 relationships using the operator-only `assign_maintenance_unit` command. See
@@ -53,18 +69,18 @@ LeaseGuard uses a **client–server architecture**:
 - **Frontend:** React Native and TypeScript for iOS/Android screens, navigation, forms, and HTTP/JSON requests.
 - **Backend:** Python 3.12 and Django 5.2 for authentication, sessions, API logic, and data access.
 - **Database:** MongoDB using the official Django MongoDB Backend. Automated CI tests use an isolated replica set; the team's hosted Atlas connection still needs verification.
-- **Planned integration:** Secure photo storage and AI-assisted comparisons between baseline and later inspection images, with findings reviewed by landlords.
+- **Integrations:** Authenticated Cloudinary storage and explicit Gemini comparisons between approved baseline and later inspection images, with findings reviewed by landlords.
 
 ```mermaid
 flowchart TD
     A[Landlord / Tenant] --> B[React Native App]
     B -->|HTTP / JSON| C[Django Backend]
     C --> D[(MongoDB)]
-    C -. Planned .-> E[Photo Storage + AI Analysis]
-    C -. Planned .-> F[Notifications]
+    C --> E[Private Photo Storage + Explicit AI Analysis]
+    C --> F[Persisted In-app Notifications]
 ```
 
-The React Native app never connects directly to MongoDB or stores database credentials. The dashed diagram connections represent planned functionality.
+The React Native app never connects directly to MongoDB or stores database credentials. Email and push notification delivery are not configured.
 
 ## Getting Started
 
@@ -81,12 +97,10 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-Set `MONGODB_URI` and `MONGODB_DB_NAME` in the ignored `.env` file. Django reads **process environment variables**, so export them before running commands:
+Set `MONGODB_URI` and `MONGODB_DB_NAME` for an authorized development database in
+the ignored `.env`. Django loads it automatically; exported settings take precedence.
 
 ```bash
-set -a
-source .env
-set +a
 python manage.py migrate
 python manage.py runserver 127.0.0.1:8000
 ```
@@ -168,16 +182,22 @@ All four members participate in planning, implementation, testing, and peer revi
 
 ## Sprint 3 — AI Image Comparison and Golden Evals
 
-The `ai-image-comparison` branch adds a server-side Gemini image comparison proof of concept. The audit-friendly system prompt is in [`inspections/prompts/image_comparison_v1.txt`](inspections/prompts/image_comparison_v1.txt); never commit API keys. Use `GEMINI_API_KEY` in your ignored local `.env` and configure it as a GitHub Actions **repository secret** for trusted manual live evaluation. An experimental landlord comparison panel now supports camera/library selection, a secure Django endpoint, authenticated Cloudinary photo storage with legacy GridFS reads, and saved human-review decisions. Full tenant-to-landlord sharing and property/unit authorization are still planned and the original inspection/maintenance prototypes remain incomplete.
+Guided and standalone comparisons share the existing Gemini service, versioned
+prompt, strict structured schema, manual fallback and daily 3/account + 30/global
+budgets. Stored findings remain advisory; landlords record individual or pair
+confirmation, dismissal, manual review and resolution. Eligible high-severity results
+create unverified in-app alerts. Provider keys remain backend-only.
 
-- **Fallback:** Invalid photos, provider timeout, invalid response, or missing API key must not produce a damage finding. `compare_images_safe` marks the comparison unavailable and requires human review. No automatic retry; provider timeout is 20 seconds. Gemini calls are limited to 3 per account and 30 globally per UTC day.
-- **Golden dataset:** [19 labeled synthetic baseline/current cases](inspections/evals/golden_cases.json). Checks include zero false damage classifications on non-damage cases (hallucination rate ≤ 0), ≥95% agreement across two runs (consistency), and ≥80% match to expected photo quality/classification. All checks must pass.
-- **One-command PR evaluation:** `python manage.py run_ai_evals`. CI's **Eval** job executes safe mocked replay on PRs to main; it never consumes paid model credits. `python manage.py run_ai_evals --live` makes at most 38 one-shot calls and requires a configured private key; only run live mode deliberately on the trusted default branch. Replay alone **cannot** detect a model update tomorrow.
-- **Prompt-injection risk:** User-entered notes or text in photos may instruct Gemini to misreport damage. These are untrusted inputs, not higher-priority rules. Threat identified for Sprint 4 adversarial hardening; do not treat current prompt guidance as a proven defense.
-- **AI-use statement:** AI assistance helped draft the fallback implementation, test cases, workflow changes, and documentation. We identified the original exception-only fallback and absence of a golden evaluation gate through repository review and added tests/checks for those gaps. Do not claim any real-provider evaluation passed until a live run is executed and reviewed.
+`python manage.py run_ai_evals` replays **21 synthetic cases with zero provider calls**.
+Thresholds are 0% hallucination, at least 95% consistency and 80% expected matching.
+Replay does not measure model accuracy or prompt-injection resistance. Paid live
+checks require explicit approval; the trusted manual suite accepts 15–20 selected
+cases under its 40-call ceiling. Never start that suite as an ordinary PR test.
 
-For usage, thresholds, limitations and example cases see [Sprint 3 evaluation details](docs/SPRINT3_AI_EVAL.md). The AI epic and end-to-end landlord/tenant story acceptance criteria must remain open until they are fully implemented and manually tested.
-
+See [evaluation details](docs/SPRINT3_AI_EVAL.md) and [the finalization report](docs/SPRINT3_FINALIZATION_REPORT.md)
+for executed tests, live-service/device gaps, security mitigations and AI assistance
+disclosure. Keep the related issues open until review, integration and manual
+acceptance are complete.
 
 New inspection photos use backend-only **authenticated Cloudinary** storage;
 MongoDB stores references, AI findings and review history. The existing owner-only

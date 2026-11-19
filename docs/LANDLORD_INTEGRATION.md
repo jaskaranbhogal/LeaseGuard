@@ -72,3 +72,10 @@ list/detail flow. Explicit property-manager membership authorizes submitted
 requests, private photos and persisted forward-only status/history updates.
 Drafts and unrelated units are excluded. Demo property/inspection screens remain
 marked samples. See [maintenance setup, routes, retention and iOS checks](SPRINT3_MAINTENANCE.md).
+
+## Persisted assignments and reviews
+
+ScheduleInspection now selects verified managed units and eligible tenants. Review
+loads actual evidence, approved baselines, explicit Gemini analyses and human decisions.
+Unit history and in-app notifications use persisted records. See
+[guided API and demo](GUIDED_INSPECTIONS.md).

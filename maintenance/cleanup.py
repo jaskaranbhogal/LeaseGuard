@@ -16,6 +16,8 @@ def cleanup(db, now, execute, limit):
     for record in collection.find({'updated_at': {'$lte': cutoff}, 'photos.0': {'$exists': True},
                                     'media_deleted': {'$ne': True}}).limit(limit):
         refs = [p['ref'] for p in record['photos']]
+        if any(ref.get('public_id', '').startswith('leaseguard/guided/') for ref in refs):
+            continue  # Shared inspection evidence is under an indefinite retention hold.
         if not all(ref.get('uploaded_at') and ref.get('retain_until')
                    and aware(ref['retain_until']) <= now
                    and aware(ref['uploaded_at']) + timedelta(days=90) <= now for ref in refs):

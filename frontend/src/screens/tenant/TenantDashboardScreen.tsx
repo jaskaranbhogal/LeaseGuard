@@ -1,10 +1,9 @@
+import GuidedRecords from '../../components/GuidedRecords';
 import { MaintenanceRecords } from '../../components/MaintenanceRecords';
 import Header from '../../components/Header';
 import { colors } from '../../theme/colors';
-import DemoNotice from '../../components/DemoNotice';
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useInspection } from '../../context/InspectionContext';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -14,8 +13,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { TenantTabParamList } from '../../navigation/types';
 import type { TenantStackParamList } from '../../navigation/types';
-
-import { tenantMockData } from '../../data/tenantMockData';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<TenantTabParamList, 'Home'>,
@@ -38,8 +35,6 @@ const COLORS = {
 
 export default function TenantDashboardScreen({ navigation }: Props) {
   const { user } = useAuth();
-  const demo = useInspection();
-  const { tenant, inspection } = tenantMockData;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -52,59 +47,19 @@ export default function TenantDashboardScreen({ navigation }: Props) {
           {/* Tenant information */}
           <Header
             title={`Hi, ${user?.name || user?.email || ''}`}
-            subtitle={`${tenant.propertyAddress} • Unit ${tenant.unitNumber}`}
+            subtitle="Your saved inspections and maintenance requests"
             titleStyle={styles.greeting}
             subtitleStyle={styles.property}
             style={styles.header}
-            unreadCount={tenantMockData.notifications.unreadCount}
             onNotificationsPress={() => navigation.navigate('Notifications')}
           />
 
-          <DemoNotice />
-          {/* Upcoming inspection */}
-          {inspection ? (
-            <View style={styles.inspectionCard}>
-              <View style={styles.dueBadge}>
-                <Text style={styles.dueText}>
-                  DUE {inspection.dueDate.toUpperCase()}
-                </Text>
-              </View>
-
-              <Text style={styles.inspectionTitle}>{inspection.title}</Text>
-
-              <Text style={styles.inspectionSubtitle}>
-                {inspection.requiredAreas} required areas • about{' '}
-                {inspection.estimatedMinutes} minutes
-              </Text>
-
-              <Pressable
-                accessibilityRole="button"
-                style={styles.primaryButton}
-                onPress={() => {
-                  if (demo.complete) {
-                    demo.restart();
-                  }
-                  navigation.navigate('GuidedInspection');
-                }}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {demo.complete
-                    ? 'Start another demo'
-                    : demo.acceptedCount
-                    ? 'Resume inspection demo'
-                    : 'Start inspection demo'}
-                </Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>No upcoming inspections</Text>
-
-              <Text style={styles.mutedText}>
-                Your scheduled inspections will appear here.
-              </Text>
-            </View>
-          )}
+          <GuidedRecords
+            tenant
+            onOpen={inspectionId =>
+              navigation.navigate('GuidedInspection', { inspectionId })
+            }
+          />
 
           {/* Quick actions */}
           <Text style={styles.sectionTitle}>Quick actions</Text>
@@ -121,7 +76,7 @@ export default function TenantDashboardScreen({ navigation }: Props) {
 
               <Text style={styles.quickTitle}>Report issue</Text>
 
-              <Text style={styles.quickSubtitle}>Demo form</Text>
+              <Text style={styles.quickSubtitle}>Save a repair request</Text>
             </Pressable>
 
             <Pressable
