@@ -54,7 +54,7 @@ def prepare_image(image):
         raise AIComparisonError("Invalid or unsupported photo") from exc
 
 
-def compare_images(baseline, current, room, area, landlord_notes=None, known_issues=None):
+def compare_images(baseline, current, room, area, landlord_notes=None, known_issues=None, tenant_notes=None):
     """Low-level operation. Exactly one call, no automatic retries or loops."""
     # Validate input before constructing a client or spending provider credits.
     images = [prepare_image(baseline), prepare_image(current)]
@@ -65,7 +65,7 @@ def compare_images(baseline, current, room, area, landlord_notes=None, known_iss
     contents = [
         types.Part.from_bytes(data=images[0], mime_type="image/jpeg"),
         types.Part.from_bytes(data=images[1], mime_type="image/jpeg"),
-        build_message(room, area, landlord_notes, known_issues),
+        build_message(room, area, landlord_notes, known_issues, tenant_notes),
     ]
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
@@ -94,10 +94,10 @@ def compare_images(baseline, current, room, area, landlord_notes=None, known_iss
         raise AIComparisonError("Gemini returned an invalid result") from exc
 
 
-def compare_images_safe(baseline, current, room, area, landlord_notes=None, known_issues=None):
+def compare_images_safe(baseline, current, room, area, landlord_notes=None, known_issues=None, tenant_notes=None):
     """Fail safely; the original photos remain available for human review."""
     try:
-        result = compare_images(baseline, current, room, area, landlord_notes, known_issues)
+        result = compare_images(baseline, current, room, area, landlord_notes, known_issues, tenant_notes)
         return {"analysis_status": "completed", "requires_manual_review": True, **result}
     except AIComparisonError:
         return {

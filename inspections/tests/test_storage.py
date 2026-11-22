@@ -311,8 +311,11 @@ class PersistenceTests(SimpleTestCase):
 @override_settings(CLOUDINARY_URL=CONFIG)
 class APIStorageTests(SimpleTestCase):
     def setUp(self):
+        access = patch('inspections.views.analysis_access', return_value=None)
+        access.start(); self.addCleanup(access.stop)
         self.helper = test_views.ComparisonAPITests()
         self.helper.setUp()
+        self.addCleanup(self.helper.doCleanups)
         self.db = MagicMock()
         self.db.inspection_comparisons = MemoryCollection()
         self.mocks = {}

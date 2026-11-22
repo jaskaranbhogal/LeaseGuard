@@ -1,3 +1,29 @@
+jest.mock('../src/services/leaseService', () => ({
+  landlordApi: {
+    state: jest.fn(async () => ({
+      consented: true,
+      properties: [],
+      activity: [],
+    })),
+    addProperty: jest.fn(),
+    updateUnit: jest.fn(),
+    invite: jest.fn(),
+  },
+  tenantApi: {
+    state: jest.fn(async () => ({
+      consented: true,
+      welcomed: true,
+      baselineReviewed: false,
+      movePhotos: {},
+      unit: null,
+      details: null,
+      pendingInvite: null,
+    })),
+  },
+  listAppointments: jest.fn(async () => ({ appointments: [] })),
+  appointmentAction: jest.fn(async () => ({ saved: true })),
+  consent: jest.fn(),
+}));
 import * as guided from '../src/services/guidedInspectionService';
 import { guidedFixture } from '../testFixtures/guided';
 import React from 'react';
@@ -22,7 +48,8 @@ import TenantDashboardScreen from '../src/screens/tenant/TenantDashboardScreen';
 import GuidedInspectionScreen from '../src/screens/tenant/GuidedInspectionScreen';
 import InspectionSubmittedScreen from '../src/screens/tenant/InspectionSubmittedScreen';
 import MaintenanceDetailScreen from '../src/screens/tenant/MaintenanceDetailScreen';
-import InspectionAvailabilityScreen from '../src/screens/tenant/InspectionAvailabilityScreen';
+import AppointmentsScreen from '../src/screens/shared/AppointmentsScreen';
+import * as housing from '../src/services/leaseService';
 import ReportMaintenanceScreen from '../src/screens/tenant/ReportMaintenanceScreen';
 import UnitHistoryScreen from '../src/screens/tenant/UnitHistoryScreen';
 import LoginScreen from '../src/screens/auth/LoginScreen';
@@ -205,12 +232,10 @@ it('explains an empty inspection list and offers maintenance without an inspecti
   expect(navigation.getCurrentRoute()?.name).toBe('ReportMaintenance');
 });
 it('resumes an assigned draft from its saved inspection record', async () => {
-  jest
-    .mocked(guided.listGuided)
-    .mockResolvedValue({
-      inspections: [{ ...guidedFixture, status: 'draft', progress: 1 }],
-      next: null,
-    });
+  jest.mocked(guided.listGuided).mockResolvedValue({
+    inspections: [{ ...guidedFixture, status: 'draft', progress: 1 }],
+    next: null,
+  });
   await mount();
   await press('Resume guided inspection');
   expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
@@ -356,7 +381,7 @@ it.each(['unknown', undefined])(
 );
 it('validates fields and requires five securely saved photos', async () => {
   await mount();
-  await press('Report issue');
+  await press('Report maintenance');
   const form = app.root.findByType(ReportMaintenanceScreen);
   await press('Save draft', form);
   expect(JSON.stringify(app.toJSON())).toContain(
@@ -422,7 +447,7 @@ it('reviews multiple gallery photos individually and confirms real submission', 
   });
   const alert = jest.spyOn(Alert, 'alert');
   await mount();
-  await press('Report issue');
+  await press('Report maintenance');
   const form = app.root.findByType(ReportMaintenanceScreen);
   await act(async () => {
     form.findAllByType(TextInput)[0].props.onChangeText('Kitchen');
@@ -480,7 +505,7 @@ it('recovers a failed accepted camera upload and does not show false success', a
   });
   const alert = jest.spyOn(Alert, 'alert');
   await mount();
-  await press('Report issue');
+  await press('Report maintenance');
   const form = app.root.findByType(ReportMaintenanceScreen);
   await act(async () => {
     form.findAllByType(TextInput)[0].props.onChangeText('Kitchen');
@@ -517,7 +542,7 @@ it('keeps the next gallery photo awaiting review after an upload retry', async (
   });
   const alert = jest.spyOn(Alert, 'alert');
   await mount();
-  await press('Report issue');
+  await press('Report maintenance');
   const form = app.root.findByType(ReportMaintenanceScreen);
   await act(async () => {
     form.findAllByType(TextInput)[0].props.onChangeText('Kitchen');
@@ -575,27 +600,32 @@ it('waits for backend submission confirmation and prevents repeated taps', async
   );
   expect(JSON.stringify(app.toJSON())).toContain('Request submitted');
 });
-it('validates availability and retains checked slots after preview', async () => {
-  const alert = jest.spyOn(Alert, 'alert');
+it('saves availability against a real appointment and retains the selected slot', async () => {
+  const appointment = {
+    id: 'a'.repeat(32),
+    unit_id: 'b'.repeat(24),
+    tenant_id: tenant.id,
+    timezone: 'America/New_York',
+    status: 'offered',
+    revision: 0,
+    slots: [{ id: 'slot', at: '2027-12-01T14:00:00-05:00' }],
+    tenant_slots: [],
+    confirmed_slot: '',
+    history: [],
+  };
+  jest
+    .mocked(housing.listAppointments)
+    .mockResolvedValue({ appointments: [appointment] });
   await mount();
-  await press('Availability');
-  const screen = app.root.findByType(InspectionAvailabilityScreen);
-  await press('Preview demo availability', screen);
-  expect(alert).toHaveBeenLastCalledWith('Select a time', expect.any(String));
-  const slots = () =>
-    screen
-      .findAll(node => typeof node.props.onPress === 'function')
-      .filter(p => p.props.accessibilityRole === 'checkbox');
-  await act(async () => slots()[0].props.onPress());
-  await press('Preview demo availability', screen);
-  expect(slots()[0].props.accessibilityState.checked).toBe(true);
-  expect(alert).toHaveBeenLastCalledWith(
-    'Demo availability selected',
-    expect.stringContaining('not been saved or sent'),
-    expect.any(Array),
-  );
-  await act(async () => slots()[0].props.onPress());
-  expect(slots()[0].props.accessibilityState.checked).toBe(false);
+  await press('In-person appointments');
+  const screen = app.root.findByType(AppointmentsScreen);
+  await press('Available at this time', screen);
+  await press('Send availability', screen);
+  expect(housing.appointmentAction).toHaveBeenCalledWith(appointment, {
+    action: 'respond',
+    slot_ids: ['slot'],
+  });
+  expect(JSON.stringify(app.toJSON())).toContain('✓ Available at this time');
 });
 
 it('reloads persisted inspection progress during session revalidation', async () => {

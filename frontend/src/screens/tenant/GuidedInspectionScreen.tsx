@@ -1,3 +1,9 @@
+import CameraFrame from '../../components/CameraFrame';
+import ScreenTitle from '../../components/ScreenTitle';
+import PhotoTile from '../../components/PhotoTile';
+import { colors } from '../../theme/colors';
+import EvidenceNotes from '../../components/EvidenceNotes';
+import ProgressBar from '../../components/ProgressBar';
 import React, { useCallback, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -115,12 +121,15 @@ export default function GuidedInspectionScreen({
   }
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Button
-          title="Back"
-          variant="outline"
-          disabled={busy}
-          onPress={() => navigation.goBack()}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+      >
+        <ScreenTitle
+          title="Guided photo inspection"
+          onBack={() => {
+            if (!busy) navigation.goBack();
+          }}
         />
         {!id ? (
           <GuidedRecords
@@ -129,7 +138,6 @@ export default function GuidedInspectionScreen({
           />
         ) : (
           <>
-            <Text style={styles.title}>Guided photo inspection</Text>
             {!!error && <Text accessibilityRole="alert">{error}</Text>}
             <Button
               title="Refresh saved progress"
@@ -146,6 +154,7 @@ export default function GuidedInspectionScreen({
                   Due {new Date(record.due_at).toLocaleDateString()} ·{' '}
                   {record.status}
                 </Text>
+                <ProgressBar value={record.progress / record.required} />
                 <Text>
                   {record.progress}/{record.required} photos securely saved
                 </Text>
@@ -160,11 +169,53 @@ export default function GuidedInspectionScreen({
                       {index + 1}. {step.room} · Photo {step.slot + 1}
                     </Text>
                     <Text>{step.instructions}</Text>
+                    {record.baseline_photos
+                      .filter(
+                        p => p.step_id === step.id && p.slot === step.slot,
+                      )
+                      .map(p => (
+                        <View key={p.id}>
+                          <Text>
+                            Approved baseline reference · static preview
+                          </Text>
+                          <CameraFrame
+                            overlayUri={guidedPhotoUrl(record.id, p.id, true)}
+                            overlayLabel="Static reference · match this angle in your next photo"
+                          />
+                          <EvidenceNotes notes={p.notes} />
+                        </View>
+                      ))}
                     {photo && (
                       <Image
                         accessibilityLabel="Saved inspection photo"
                         source={{ uri: guidedPhotoUrl(record.id, photo.id) }}
                         style={styles.photo}
+                      />
+                    )}
+                    {photo && (
+                      <EvidenceNotes
+                        notes={photo.notes}
+                        busy={busy}
+                        onSave={
+                          editable
+                            ? async (note, kind) => {
+                                setBusy(true);
+                                try {
+                                  setRecord(
+                                    await guidedAction(record, 'notes', {
+                                      photo_id: photo.id,
+                                      note,
+                                      kind,
+                                    }),
+                                  );
+                                } catch (e) {
+                                  setError((e as Error).message);
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }
+                            : undefined
+                        }
                       />
                     )}
                     {busy && (
@@ -222,6 +273,37 @@ export default function GuidedInspectionScreen({
                     Some uploads need recovery. Re-select the same photo and
                     retry after the upload lease expires.
                   </Text>
+                )}
+                {record.progress === record.required && (
+                  <View style={styles.reviewList}>
+                    <Text style={styles.title}>
+                      Review all inspection photos
+                    </Text>
+                    {record.photos.map(p => (
+                      <View key={p.id}>
+                        <PhotoTile
+                          area={
+                            record.steps.find(s => s.id === p.step_id)?.room ||
+                            p.step_id
+                          }
+                          uri={guidedPhotoUrl(record.id, p.id)}
+                          placeholder="Saved evidence"
+                          onRetake={
+                            editable
+                              ? () =>
+                                  setIndex(
+                                    slots.findIndex(
+                                      s =>
+                                        s.id === p.step_id && s.slot === p.slot,
+                                    ),
+                                  )
+                              : undefined
+                          }
+                        />
+                        <EvidenceNotes notes={p.notes} />
+                      </View>
+                    ))}
+                  </View>
                 )}
                 {editable && (
                   <Button
@@ -290,9 +372,10 @@ export default function GuidedInspectionScreen({
   );
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F7FB' },
+  reviewList: { gap: 12 },
+  root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: '#131824' },
+  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
   photo: { width: '100%', height: 260, resizeMode: 'contain' },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
 });

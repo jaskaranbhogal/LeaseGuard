@@ -1,5 +1,5 @@
 {
-  "version": "image_comparison_v1",
+  "version": "image_comparison_v2",
   "description": "Synthetic photo-pair golden fixtures (replace/add consented real photos before production use)",
   "cases": [
     {

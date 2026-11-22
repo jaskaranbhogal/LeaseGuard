@@ -1,3 +1,4 @@
+import { colors } from '../../theme/colors';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,6 +43,6 @@ export function SavedMaintenanceDetail({
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F5F7FB' },
+  screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 16 },
 });

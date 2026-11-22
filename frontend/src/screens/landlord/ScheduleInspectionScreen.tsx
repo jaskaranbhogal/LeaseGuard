@@ -1,3 +1,5 @@
+import ScreenTitle from '../../components/ScreenTitle';
+import { colors } from '../../theme/colors';
 import { inspectionDateError } from '../../utils/landlordValidation';
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, StyleSheet } from 'react-native';
@@ -14,6 +16,7 @@ import {
 } from '../../services/guidedInspectionService';
 export default function ScheduleInspectionScreen({
   navigation,
+  route,
 }: NativeStackScreenProps<LandlordStackParamList, 'ScheduleInspection'>) {
   const [options, setOptions] = useState<AssignmentOptions>();
   const [unitId, setUnitId] = useState('');
@@ -34,10 +37,16 @@ export default function ScheduleInspectionScreen({
     getAssignmentOptions()
       .then(o => {
         setOptions(o);
-        setSteps(o.default_steps);
+        const selected = o.units.find(u => u.id === route.params?.unitId);
+        if (selected) {
+          setUnitId(selected.id);
+          setTenantId(selected.tenants[0]?.id || '');
+          setTemplateId(selected.baseline_template_id || '');
+        }
+        setSteps(selected?.configured_steps || o.default_steps);
       })
       .catch(e => setError(e.message));
-  }, []);
+  }, [route.params?.unitId]);
   const unit = options?.units.find(u => u.id === unitId);
   async function saveTemplate() {
     setBusy(true);
@@ -76,13 +85,16 @@ export default function ScheduleInspectionScreen({
   }
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Button
-          title="Back"
-          variant="outline"
-          onPress={() => navigation.goBack()}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+      >
+        <ScreenTitle
+          title="Schedule inspection"
+          onBack={() => {
+            if (!busy) navigation.goBack();
+          }}
         />
-        <Text style={styles.title}>Assign photo inspection</Text>
         {!!error && <Text accessibilityRole="alert">{error}</Text>}
         {review ? (
           <>
@@ -131,6 +143,7 @@ export default function ScheduleInspectionScreen({
                   setUnitId(u.id);
                   setTenantId('');
                   setTemplateId(u.baseline_template_id || '');
+                  setSteps(u.configured_steps || options.default_steps);
                 }}
               />
             ))}
@@ -183,7 +196,8 @@ export default function ScheduleInspectionScreen({
             <Text style={styles.title}>Create a layout template</Text>
             <Text>
               Use the same saved template for baseline and future inspections.
-              Stable IDs cannot change after creation.
+              Saved layouts remain unchanged; create a new layout for future
+              areas.
             </Text>
             <TextInput
               accessibilityLabel="Template name"
@@ -193,16 +207,6 @@ export default function ScheduleInspectionScreen({
             />
             {steps.map((s, i) => (
               <React.Fragment key={i}>
-                <TextInput
-                  style={styles.input}
-                  accessibilityLabel={`Step ${i + 1} ID`}
-                  value={s.id}
-                  onChangeText={id =>
-                    setSteps(old =>
-                      old.map((x, j) => (i === j ? { ...x, id } : x)),
-                    )
-                  }
-                />
                 <TextInput
                   style={styles.input}
                   accessibilityLabel={`Step ${i + 1} room`}
@@ -275,15 +279,15 @@ export default function ScheduleInspectionScreen({
   );
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F7FB' },
+  root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 14 },
   title: { fontSize: 24, fontWeight: '700' },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: '#D6DEEB',
+    borderColor: colors.cardBorder,
     borderRadius: 12,
     padding: 12,
-    color: '#131824',
+    color: colors.ink,
   },
 });

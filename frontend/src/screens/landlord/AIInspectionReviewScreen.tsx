@@ -1,3 +1,6 @@
+import ScreenTitle from '../../components/ScreenTitle';
+import { colors } from '../../theme/colors';
+import EvidenceNotes from '../../components/EvidenceNotes';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
@@ -61,13 +64,16 @@ export default function AIInspectionReviewScreen({
   }
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Button
-          title="Back"
-          variant="outline"
-          onPress={() => navigation.goBack()}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+      >
+        <ScreenTitle
+          title="Inspection review"
+          onBack={() => {
+            if (!busy) navigation.goBack();
+          }}
         />
-        <Text style={styles.title}>Inspection review</Text>
         {!!error && <Text accessibilityRole="alert">{error}</Text>}
         {!id ? (
           <>
@@ -136,6 +142,8 @@ export default function AIInspectionReviewScreen({
                           />
                         </View>
                       </View>
+                      {previous && <EvidenceNotes notes={previous.notes} />}
+                      <EvidenceNotes notes={p.notes} />
                       {previous && record.status === 'submitted' && (
                         <Button
                           title="Analyze with Gemini"
@@ -152,6 +160,40 @@ export default function AIInspectionReviewScreen({
                             {c.result?.summary ||
                               'Analysis pending. Refresh to recover its result.'}
                           </Text>
+                          <EvidenceNotes notes={c.baseline_notes} />
+                          <EvidenceNotes notes={c.current_notes} />
+                          {c.result && (
+                            <View style={styles.assessment}>
+                              <Text>
+                                AI photo-quality assessment:{' '}
+                                {c.result.photo_quality || 'Unknown'}
+                              </Text>
+                              <Text>
+                                Same-area assessment:{' '}
+                                {c.result.same_area === true
+                                  ? 'Likely same area'
+                                  : c.result.same_area === false
+                                  ? 'Different area'
+                                  : 'Uncertain'}
+                              </Text>
+                              <Text>
+                                Classification:{' '}
+                                {c.result.analysis_status === 'unavailable'
+                                  ? 'Unavailable · manual review required'
+                                  : c.result.classification}
+                              </Text>
+                              <Text>
+                                Severity: {c.result.severity || 'Not assessed'}{' '}
+                                · Confidence: {c.result.confidence}
+                              </Text>
+                              {!!c.result.obstructed_areas && (
+                                <Text>
+                                  Obstructions / retake guidance:{' '}
+                                  {c.result.obstructed_areas}
+                                </Text>
+                              )}
+                            </View>
+                          )}
                           {c.baseline_photo_id && c.current_photo_id && (
                             <View style={styles.pair}>
                               <View style={styles.half}>
@@ -196,6 +238,8 @@ export default function AIInspectionReviewScreen({
                                 }
                               />
                             )}
+                          <EvidenceNotes notes={c.baseline_notes} />
+                          <EvidenceNotes notes={c.current_notes} />
                           {c.result && (
                             <>
                               <Text>
@@ -459,16 +503,22 @@ export default function AIInspectionReviewScreen({
   );
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F7FB' },
+  root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 16 },
   title: { fontSize: 22, fontWeight: '700' },
-  card: { backgroundColor: 'white', borderRadius: 16, padding: 12, gap: 12 },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 12,
+    gap: 12,
+  },
+  assessment: { gap: 8 },
   pair: { flexDirection: 'row', gap: 8 },
   half: { flex: 1 },
   photo: { width: '100%', height: 220, resizeMode: 'contain' },
   input: {
     borderWidth: 1,
-    borderColor: '#D6DEEB',
+    borderColor: colors.cardBorder,
     padding: 12,
     borderRadius: 12,
   },

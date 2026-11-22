@@ -22,7 +22,7 @@ limits remain 3/account/day and 30 globally/day.
 See [architecture, API, retention, local setup and demonstration](docs/GUIDED_INSPECTIONS.md)
 and the [Sprint 3 finalization report](docs/SPRINT3_FINALIZATION_REPORT.md).
 Provider/dashboard and physical-device verification remain separate from local tests.
-Property setup and availability demos remain labeled prototypes.
+Property/unit setup, tenant invitations, durable consent, and in-person appointment availability now use canonical backend records. See [Jon integration report](docs/JON_INTEGRATION.md).
 
 ## Sprint 0 — Project Scope and Backlog
 
@@ -47,8 +47,7 @@ does not call Gemini; guided inspections now provide approved unit baselines and
 Run `python manage.py migrate` on your development database and provision verified
 relationships using the operator-only `assign_maintenance_unit` command. See
 [maintenance API, setup, recovery and iOS testing](docs/SPRINT3_MAINTENANCE.md) and
-[Cloudinary retention](docs/CLOUDINARY_STORAGE.md). Other sample screens remain
-prototypes. Live upload/private-delivery spot checks passed; physical-device validation remains
+[Cloudinary retention](docs/CLOUDINARY_STORAGE.md). Settings preferences and unsupported profile actions remain explicitly labeled prototypes. Live upload/private-delivery spot checks passed; physical-device validation remains
 required. See the [security review and remaining dependency advisory](docs/SECURITY_REVIEW.md).
 
 ## Prototype (Sprint 1)
@@ -80,7 +79,7 @@ flowchart TD
     C --> F[Persisted In-app Notifications]
 ```
 
-The React Native app never connects directly to MongoDB or stores database credentials. Email and push notification delivery are not configured.
+The React Native app never connects directly to MongoDB or stores database credentials. Tenant invitations use configured SMTP delivery; unavailable or failed delivery is reported explicitly. Invitation codes are never printed by the console email backend. Push notification delivery is not implemented.
 
 ## Getting Started
 

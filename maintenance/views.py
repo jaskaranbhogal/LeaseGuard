@@ -35,6 +35,9 @@ def endpoint(methods):
                     response = JsonResponse({'detail': 'Too many maintenance requests. Wait a minute and retry.'}, status=429)
                     response['Retry-After'] = '60'
                     return response
+                if request.method != 'GET' and request.path.startswith(('/api/guided-inspections/', '/api/maintenance/')):
+                    from .housing import require_consent
+                    require_consent(request)
                 return fn(request, *args, **kwargs)
             except (PyMongoError, DatabaseError, media.StorageError):
                 return JsonResponse({'detail': 'Secure storage is unavailable. Refresh and retry.'}, status=503)

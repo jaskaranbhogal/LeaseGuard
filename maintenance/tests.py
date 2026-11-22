@@ -34,6 +34,9 @@ class MaintenanceTests(TransactionTestCase):
         for user, role in [(self.tenant, 'tenant'), (self.other, 'tenant'),
                            (self.landlord, 'landlord'), (self.stranger, 'landlord')]:
             AccountProfile.objects.create(user=user, role=role)
+            from maintenance.models import PolicyConsent
+            from maintenance.housing import POLICY_VERSION
+            PolicyConsent.objects.create(consent_key=str(user.pk), user=user, role=role, policy_version=POLICY_VERSION)
         self.prop = Property.objects.create(name='Verified property')
         self.prop.managers.add(self.landlord)
         self.unit = Unit.objects.create(property=self.prop, label='101')

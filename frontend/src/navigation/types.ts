@@ -4,6 +4,8 @@ import type { ResetDelivery } from '../services/authService';
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  InviteEmail: undefined;
+  RegisterInvite: undefined;
   ForgotPassword: { email?: string } | undefined;
   ResetEmailSent: { email: string; delivery: ResetDelivery };
 };
@@ -11,9 +13,12 @@ export type AuthStackParamList = {
 export type LandlordStackParamList = {
   Notifications: undefined;
   Dashboard: undefined;
-  AddProperty: undefined;
-  ScheduleInspection: undefined;
-  MoveInBaseline: undefined;
+  AddProperty: { propertyId?: string } | undefined;
+  ScheduleInspection: { propertyId?: string; unitId?: string } | undefined;
+  MoveInBaseline: { unitId?: string } | undefined;
+  MoveInTour: { propertyId: string; unitId: string };
+  EditUnit: { propertyId: string; unitId: string };
+  Appointments: undefined;
   AIInspectionReview: { inspectionId: string } | undefined;
   MaintenanceRequests: undefined;
   SavedMaintenanceDetail: { requestId: string };
@@ -29,9 +34,7 @@ export type LandlordSettingsStackParamList = {
 export type LandlordTabParamList = {
   HomeStack: NavigatorScreenParams<LandlordStackParamList> | undefined;
   History: undefined;
-  Settings:
-    | NavigatorScreenParams<LandlordSettingsStackParamList>
-    | undefined;
+  Settings: NavigatorScreenParams<LandlordSettingsStackParamList> | undefined;
 };
 export type TenantTabParamList = {
   Home: undefined;
@@ -49,8 +52,10 @@ export type TenantStackParamList = {
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;
   GuidedInspection: { inspectionId: string } | undefined;
+  TenantBaseline: { unitId: string };
   ReportMaintenance: { draftId?: string } | undefined;
   InspectionAvailability: undefined;
+  Appointments: undefined;
   MaintenanceDetail: {
     requestId: string;
   };

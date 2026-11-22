@@ -29,11 +29,11 @@ type Props = NativeStackScreenProps<TenantStackParamList, 'ReportMaintenance'>;
 const COLORS = {
   background: colors.background,
   white: colors.white,
-  primary: '#1459EB',
-  primaryLight: '#EBF2FF',
-  text: '#131824',
-  muted: '#5E6B80',
-  border: '#D6DEEB',
+  primary: colors.brand,
+  primaryLight: colors.brandSoft,
+  text: colors.ink,
+  muted: colors.muted,
+  border: colors.cardBorder,
   orange: '#E58212',
   orangeLight: '#FFF2DE',
 };

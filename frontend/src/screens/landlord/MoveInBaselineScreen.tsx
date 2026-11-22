@@ -1,3 +1,9 @@
+import ScreenTitle from '../../components/ScreenTitle';
+import PhotoTile from '../../components/PhotoTile';
+import { View } from 'react-native';
+import { colors } from '../../theme/colors';
+import EvidenceNotes from '../../components/EvidenceNotes';
+import ProgressBar from '../../components/ProgressBar';
 import React, { useCallback, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +23,7 @@ import {
   type AssignmentOptions,
 } from '../../services/guidedInspectionService';
 import {
+  saveBaselineNote,
   approveBaseline,
   baselinePhotoUrl,
   createBaseline,
@@ -30,6 +37,7 @@ import {
 
 export default function MoveInBaselineScreen({
   navigation,
+  route,
 }: NativeStackScreenProps<LandlordStackParamList, 'MoveInBaseline'>) {
   const [options, setOptions] = useState<AssignmentOptions>();
   const [unit, setUnit] = useState('');
@@ -57,9 +65,12 @@ export default function MoveInBaselineScreen({
   useFocusEffect(
     useCallback(() => {
       getAssignmentOptions()
-        .then(setOptions)
+        .then(async o => {
+          setOptions(o);
+          if (route.params?.unitId) await selectUnit(route.params.unitId);
+        })
         .catch(e => setError(e.message));
-    }, []),
+    }, [route.params?.unitId]),
   );
   async function selectUnit(id: string) {
     // Clear the previous unit before the request; a failed request must never
@@ -117,13 +128,16 @@ export default function MoveInBaselineScreen({
   }
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Button
-          title="Back"
-          disabled={busy}
-          onPress={() => navigation.goBack()}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={styles.content}
+      >
+        <ScreenTitle
+          title="Move-in baselines"
+          onBack={() => {
+            if (!busy) navigation.goBack();
+          }}
         />
-        <Text style={styles.title}>Move-in baselines</Text>
         {!!error && <Text accessibilityRole="alert">{error}</Text>}
         <Button
           title="Refresh units"
@@ -189,7 +203,8 @@ export default function MoveInBaselineScreen({
                       if (!options) return;
                       const t = await createTemplate(
                         'Move-in five-room layout',
-                        options.default_steps,
+                        options.units.find(u => u.id === unit)
+                          ?.configured_steps || options.default_steps,
                       );
                       setOptions(await getAssignmentOptions());
                       setDraft(await createBaseline(unit, t.id));
@@ -202,6 +217,7 @@ export default function MoveInBaselineScreen({
         )}
         {draft && (
           <>
+            <ProgressBar value={draft.progress / draft.required} />
             <Text>
               {draft.status} · {draft.progress}/{draft.required} photos securely
               saved
@@ -224,6 +240,28 @@ export default function MoveInBaselineScreen({
                     accessibilityLabel="Saved baseline photo"
                     style={styles.photo}
                     source={{ uri: baselinePhotoUrl(draft.id, saved.id) }}
+                  />
+                )}
+                {saved && (
+                  <EvidenceNotes
+                    notes={saved.notes}
+                    busy={busy}
+                    baseline
+                    onSave={
+                      draft.status === 'draft'
+                        ? (note, kind) =>
+                            run(async () =>
+                              setDraft(
+                                await saveBaselineNote(
+                                  draft,
+                                  saved.id,
+                                  note,
+                                  kind,
+                                ),
+                              ),
+                            )
+                        : undefined
+                    }
                   />
                 )}
                 {busy && (
@@ -272,6 +310,10 @@ export default function MoveInBaselineScreen({
                 />
               </>
             )}
+            {review &&
+              draft.photos.map(p => (
+                <EvidenceNotes key={p.id} notes={p.notes} />
+              ))}
             {!!draft.uploads.length && (
               <Text>
                 Recover interrupted uploads by selecting the same photo after
@@ -287,16 +329,31 @@ export default function MoveInBaselineScreen({
             )}
             {review && (
               <>
-                {draft.photos.map(p => (
-                  <Image
-                    key={p.id}
-                    accessibilityLabel={`Review ${p.step_id} photo ${
-                      p.slot + 1
-                    }`}
-                    source={{ uri: baselinePhotoUrl(draft.id, p.id) }}
-                    style={styles.photo}
-                  />
-                ))}
+                <View style={styles.reviewGrid}>
+                  {draft.photos.map(p => (
+                    <PhotoTile
+                      key={p.id}
+                      area={
+                        draft.steps.find(s => s.id === p.step_id)?.room ||
+                        p.step_id
+                      }
+                      uri={baselinePhotoUrl(draft.id, p.id)}
+                      placeholder="Saved evidence"
+                      onRetake={
+                        draft.status === 'draft'
+                          ? () => {
+                              setIndex(
+                                slots.findIndex(
+                                  s => s.id === p.step_id && s.slot === p.slot,
+                                ),
+                              );
+                              setReview(false);
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
+                </View>
                 <Button
                   title="Approve and Save Baseline"
                   disabled={busy}
@@ -324,12 +381,15 @@ export default function MoveInBaselineScreen({
               {v.source}
             </Text>
             {v.photos.map(p => (
-              <Image
-                key={p.id}
-                accessibilityLabel={`${v.status} baseline evidence`}
-                style={styles.photo}
-                source={{ uri: versionPhotoUrl(unit, v.id, p.id) }}
-              />
+              <View key={p.id}>
+                <EvidenceNotes notes={p.notes} />
+                <Image
+                  key={p.id}
+                  accessibilityLabel={`${v.status} baseline evidence`}
+                  style={styles.photo}
+                  source={{ uri: versionPhotoUrl(unit, v.id, p.id) }}
+                />
+              </View>
             ))}
           </React.Fragment>
         ))}
@@ -344,8 +404,9 @@ export default function MoveInBaselineScreen({
   );
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F7FB' },
+  reviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  root: { flex: 1, backgroundColor: colors.background },
   content: { padding: 24, gap: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: '#131824' },
+  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
   photo: { width: '100%', height: 260, resizeMode: 'contain' },
 });

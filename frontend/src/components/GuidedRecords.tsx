@@ -1,3 +1,4 @@
+import { colors } from '../theme/colors';
 import React, { useCallback, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -99,7 +100,12 @@ export default function GuidedRecords({
 }
 const styles = StyleSheet.create({
   list: { gap: 12 },
-  card: { padding: 16, gap: 10, backgroundColor: 'white', borderRadius: 16 },
-  title: { fontSize: 20, fontWeight: '600', color: '#131824' },
-  description: { fontSize: 16, lineHeight: 24, color: '#5E6B80' },
+  card: {
+    padding: 16,
+    gap: 10,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+  },
+  title: { fontSize: 20, fontWeight: '600', color: colors.ink },
+  description: { fontSize: 16, lineHeight: 24, color: colors.muted },
 });

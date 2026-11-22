@@ -17,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAuthRequest } from '../../utils/useAuthRequest';
 // Colors that are not in colors.ts yet (same values as before).
 const SWITCH_OFF = '#D1D5DB';
-const CHEVRON = '#7B8794';
+const CHEVRON = colors.placeholder;
 const LOGOUT_BORDER = '#F04444';
 const LOGOUT_BACKGROUND = '#FFF5F5';
 
@@ -39,7 +39,11 @@ export default function SettingsScreen({
   return (
     <ScreenContainer style={styles.content}>
       <StatusBar barStyle="dark-content" />
-      <Header title="Settings" titleStyle={styles.title} style={styles.header} />
+      <Header
+        title="Settings"
+        titleStyle={styles.title}
+        style={styles.header}
+      />
 
       <Text style={styles.notice}>
         Prototype settings. Notification preferences are local to this screen

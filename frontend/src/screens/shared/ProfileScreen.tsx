@@ -1,6 +1,13 @@
 import { useNavigation } from '@react-navigation/native';
 import { useRef, useState, type ComponentRef } from 'react';
-import { Alert, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import Button from '../../components/Button';
 import Header from '../../components/Header';
@@ -13,7 +20,7 @@ import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
 
 // Read-only field tint from the mockup (not in colors.ts yet).
-const READ_ONLY_BG = '#EAF0F6';
+const READ_ONLY_BG = colors.readOnly;
 
 export default function ProfileScreen() {
   const navigation = useNavigation();

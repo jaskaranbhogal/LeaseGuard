@@ -56,12 +56,12 @@ export default function PrivacySecurityScreen() {
       />
 
       <View>
-        {/* Photos and videos */}
+        {/* Photo evidence */}
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Your photos and videos</Text>
+          <Text style={styles.infoTitle}>Your photo evidence</Text>
           <Text style={styles.infoText}>
-            Stored securely and visible only to the landlord and tenant of the
-            unit they belong to.
+            Stored privately for authorized unit tenants and property managers.
+            Authorized application services and processors also handle evidence.
           </Text>
         </View>
 
@@ -76,9 +76,13 @@ export default function PrivacySecurityScreen() {
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
 
-        {/* Consent (status removed, not implemented yet) */}
+        {/* Consent acknowledgments are versioned and stored by the server. */}
         <View style={styles.menuItem}>
           <Text style={styles.menuText}>Consent and data handling</Text>
+          <Text style={styles.infoText}>
+            Required acknowledgment is recorded against your account and policy
+            version. Guided evidence is preserved for historical review.
+          </Text>
         </View>
 
         {/* Camera permission */}
@@ -168,7 +172,7 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 39,
     fontWeight: '300',
-    color: '#7B8794',
+    color: colors.placeholder,
     lineHeight: 39,
   },
 

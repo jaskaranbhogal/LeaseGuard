@@ -1,14 +1,17 @@
 export function bedroomCountError(value: string): string | undefined {
-  return /^\d+$/.test(value.trim()) && Number.isSafeInteger(Number(value))
+  return /^\d+$/.test(value.trim()) &&
+    Number.isSafeInteger(Number(value)) &&
+    Number(value) <= 20
     ? undefined
-    : 'Enter a nonnegative whole number of bedrooms.';
+    : 'Enter a nonnegative whole number of bedrooms (up to 20).';
 }
 
 export function bathroomCountError(value: string): string | undefined {
   return /^\d+(\.0|\.5)?$/.test(value.trim()) &&
-    Number.isSafeInteger(Number(value) * 2)
+    Number.isSafeInteger(Number(value) * 2) &&
+    Number(value) <= 20
     ? undefined
-    : 'Enter bathrooms in half increments, such as 0, 1, or 1.5.';
+    : 'Enter bathrooms in half increments, such as 0, 1, or 1.5 (up to 20).';
 }
 
 export function formatLocalDate(date: Date): string {

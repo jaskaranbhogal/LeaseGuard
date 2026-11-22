@@ -1,3 +1,4 @@
+import { colors } from '../theme/colors';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -237,20 +238,20 @@ function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
 }
 const styles = StyleSheet.create({
   list: { gap: 16, marginTop: 20 },
-  title: { fontSize: 18, fontWeight: '600', color: '#131824' },
+  title: { fontSize: 18, fontWeight: '600', color: colors.ink },
   card: {
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.white,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#D6DEEB',
+    borderColor: colors.cardBorder,
     gap: 8,
   },
-  link: { color: '#1459EB', paddingVertical: 12 },
+  link: { color: colors.brand, paddingVertical: 12 },
   photo: {
     width: '100%',
     height: 240,
-    backgroundColor: '#D6DEEB',
+    backgroundColor: colors.cardBorder,
     borderRadius: 12,
   },
 });

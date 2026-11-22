@@ -1,3 +1,27 @@
+jest.mock('../src/services/leaseService', () => ({
+  landlordApi: {
+    state: jest.fn(async () => ({
+      consented: true,
+      properties: [],
+      activity: [],
+    })),
+    addProperty: jest.fn(),
+    updateUnit: jest.fn(),
+    invite: jest.fn(),
+  },
+  tenantApi: {
+    state: jest.fn(async () => ({
+      consented: true,
+      welcomed: true,
+      baselineReviewed: false,
+      movePhotos: {},
+      unit: null,
+      details: null,
+      pendingInvite: null,
+    })),
+  },
+  consent: jest.fn(),
+}));
 import * as baselines from '../src/services/baselineService';
 import MoveInBaselineScreen from '../src/screens/landlord/MoveInBaselineScreen';
 import PhotoReview from '../src/components/PhotoReview';
@@ -25,6 +49,8 @@ import type { User } from '../src/types/user';
 import * as auth from '../src/services/authService';
 import { ApiError } from '../src/services/api';
 import Button from '../src/components/Button';
+import * as housing from '../src/services/leaseService';
+import ScreenTitle from '../src/components/ScreenTitle';
 import Header from '../src/components/Header';
 import BackButton from '../src/components/BackButton';
 import NotificationBell from '../src/components/NotificationBell';
@@ -63,6 +89,15 @@ let navigation: ReturnType<
 >;
 let alert: jest.SpyInstance;
 beforeEach(() => {
+  jest
+    .mocked(housing.landlordApi.state)
+    .mockResolvedValue({ consented: true, properties: [], activity: [] });
+  jest
+    .mocked(baselines.baselinePhotoUrl)
+    .mockImplementation(
+      (id, photo) =>
+        `http://localhost/api/guided-inspections/baseline-drafts/${id}/photos/${photo}/`,
+    );
   jest.useFakeTimers();
   jest.clearAllMocks();
   jest
@@ -128,7 +163,7 @@ async function fill(scope: ReactTestInstance, values: Record<string, string>) {
   });
 }
 
-it('logs a landlord in, shows the authenticated name, and labels sample records', async () => {
+it('logs a landlord in and shows authenticated API-backed dashboard', async () => {
   await mount(null);
   jest.mocked(auth.login).mockResolvedValueOnce(landlord);
   const login = app.root.findByType(LoginScreen);
@@ -137,12 +172,12 @@ it('logs a landlord in, shows the authenticated name, and labels sample records'
   expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
   expect(json()).toContain('Alex Owner');
   expect(json()).not.toContain('Marcus');
-  expect(json()).toContain('Sample records and dates');
+  expect(json()).not.toContain('Sample records and dates');
   expect(navigation.canGoBack()).toBe(false);
   expect(
     app.root
       .findByType(LandlordDashboardScreen)
-      .findByType(Header)
+      .findByType(ScreenTitle)
       .findAllByType(NotificationBell),
   ).toHaveLength(1);
 });
@@ -169,11 +204,14 @@ it.each([landlord, tenant])(
     expect(settings.findAllByType(BackButton)).toHaveLength(0);
   },
 );
-it('validates property fields and reports a demo without creating or assigning a record', async () => {
+it('validates property fields and saves through the canonical housing API', async () => {
+  jest
+    .mocked(housing.landlordApi.addProperty)
+    .mockResolvedValue({ consented: true, properties: [], activity: [] });
   await mount();
   await press('+ Add property');
   const form = app.root.findByType(AddPropertyScreen);
-  await press('Preview demo property', form);
+  await press('Save property', form);
   expect(json()).toContain('Enter the property address');
   expect(json()).toContain('Enter a unit name');
   await fill(form, {
@@ -181,29 +219,18 @@ it('validates property fields and reports a demo without creating or assigning a
     Unit: '1A',
     Bedrooms: '1.5',
     Bathrooms: '1.25',
-    'Tenant email': 'invalid',
   });
-  await press('Preview demo property', form);
+  await press('Save property', form);
   expect(json()).toContain('nonnegative whole number');
   expect(json()).toContain('half increments');
-  expect(alert).not.toHaveBeenCalled();
   await fill(form, { Bedrooms: '0', Bathrooms: '1.5' });
-  await act(async () =>
-    form
-      .findAllByProps({ accessibilityLabel: 'Assign tenant to this unit' })
-      .find(n => n.props.onValueChange)!
-      .props.onValueChange(false),
+  await press('Save property', form);
+  expect(housing.landlordApi.addProperty).toHaveBeenCalledWith(
+    expect.objectContaining({ street: '18 Example St', unit: '1A' }),
   );
-  await press('Preview demo property', form);
-  expect(alert).toHaveBeenLastCalledWith(
-    'Demo property preview',
-    expect.stringContaining('No property or unit was saved'),
-  );
-  expect(navigation.getCurrentRoute()?.name).toBe('AddProperty');
-  await press('Cancel', form);
   expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
 });
-it('requires a valid tenant email only when assignment is enabled', async () => {
+it('rejects an invalid optional tenant invitation email before saving', async () => {
   await mount();
   await press('+ Add property');
   const form = app.root.findByType(AddPropertyScreen);
@@ -214,19 +241,14 @@ it('requires a valid tenant email only when assignment is enabled', async () => 
     Bathrooms: '0',
     'Tenant email': 'invalid',
   });
-  await press('Preview demo property', form);
-  expect(alert).not.toHaveBeenCalled();
-  await fill(form, { 'Tenant email': 'sample@example.com' });
-  await press('Preview demo property', form);
-  expect(alert).toHaveBeenCalledWith(
-    'Demo property preview',
-    expect.stringContaining('no tenant was assigned'),
-  );
+  await press('Save & send invite', form);
+  expect(housing.landlordApi.addProperty).not.toHaveBeenCalled();
+  expect(navigation.getCurrentRoute()?.name).toBe('AddProperty');
 });
 it('reviews a verified assignment and creates it through Django', async () => {
   jest.mocked(guided.createAssignment).mockResolvedValue(guidedFixture);
   await mount();
-  await press('Assign photo inspection');
+  await press('Schedule inspection');
   const form = app.root.findByType(ScheduleInspectionScreen);
   await press('Verified property · 101', form);
   await press('Resident', form);
@@ -333,12 +355,10 @@ it('shared Header back button returns from inspection results', async () => {
   await press('Back', app.root.findByType(AIInspectionReviewScreen));
   expect(navigation.getCurrentRoute()?.name).toBe('Dashboard');
 });
-it('disables Manage Unit Details instead of advertising a working destination', async () => {
+it('offers property management as a functional destination', async () => {
   await mount();
-  const action = app.root
-    .findAllByType(Button)
-    .find(n => n.props.title === 'Manage unit details');
-  expect(action?.props.disabled).toBe(true);
+  await press('+ Add property');
+  expect(navigation.getCurrentRoute()?.name).toBe('AddProperty');
 });
 
 describe('landlord numeric and calendar validation', () => {
@@ -645,14 +665,12 @@ it('records an individual finding decision using its saved result index', async 
     ],
   };
   jest.mocked(guided.getGuided).mockResolvedValue(record);
-  jest
-    .mocked(guided.guidedAction)
-    .mockResolvedValue({
-      ...record,
-      comparisons: [
-        { ...record.comparisons[0], finding_decisions: ['confirmed', null] },
-      ],
-    });
+  jest.mocked(guided.guidedAction).mockResolvedValue({
+    ...record,
+    comparisons: [
+      { ...record.comparisons[0], finding_decisions: ['confirmed', null] },
+    ],
+  });
   await mount();
   await press('Open move-in inspection');
   await press('Finding 1: confirmed');
@@ -663,4 +681,40 @@ it('records an individual finding decision using its saved result index', async 
   });
   expect(json()).toContain('Wall hole.');
   expect(json()).toContain('Small scuff.');
+});
+
+it('starts Jon’s move-in tour and resumes the canonical baseline workflow for that unit', async () => {
+  jest
+    .mocked(housing.landlordApi.state)
+    .mockResolvedValue({
+      consented: true,
+      activity: [],
+      properties: [
+        {
+          id: 'a'.repeat(24),
+          street: 'Verified property',
+          city: 'NY',
+          units: [
+            {
+              id: guidedFixture.unit_id,
+              name: '101',
+              bedrooms: '1',
+              bathrooms: '1',
+              revision: 0,
+              areas: guidedFixture.steps.map(s => s.room),
+            },
+          ],
+        },
+      ],
+    });
+  jest.mocked(baselines.getBaselines).mockResolvedValue(baselineHistory);
+  await mount();
+  await press('Record move-in baseline');
+  expect(navigation.getCurrentRoute()?.name).toBe('MoveInTour');
+  await press('Start or resume baseline');
+  expect(navigation.getCurrentRoute()?.name).toBe('MoveInBaseline');
+  expect(navigation.getCurrentRoute()?.params).toEqual({
+    unitId: guidedFixture.unit_id,
+  });
+  expect(baselines.getBaselines).toHaveBeenCalledWith(guidedFixture.unit_id);
 });

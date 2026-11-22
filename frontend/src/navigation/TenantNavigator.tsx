@@ -1,3 +1,7 @@
+import TenantBaselineScreen from '../screens/tenant/TenantBaselineScreen';
+import AppointmentsScreen from '../screens/shared/AppointmentsScreen';
+import { TenantDemoProvider } from '../context/TenantDemoContext';
+import { TenantGate } from '../components/HousingGate';
 import UnitHistoryScreen from '../screens/tenant/UnitHistoryScreen';
 import NotificationsScreen from '../screens/shared/NotificationsScreen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -19,75 +23,87 @@ const Stack = createNativeStackNavigator<TenantStackParamList>();
 
 export default function TenantNavigator() {
   return (
-    <>
-      <Stack.Navigator>
-        <Stack.Screen
-          name="TenantTabs"
-          component={TenantTabs}
-          options={{ headerShown: false }}
-        />
+    <TenantDemoProvider>
+      <TenantGate>
+        <Stack.Navigator initialRouteName="TenantTabs">
+          <Stack.Screen
+            name="TenantBaseline"
+            component={TenantBaselineScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Appointments"
+            component={AppointmentsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="TenantTabs"
+            component={TenantTabs}
+            options={{ headerShown: false }}
+          />
 
-        <Stack.Screen
-          name="History"
-          component={UnitHistoryScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Notifications"
-          component={NotificationsScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="PrivacySecurity"
-          component={PrivacySecurityScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="PrivacyPolicy"
-          component={PrivacyPolicyScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Profile"
-          component={ProfileScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="GuidedInspection"
-          component={GuidedInspectionScreen}
-          options={{ headerShown: false }}
-        />
+          <Stack.Screen
+            name="History"
+            component={UnitHistoryScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PrivacySecurity"
+            component={PrivacySecurityScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="PrivacyPolicy"
+            component={PrivacyPolicyScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Profile"
+            component={ProfileScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="GuidedInspection"
+            component={GuidedInspectionScreen}
+            options={{ headerShown: false }}
+          />
 
-        <Stack.Screen
-          name="ReportMaintenance"
-          component={ReportMaintenanceScreen}
-          options={{ headerShown: false }}
-        />
+          <Stack.Screen
+            name="ReportMaintenance"
+            component={ReportMaintenanceScreen}
+            options={{ headerShown: false }}
+          />
 
-        <Stack.Screen
-          name="InspectionAvailability"
-          component={InspectionAvailabilityScreen}
-          options={{ headerShown: false }}
-        />
+          <Stack.Screen
+            name="InspectionAvailability"
+            component={InspectionAvailabilityScreen}
+            options={{ headerShown: false }}
+          />
 
-        <Stack.Screen
-          name="MaintenanceDetail"
-          component={MaintenanceDetailScreen}
-          options={{ headerShown: false }}
-        />
+          <Stack.Screen
+            name="MaintenanceDetail"
+            component={MaintenanceDetailScreen}
+            options={{ headerShown: false }}
+          />
 
-        <Stack.Screen
-          name="ReviewInspectionPhoto"
-          component={ReviewInspectionPhotoScreen}
-          options={{ headerShown: false }}
-        />
+          <Stack.Screen
+            name="ReviewInspectionPhoto"
+            component={ReviewInspectionPhotoScreen}
+            options={{ headerShown: false }}
+          />
 
-        <Stack.Screen
-          name="InspectionSubmitted"
-          component={InspectionSubmittedScreen}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </>
+          <Stack.Screen
+            name="InspectionSubmitted"
+            component={InspectionSubmittedScreen}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </TenantGate>
+    </TenantDemoProvider>
   );
 }
