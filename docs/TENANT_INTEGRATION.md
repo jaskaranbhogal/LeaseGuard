@@ -53,11 +53,11 @@ A foreground check and an active-app check every 60 seconds revalidate the sessi
 
 ## Tenant prototype behavior
 
-- Home greets the authenticated user. Property, dates, maintenance, and inspection records are prominently labeled sample data and do not imply a real property assignment.
+- Home greets the authenticated user. Property, dates and inspection samples remain labeled demo data; saved maintenance is loaded separately from the real API and does not infer an assignment from those samples.
 - Home, Inspections, History, and Settings tabs work. Inspections opens the guided demo and availability; Settings provides logout. Dashboard quick actions open maintenance and availability. Existing custom tabs, notification bell, and layouts are retained.
 - Guided inspection has four actual step records. An InspectionProvider above the tenant stack retains accepted-step progress across back navigation and tab changes. Each step previews a placeholder, supports retake, and advances once accepted. Completion removes the old review routes and explicitly says no photos were captured, analyzed, saved, or submitted and no landlord was notified. Progress is memory-only and resets on logout or app restart.
 - Maintenance uses a shared typed request ID. Dashboard opens the sink record; history can open the separate window-latch record. Missing/unknown IDs show a safe not-found screen. Back returns to the source screen.
-- Maintenance reporting retains required area/description validation. Media upload is unavailable; the action previews a demo form without sending an API request.
+- Maintenance reporting now uses real drafts, individual camera/gallery photo review, authenticated uploads and submission. See [Sprint 3 maintenance](SPRINT3_MAINTENANCE.md) for verified assignments, API routes, recovery and current tests.
 - Availability retains multi-select state and requires at least one slot. Preview does not send or persist selections. Historical sample dates are explicitly labeled.
 - LandlordHome is an intentionally small coming-soon screen identifying the landlord account and providing logout. The landlord team can replace this screen inside LandlordNavigator.
 
@@ -90,7 +90,7 @@ CI keeps both Django and React Native jobs and adds pushes to `merge/tenantflow-
 
 ## Remaining work
 
-Property/unit assignments and backend authorization; actual inspection and maintenance APIs; camera/media storage; AI analysis; landlord feature screens; notifications; real SMTP delivery validation; Android SDK/emulator verification and physical-device/release validation remain outside this integration. This branch does not simulate successful production API submissions.
+The original integration left property assignments and maintenance as prototypes; these are now implemented in [Sprint 3 maintenance](SPRINT3_MAINTENANCE.md). Guided inspection persistence, notifications, real SMTP delivery, Android verification and physical-device/release validation remain incomplete. This branch does not simulate successful production API submissions.
 
 ## Files changed from main
 
@@ -153,3 +153,10 @@ frontend/src/services/authService.ts
 frontend/src/types/maintenance.ts
 frontend/src/types/user.ts
 ```
+
+## Persisted guided inspections
+
+The dashboard and inspection tab now load authorized assignments. Camera/gallery
+previews use the shared PhotoReview component, with server-confirmed uploads,
+restart-safe drafts, submission, retakes and maintenance follow-up. The obsolete
+mock InspectionContext has been removed. See [guided demo instructions](GUIDED_INSPECTIONS.md#tenantlandlord-demonstration).
