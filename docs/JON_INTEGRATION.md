@@ -115,3 +115,22 @@ Production SMTP delivery and provider/device spot checks remain deployment
 validation requirements. Existing prototype settings preferences/profile changes
 remain clearly labeled; this integration does not claim they are persisted.
 No production database migration or production-provider test was performed.
+
+### Recorded check results
+
+| Check | Result |
+| --- | --- |
+| `python manage.py check` | No issues, 0 silenced |
+| `python manage.py makemigrations --check --dry-run` | No changes detected |
+| `python manage.py test --noinput` | 146 tests passed in 44.127 seconds |
+| `python manage.py run_ai_evals` | 21 synthetic cases passed; 0 provider calls; replay consistency/expected match 1.0, replay hallucination rate 0.0 |
+| `npx --no-install tsc --noEmit` | Passed |
+| `npm run lint` | Passed, 0 errors and 0 warnings |
+| `npm test -- --runInBand` | 9 suites, 116 tests passed in 3.376 seconds |
+| iOS Debug simulator build | `BUILD SUCCEEDED`; signing disabled |
+| Android offline Debug build | Blocked: Android SDK location not found |
+| Merge markers / staged whitespace / secret-pattern checks | Passed |
+
+The implementation merge is `9724d84`; the subsequent documentation checkpoint
+records these results. These are local checks, not a claim that remote CI or live
+providers have been verified.
