@@ -78,7 +78,7 @@ export default function Header({
 
 const styles = StyleSheet.create({
   container: { gap: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   text: { flex: 1, minWidth: 0 },
   title: {
     fontSize: 26,

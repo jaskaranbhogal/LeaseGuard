@@ -1,6 +1,6 @@
 import { colors } from '../theme/colors';
 import React from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import CameraFrame from './CameraFrame';
 import ActionButton from './ActionButton';
 import ScreenTitle from './ScreenTitle';
@@ -21,27 +21,29 @@ export default function PhotoReview({
 }) {
   return (
     <Modal visible={!!asset} onRequestClose={onDiscard} animationType="slide">
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={layout.content}>
-          <ScreenTitle
-            title="Review photo"
-            subtitle={`${remaining} remaining`}
-          />
-          <Text style={layout.muted}>
-            Check that the area is clear and in focus before accepting.
-            Accepting uploads this photo to your saved draft.
-          </Text>
-          {asset?.uri && <CameraFrame uri={asset.uri} />}
-          <View style={styles.actions}>
-            <ActionButton
-              title="Discard / retake"
-              variant="secondary"
-              onPress={onDiscard}
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
+          <ScrollView contentContainerStyle={layout.content}>
+            <ScreenTitle
+              title="Review photo"
+              subtitle={`${remaining} remaining`}
             />
-            <ActionButton title="Accept photo" onPress={onAccept} />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+            <Text style={layout.muted}>
+              Check that the area is clear and in focus before accepting.
+              Accepting uploads this photo to your saved draft.
+            </Text>
+            {asset?.uri && <CameraFrame uri={asset.uri} />}
+            <View style={styles.actions}>
+              <ActionButton
+                title="Discard / retake"
+                variant="secondary"
+                onPress={onDiscard}
+              />
+              <ActionButton title="Accept photo" onPress={onAccept} />
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
