@@ -13,7 +13,7 @@ import {
 } from '../src/context/TenantDemoContext';
 import TenantInvitePromptScreen from '../src/screens/tenant/TenantInvitePromptScreen';
 import ActionButton from '../src/components/ActionButton';
-import { LandlordGate } from '../src/components/HousingGate';
+import { LandlordGate, TenantGate } from '../src/components/HousingGate';
 import * as api from '../src/services/leaseService';
 import type { LandlordState, TenantState } from '../src/services/leaseService';
 jest.mock('../src/services/leaseService');
@@ -348,3 +348,39 @@ it('does not issue another invitation if revoking the pending one fails', async 
   expect(api.landlordApi.invite).not.toHaveBeenCalled();
   expect(JSON.stringify(app.toJSON())).toContain('Revoke failed.');
 });
+
+it.each(['landlord', 'tenant'] as const)(
+  'shows a recoverable %s account-load error instead of falsely requesting consent',
+  async role => {
+    const Provider =
+      role === 'landlord' ? LandlordDemoProvider : TenantDemoProvider;
+    const Gate = role === 'landlord' ? LandlordGate : TenantGate;
+    if (role === 'landlord')
+      jest
+        .mocked(api.landlordApi.state)
+        .mockRejectedValueOnce(new Error('Wait a minute and retry.'));
+    else
+      jest
+        .mocked(api.tenantApi.state)
+        .mockRejectedValueOnce(new Error('Wait a minute and retry.'));
+    await mount(
+      <Provider>
+        <Gate>
+          <Text>Protected account screen</Text>
+        </Gate>
+      </Provider>,
+    );
+    expect(JSON.stringify(app.toJSON())).toContain('Unable to load account');
+    expect(JSON.stringify(app.toJSON())).not.toContain('Before you start');
+    expect(JSON.stringify(app.toJSON())).not.toContain(
+      'Protected account screen',
+    );
+    jest.mocked(api.landlordApi.state).mockResolvedValue(empty);
+    jest
+      .mocked(api.tenantApi.state)
+      .mockResolvedValue({ ...pending, pendingInvite: null });
+    await act(async () => button('Retry loading account').props.onPress());
+    expect(JSON.stringify(app.toJSON())).toContain('Protected account screen');
+    expect(api.consent).not.toHaveBeenCalled();
+  },
+);

@@ -4,6 +4,8 @@ import ConsentScreen from './ConsentScreen';
 import ScreenContainer from './ScreenContainer';
 import ActionButton from './ActionButton';
 import LoadingView from './LoadingView';
+import ScreenTitle from './ScreenTitle';
+import StateCard from './StateCard';
 import { useLandlordDemo } from '../context/LandlordDemoContext';
 import { useTenantDemo } from '../context/TenantDemoContext';
 import AddedToUnitScreen from '../screens/tenant/AddedToUnitScreen';
@@ -27,7 +29,32 @@ function Gate({
   busy?: boolean;
 }>) {
   const [policy, setPolicy] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   if (loading) return <LoadingView />;
+  if (error && !consented) {
+    return (
+      <ScreenContainer>
+        <ScreenTitle title="Unable to load account" />
+        <StateCard
+          title="Your account is temporarily unavailable"
+          message={error}
+        />
+        <ActionButton
+          title="Retry loading account"
+          loading={retrying}
+          disabled={retrying}
+          onPress={async () => {
+            setRetrying(true);
+            try {
+              await refresh();
+            } finally {
+              setRetrying(false);
+            }
+          }}
+        />
+      </ScreenContainer>
+    );
+  }
   if (policy)
     return (
       <ScreenContainer style={styles.policy}>
