@@ -21,7 +21,10 @@ import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
 import { useAuthRequest } from '../../utils/useAuthRequest';
 
-type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
+type Props = NativeStackScreenProps<
+  AuthStackParamList,
+  'Register' | 'RegisterInvite'
+>;
 export default function RegisterScreen({ navigation }: Props) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState('');

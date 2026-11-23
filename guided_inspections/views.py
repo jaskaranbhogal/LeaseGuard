@@ -45,7 +45,7 @@ def notify(record, message, recipient, event):
 
 
 def photo_json(p):
-    return {k: p[k] for k in ('id', 'step_id', 'slot', 'state')}
+    return {**{k: p[k] for k in ('id', 'step_id', 'slot', 'state')}, 'notes': p.get('notes', [])}
 
 
 def serialize(record, detail=True):
@@ -71,7 +71,8 @@ def serialize(record, detail=True):
                       history=record['history'], baseline_available=compatible,
                       baseline_photos=[photo_json(p) for p in base['photos']] if compatible else [],
                       comparisons=[{**{k: v for k, v in c.items() if k not in {'baseline_photo', 'current_photo'}},
-                                    'baseline_photo_id': c['baseline_photo']['id'], 'current_photo_id': c['current_photo']['id']}
+                                    'baseline_photo_id': c['baseline_photo']['id'], 'current_photo_id': c['current_photo']['id'],
+                                    'baseline_notes': c['baseline_photo'].get('notes', []), 'current_notes': c['current_photo'].get('notes', [])}
                                    for c in record['comparisons']])
     return result
 
@@ -98,6 +99,7 @@ def options(request):
             saved = InspectionTemplate.objects.filter(pk=ObjectId(base['template_id'])).first() if base else None
             eligible.append(dict(id=str(unit.pk), label=unit.label, property=unit.property.name,
                                  baseline_template_id=saved.public_id if saved else None,
+                                 configured_steps=[dict(id="area-"+hashlib.sha256(a.encode()).hexdigest()[:16], room=a, instructions="Include fixed surfaces and use the same angle as the baseline.", count=1) for a in unit.areas] if unit.areas else store.DEFAULT_STEPS,
                                  tenants=[dict(id=str(a.tenant_id), label=a.tenant.get_full_name() or a.tenant.get_username())
                                           for a in UnitAssignment.objects.filter(unit=unit, active=True).select_related('tenant')[:100]]))
     templates = available_templates(request)
@@ -221,7 +223,13 @@ def action(request, inspection_id, action):
     data = body(request)
     actor = request.user.pk
     landlord = role(request) == 'landlord'
-    if action == 'maintenance-draft' and role(request) == 'tenant':
+    if action == 'notes':
+        store.check_revision(record, data.get('revision'))
+        kind = data.get('kind', 'observation')
+        if role(request) != 'tenant' or kind != 'observation':
+            return JsonResponse({'detail': 'Tenant observations only.'}, status=403)
+        record = store.annotate(record, data.get('photo_id'), data.get('note'), kind, actor)
+    elif action == 'maintenance-draft' and role(request) == 'tenant':
         if record['status'] not in {'submitted', 'reviewed'}:
             raise Conflict('Submit the inspection before creating maintenance follow-up.')
         comparison = next((c for c in record['comparisons'] if c['id'] == data.get('comparison_id') and c.get('decision') == 'confirmed'), None)

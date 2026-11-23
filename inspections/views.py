@@ -48,6 +48,9 @@ def _manual_result(message="AI comparison unavailable. Review both photos manual
 def compare_photo_view(request):
     if not _auth(request):
         return JsonResponse({"detail": "Sign in to compare photos."}, status=401)
+    denied = analysis_access(request)
+    if denied is not None:
+        return denied
     baseline, current = request.FILES.get("baseline"), request.FILES.get("current")
     if getattr(request, "upload_limit_exceeded", False):
         return JsonResponse({"detail": "Each photo must be 8 MB or smaller."}, status=413)
@@ -145,3 +148,17 @@ def set_comparison_decision(request, comparison_id):
     if record is None:
         return JsonResponse({"detail": "Comparison not found or not ready."}, status=404)
     return JsonResponse({"comparison": _serialize(record)})
+
+
+def analysis_access(request):
+    """Standalone comparisons follow the same explicit landlord/consent gate."""
+    from django.db import DatabaseError
+    from maintenance.housing import consented
+    try:
+        if not AccountProfile.objects.filter(user=request.user, role='landlord').exists():
+            return JsonResponse({'detail': 'Landlord analysis access required.'}, status=403)
+        if not consented(request):
+            return JsonResponse({'detail': 'Accept the current privacy policy before analysis.'}, status=409)
+    except (PyMongoError, DatabaseError):
+        return JsonResponse({'detail': 'Authorization storage unavailable.'}, status=503)
+    return None

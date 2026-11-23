@@ -2,6 +2,9 @@ from django.urls import path
 from . import views, baselines
 
 urlpatterns = [
+    path('units/<str:unit_id>/approved-baseline/<str:version_id>/photos/<str:photo_id>/', baselines.approved_baseline_photo),
+    path('units/<str:unit_id>/approved-baseline/', baselines.approved_baseline),
+    path('baseline-drafts/<str:draft_id>/notes/', baselines.notes),
     path('units/<str:unit_id>/baselines/', baselines.unit_baselines),
     path('units/<str:unit_id>/baselines/<str:version_id>/photos/<str:photo_id>/', baselines.version_photo),
     path('baseline-drafts/<str:draft_id>/', baselines.draft),

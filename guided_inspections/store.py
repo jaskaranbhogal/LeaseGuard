@@ -272,7 +272,10 @@ def compare(record, photo_id, actor):
     except DuplicateKeyError:
         claimed = False
     if claimed:
-        result = (compare_images_safe(first, second, step['room'], step['id']) if storage.consume_daily_call(str(actor))
+        context = dict(landlord_notes=note_context(previous, 'baseline'), known_issues=note_context(previous, 'known-issue'),
+                       tenant_notes=note_context(current, 'observation'))
+        context = {k: v for k, v in context.items() if v}
+        result = (compare_images_safe(first, second, step['room'], step['id'], **context) if storage.consume_daily_call(str(actor))
                   else _manual_result('Daily AI budget reached. Review stored evidence manually.'))
         storage.complete_pair(str(actor), key, result)
     else:
@@ -297,3 +300,28 @@ def recover_comparison(record, entry):
         raise Conflict('Analysis is still pending. Refresh after 90 seconds; it will not be retried.')
     result = result or _manual_result('Analysis was interrupted. Review manually; no second paid call will be made.')
     return change(record, {'comparisons': [{**c, 'status': 'completed', 'result': result} if c['id'] == entry['id'] else c for c in record['comparisons']]})
+
+
+def annotate(record, photo_id, note, kind, actor):
+    """Draft-only, revision-checked observations attached to a stable photo identity."""
+    editable(record)
+    if kind not in {'observation', 'baseline', 'known-issue'} or not isinstance(note, str) or len(note) > 1200:
+        raise ValueError('Notes must be at most 1200 characters.')
+    if any(ord(c) < 32 and c not in '\n\t' for c in note):
+        raise ValueError('Invalid control characters in note.')
+    target = next((p for p in active(record) if p['id'] == photo_id), None)
+    if not target:
+        raise ValueError('Choose a saved photo.')
+    # A bounded append-only ledger also records draft corrections; never erase notes.
+    if len(target.get('notes', [])) >= 20:
+        raise Conflict('Note correction limit reached.')
+    entry = dict(text=note.strip(), kind=kind, actor=str(actor), at=timezone.now().isoformat(),
+                 unit_id=str(record['unit_id']), template_version=record['template_version'],
+                 step_id=target['step_id'], slot=target['slot'])
+    photos = [{**p, 'notes': p.get('notes', []) + [entry]} if p['id'] == photo_id else p for p in record['photos']]
+    return change(record, dict(photos=photos, history=audit(record, 'photo-note-added', actor, photo_id=photo_id, kind=kind)))
+
+
+def note_context(photo, kind):
+    # Last draft correction of a kind wins for AI context; the full ledger stays visible.
+    return next((n['text'] for n in reversed(photo.get('notes', [])) if n['kind'] == kind), '')

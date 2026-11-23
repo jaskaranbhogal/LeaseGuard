@@ -1,3 +1,27 @@
+jest.mock('../src/services/leaseService', () => ({
+  landlordApi: {
+    state: jest.fn(async () => ({
+      consented: true,
+      properties: [],
+      activity: [],
+    })),
+    addProperty: jest.fn(),
+    updateUnit: jest.fn(),
+    invite: jest.fn(),
+  },
+  tenantApi: {
+    state: jest.fn(async () => ({
+      consented: true,
+      welcomed: true,
+      baselineReviewed: false,
+      movePhotos: {},
+      unit: null,
+      details: null,
+      pendingInvite: null,
+    })),
+  },
+  consent: jest.fn(),
+}));
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import {
@@ -368,14 +392,12 @@ it.each(['tenant', 'landlord'] as const)(
         })[0]
         .props.onPress(),
     );
-    jest
-      .mocked(auth.register)
-      .mockResolvedValueOnce({
-        id: '000000000000000000000014',
-        name: 'New Resident',
-        email: 'new@example.com',
-        role,
-      });
+    jest.mocked(auth.register).mockResolvedValueOnce({
+      id: '000000000000000000000014',
+      name: 'New Resident',
+      email: 'new@example.com',
+      role,
+    });
     await act(async () => form.findByType(Button).props.onPress());
     expect(auth.register).toHaveBeenCalledWith(
       expect.objectContaining({ role }),

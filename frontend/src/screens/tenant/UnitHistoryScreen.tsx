@@ -10,18 +10,15 @@ import { MaintenanceRecords } from '../../components/MaintenanceRecords';
 export default function UnitHistoryScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<TenantStackParamList, 'History'>>();
+  const goHome = () =>
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'TenantTabs', params: { screen: 'Home' } }],
+    });
   return (
     <ScreenContainer>
-      <Header title="Unit history" />
-      <Button
-        title="Back to dashboard"
-        onPress={() =>
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'TenantTabs', params: { screen: 'Home' } }],
-          })
-        }
-      />
+      <Header title="Unit history" onBack={goHome} />
+      <Button title="Back to dashboard" variant="outline" onPress={goHome} />
       <GuidedRecords
         tenant
         onOpen={inspectionId =>

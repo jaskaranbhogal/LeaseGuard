@@ -135,3 +135,45 @@ def version_photo(request, unit_id, version_id, photo_id):
     head = store.collection(UnitBaseline).find_one({'unit_id': unit.pk})
     version = next((b for b in (head or {}).get('versions', []) if b['id'] == version_id), None)
     return image_response(next((p for p in (version or {}).get('photos', []) if p['id'] == photo_id and p['state'] == 'ready'), None))
+
+
+@endpoint(['POST'])
+def notes(request, draft_id):
+    record = draft_for(request, draft_id)
+    if not record:
+        return missing()
+    data = body(request)
+    store.check_revision(record, data.get('revision'))
+    if data.get('kind', 'baseline') not in {'baseline', 'known-issue'}:
+        raise ValueError
+    record = store.annotate(record, data.get('photo_id'), data.get('note'), data.get('kind', 'baseline'), request.user.pk)
+    return JsonResponse({'draft': serialize(record)})
+
+
+@endpoint(['GET'])
+def approved_baseline(request, unit_id):
+    unit=units(request).select_related('property').filter(pk=ObjectId(unit_id)).first()
+    if not unit:
+        return missing()
+    version=store.baseline({'unit_id':unit.pk})
+    if not version:
+        return JsonResponse({'baseline':None})
+    from .models import InspectionTemplate
+    template=InspectionTemplate.objects.filter(pk=ObjectId(version['template_id'])).first()
+    steps=template.steps if template else []
+    return JsonResponse({'baseline':dict(unit_id=str(unit.pk),unit=unit.label,property=unit.property.name,
+        id=version['id'],approved_at=version['approved_at'],source=version.get('source','tenant'),
+        template_version=version['template_version'],photos=[dict(**photo_json(p),
+            room=next((s['room'] for s in steps if s['id']==p['step_id']),p['step_id'])) for p in version['photos']])})
+
+
+@endpoint(['GET'])
+def approved_baseline_photo(request, unit_id, version_id, photo_id):
+    # Dedicated active-baseline access leaves manager historical/draft APIs unchanged.
+    unit=units(request).filter(pk=ObjectId(unit_id)).first()
+    if not unit:
+        return missing()
+    baseline=store.baseline({'unit_id':unit.pk})
+    if not baseline or baseline['id'] != version_id:
+        return missing()
+    return image_response(next((p for p in baseline['photos'] if p['id']==photo_id and p['state']=='ready'),None))

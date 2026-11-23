@@ -1,6 +1,10 @@
+import Field from '../../components/Field';
+import { layout } from '../../theme/layout';
+import ScreenTitle from '../../components/ScreenTitle';
+import { colors } from '../../theme/colors';
 import { inspectionDateError } from '../../utils/landlordValidation';
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, TextInput, StyleSheet } from 'react-native';
+import { ScrollView, Text, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { LandlordStackParamList } from '../../navigation/types';
@@ -14,6 +18,7 @@ import {
 } from '../../services/guidedInspectionService';
 export default function ScheduleInspectionScreen({
   navigation,
+  route,
 }: NativeStackScreenProps<LandlordStackParamList, 'ScheduleInspection'>) {
   const [options, setOptions] = useState<AssignmentOptions>();
   const [unitId, setUnitId] = useState('');
@@ -34,10 +39,16 @@ export default function ScheduleInspectionScreen({
     getAssignmentOptions()
       .then(o => {
         setOptions(o);
-        setSteps(o.default_steps);
+        const selected = o.units.find(u => u.id === route.params?.unitId);
+        if (selected) {
+          setUnitId(selected.id);
+          setTenantId(selected.tenants[0]?.id || '');
+          setTemplateId(selected.baseline_template_id || '');
+        }
+        setSteps(selected?.configured_steps || o.default_steps);
       })
       .catch(e => setError(e.message));
-  }, []);
+  }, [route.params?.unitId]);
   const unit = options?.units.find(u => u.id === unitId);
   async function saveTemplate() {
     setBusy(true);
@@ -76,27 +87,35 @@ export default function ScheduleInspectionScreen({
   }
   return (
     <SafeAreaView style={styles.root}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Button
-          title="Back"
-          variant="outline"
-          onPress={() => navigation.goBack()}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={layout.content}
+      >
+        <ScreenTitle
+          title="Schedule inspection"
+          onBack={() => {
+            if (!busy) navigation.goBack();
+          }}
         />
-        <Text style={styles.title}>Assign photo inspection</Text>
-        {!!error && <Text accessibilityRole="alert">{error}</Text>}
+        {!!error && (
+          <Text style={layout.error} accessibilityRole="alert">
+            {error}
+          </Text>
+        )}
         {review ? (
-          <>
-            <Text>
+          <View style={layout.card}>
+            <Text style={layout.sectionTitle}>Review assignment</Text>
+            <Text style={layout.body}>
               {unit?.property} · {unit?.label}
             </Text>
-            <Text>
+            <Text style={layout.body}>
               Tenant: {unit?.tenants.find(t => t.id === tenantId)?.label}
             </Text>
-            <Text>
+            <Text style={layout.body}>
               {type} · Due {due} · Repeat{' '}
               {recurrence ? `every ${recurrence} days` : 'off'}
             </Text>
-            <Text>
+            <Text style={layout.body}>
               Template:{' '}
               {options?.templates.find(t => t.id === templateId)?.name}
             </Text>
@@ -107,162 +126,177 @@ export default function ScheduleInspectionScreen({
             />
             <Button
               title="Edit assignment"
+              variant="outline"
               disabled={busy}
               onPress={() => setReview(false)}
             />
-          </>
+          </View>
         ) : (
           <>
-            <Text>Choose a verified property and unit</Text>
-            {!options?.units.length && (
-              <Text>
-                No managed units available. An administrator must verify
-                property and tenant assignments.
+            <View style={layout.card}>
+              <Text style={layout.sectionTitle}>Property and tenant</Text>
+              <Text style={layout.muted}>
+                Choose a verified property and unit
               </Text>
-            )}
-            {options?.units.map(u => (
-              <Button
-                key={u.id}
-                title={`${unitId === u.id ? '✓ ' : ''}${u.property} · ${
-                  u.label
-                }`}
-                variant="outline"
-                onPress={() => {
-                  setUnitId(u.id);
-                  setTenantId('');
-                  setTemplateId(u.baseline_template_id || '');
-                }}
-              />
-            ))}
-            <Text>Eligible tenant</Text>
-            {unit?.tenants.map(t => (
-              <Button
-                key={t.id}
-                title={`${tenantId === t.id ? '✓ ' : ''}${t.label}`}
-                variant="outline"
-                onPress={() => setTenantId(t.id)}
-              />
-            ))}
-            {['move-in', 'periodic', 'move-out', 'follow-up'].map(t => (
-              <Button
-                key={t}
-                title={`${type === t ? '✓ ' : ''}${t}`}
-                variant="outline"
-                onPress={() => setType(t)}
-              />
-            ))}
-            <TextInput
-              style={styles.input}
-              accessibilityLabel="Due date"
-              placeholder="Due date YYYY-MM-DD"
-              value={due}
-              onChangeText={setDue}
-            />
-            <Text>Recurrence (creates periodic assignments after review)</Text>
-            {[0, 30, 90, 180, 365].map(n => (
-              <Button
-                key={n}
-                title={`${recurrence === n ? '✓ ' : ''}${
-                  n ? `Every ${n} days` : 'No recurrence'
-                }`}
-                variant="outline"
-                onPress={() => setRecurrence(n)}
-              />
-            ))}
-            <Text>Template</Text>
-            {options?.templates.map(t => (
-              <Button
-                key={t.id}
-                title={`${templateId === t.id ? '✓ ' : ''}${t.name} v${
-                  t.version
-                }`}
-                variant="outline"
-                onPress={() => setTemplateId(t.id)}
-              />
-            ))}
-            <Text style={styles.title}>Create a layout template</Text>
-            <Text>
-              Use the same saved template for baseline and future inspections.
-              Stable IDs cannot change after creation.
-            </Text>
-            <TextInput
-              accessibilityLabel="Template name"
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-            />
-            {steps.map((s, i) => (
-              <React.Fragment key={i}>
-                <TextInput
-                  style={styles.input}
-                  accessibilityLabel={`Step ${i + 1} ID`}
-                  value={s.id}
-                  onChangeText={id =>
-                    setSteps(old =>
-                      old.map((x, j) => (i === j ? { ...x, id } : x)),
-                    )
-                  }
-                />
-                <TextInput
-                  style={styles.input}
-                  accessibilityLabel={`Step ${i + 1} room`}
-                  value={s.room}
-                  onChangeText={room =>
-                    setSteps(old =>
-                      old.map((x, j) => (i === j ? { ...x, room } : x)),
-                    )
-                  }
-                />
-                <TextInput
-                  style={styles.input}
-                  accessibilityLabel={`Step ${i + 1} instructions`}
-                  value={s.instructions}
-                  onChangeText={instructions =>
-                    setSteps(old =>
-                      old.map((x, j) => (i === j ? { ...x, instructions } : x)),
-                    )
-                  }
-                />
-                <TextInput
-                  style={styles.input}
-                  accessibilityLabel={`Step ${i + 1} photo count`}
-                  keyboardType="number-pad"
-                  value={String(s.count)}
-                  onChangeText={count =>
-                    setSteps(old =>
-                      old.map((x, j) =>
-                        i === j ? { ...x, count: Number(count) } : x,
-                      ),
-                    )
-                  }
-                />
+              {!options?.units.length && (
+                <Text style={layout.body}>
+                  No managed units available. An administrator must verify
+                  property and tenant assignments.
+                </Text>
+              )}
+              {options?.units.map(u => (
                 <Button
-                  title={`Remove step ${i + 1}`}
+                  key={u.id}
+                  title={`${unitId === u.id ? '✓ ' : ''}${u.property} · ${
+                    u.label
+                  }`}
                   variant="outline"
-                  onPress={() => setSteps(old => old.filter((_, j) => j !== i))}
+                  onPress={() => {
+                    setUnitId(u.id);
+                    setTenantId('');
+                    setTemplateId(u.baseline_template_id || '');
+                    setSteps(u.configured_steps || options.default_steps);
+                  }}
                 />
-              </React.Fragment>
-            ))}
-            <Button
-              title="Add room step"
-              disabled={steps.length >= 20}
-              onPress={() =>
-                setSteps(old => [
-                  ...old,
-                  {
-                    id: `area-${Date.now()}`,
-                    room: 'Additional room',
-                    instructions: 'Include walls, floor and fixtures.',
-                    count: 1,
-                  },
-                ])
-              }
-            />
-            <Button
-              title="Save new template"
-              disabled={busy}
-              onPress={saveTemplate}
-            />
+              ))}
+              <Text style={layout.body}>Eligible tenant</Text>
+              {unit?.tenants.map(t => (
+                <Button
+                  key={t.id}
+                  title={`${tenantId === t.id ? '✓ ' : ''}${t.label}`}
+                  variant="outline"
+                  onPress={() => setTenantId(t.id)}
+                />
+              ))}
+            </View>
+            <View style={layout.card}>
+              <Text style={layout.sectionTitle}>Inspection details</Text>
+              <Text style={layout.label}>Inspection type</Text>
+              <View style={styles.choices}>
+                {['move-in', 'periodic', 'move-out', 'follow-up'].map(t => (
+                  <Button
+                    key={t}
+                    title={`${type === t ? '✓ ' : ''}${t}`}
+                    style={styles.choice}
+                    variant="outline"
+                    onPress={() => setType(t)}
+                  />
+                ))}
+              </View>
+              <Field
+                label="Due date"
+                placeholder="Due date YYYY-MM-DD"
+                value={due}
+                onChangeText={setDue}
+              />
+              <Text style={layout.body}>
+                Recurrence (creates periodic assignments after review)
+              </Text>
+              <View style={styles.choices}>
+                {[0, 30, 90, 180, 365].map(n => (
+                  <Button
+                    key={n}
+                    style={styles.choice}
+                    title={`${recurrence === n ? '✓ ' : ''}${
+                      n ? `Every ${n} days` : 'No recurrence'
+                    }`}
+                    variant="outline"
+                    onPress={() => setRecurrence(n)}
+                  />
+                ))}
+              </View>
+            </View>
+            <View style={layout.card}>
+              <Text style={layout.sectionTitle}>Saved layout template</Text>
+              {options?.templates.map(t => (
+                <Button
+                  key={t.id}
+                  title={`${templateId === t.id ? '✓ ' : ''}${t.name} v${
+                    t.version
+                  }`}
+                  variant="outline"
+                  onPress={() => setTemplateId(t.id)}
+                />
+              ))}
+            </View>
+            <View style={layout.card}>
+              <Text style={styles.title}>Create a layout template</Text>
+              <Text style={layout.body}>
+                Use the same saved template for baseline and future inspections.
+                Saved layouts remain unchanged; create a new layout for future
+                areas.
+              </Text>
+              <Field
+                label="Template name"
+                value={name}
+                onChangeText={setName}
+              />
+              {steps.map((s, i) => (
+                <View key={i} style={layout.notice}>
+                  <Text style={layout.label}>AREA {i + 1}</Text>
+                  <Field
+                    label={`Step ${i + 1} room`}
+                    value={s.room}
+                    onChangeText={room =>
+                      setSteps(old =>
+                        old.map((x, j) => (i === j ? { ...x, room } : x)),
+                      )
+                    }
+                  />
+                  <Field
+                    label={`Step ${i + 1} instructions`}
+                    multiline
+                    value={s.instructions}
+                    onChangeText={instructions =>
+                      setSteps(old =>
+                        old.map((x, j) =>
+                          i === j ? { ...x, instructions } : x,
+                        ),
+                      )
+                    }
+                  />
+                  <Field
+                    label={`Step ${i + 1} photo count`}
+                    keyboardType="number-pad"
+                    value={String(s.count)}
+                    onChangeText={count =>
+                      setSteps(old =>
+                        old.map((x, j) =>
+                          i === j ? { ...x, count: Number(count) } : x,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    title={`Remove step ${i + 1}`}
+                    variant="outline"
+                    onPress={() =>
+                      setSteps(old => old.filter((_, j) => j !== i))
+                    }
+                  />
+                </View>
+              ))}
+              <Button
+                title="Add room step"
+                disabled={steps.length >= 20}
+                onPress={() =>
+                  setSteps(old => [
+                    ...old,
+                    {
+                      id: `area-${Date.now()}`,
+                      room: 'Additional room',
+                      instructions: 'Include walls, floor and fixtures.',
+                      count: 1,
+                    },
+                  ])
+                }
+              />
+              <Button
+                title="Save new template"
+                disabled={busy}
+                onPress={saveTemplate}
+              />
+            </View>
             <Button
               title="Review assignment"
               disabled={busy || !unitId || !tenantId || !templateId || !due}
@@ -275,15 +309,8 @@ export default function ScheduleInspectionScreen({
   );
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5F7FB' },
-  content: { padding: 24, gap: 14 },
-  title: { fontSize: 24, fontWeight: '700' },
-  input: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#D6DEEB',
-    borderRadius: 12,
-    padding: 12,
-    color: '#131824',
-  },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choice: { flexGrow: 1, flexBasis: '45%' },
+  root: { flex: 1, backgroundColor: colors.background },
+  title: { ...layout.sectionTitle },
 });

@@ -1,3 +1,4 @@
+import type { EvidenceNote } from '../components/EvidenceNotes';
 import type { Asset } from 'react-native-image-picker';
 import { API_BASE_URL, authPost, request } from './api';
 import { privatePhotoUpload } from './privatePhotoUpload';
@@ -8,6 +9,7 @@ export type Step = {
   count: number;
 };
 export type Photo = {
+  notes?: EvidenceNote[];
   id: string;
   step_id: string;
   slot: number;
@@ -41,6 +43,10 @@ export type GuidedInspection = {
     decision: string | null;
     finding_decisions?: (string | null)[];
     result: {
+      photo_quality?: string;
+      same_area?: boolean | null;
+      obstructed_areas?: string | null;
+      analysis_status?: string;
       summary: string;
       classification: string;
       severity: string | null;
@@ -48,6 +54,8 @@ export type GuidedInspection = {
       findings: { description?: string; classification?: string }[];
     } | null;
     maintenance_id?: string;
+    baseline_notes?: EvidenceNote[];
+    current_notes?: EvidenceNote[];
     baseline_photo_id?: string;
     current_photo_id?: string;
   }[];
@@ -58,6 +66,7 @@ export type AssignmentOptions = {
     label: string;
     property: string;
     baseline_template_id?: string | null;
+    configured_steps?: Step[];
     tenants: { id: string; label: string }[];
   }[];
   templates: { id: string; name: string; version: number; steps: Step[] }[];

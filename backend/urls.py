@@ -20,8 +20,19 @@ from accounts import views
 from inspections import views as inspection_views
 from django.urls import path, include
 from maintenance import views as maintenance_views
+from maintenance import housing
 
 urlpatterns = [
+    path('api/housing/consent/', housing.consent),
+    path('api/landlord/state/', housing.state, {'actor': 'landlord'}),
+    path('api/tenant/state/', housing.state, {'actor': 'tenant'}),
+    path('api/landlord/properties/', housing.properties),
+    path('api/landlord/properties/<str:property_id>/units/', housing.add_unit),
+    path('api/landlord/units/<str:unit_id>/', housing.unit_detail),
+    path('api/landlord/units/<str:unit_id>/tenant/', housing.tenant_link),
+    path('api/tenant/invite/<str:decision>/', housing.respond_invite),
+    path('api/housing/appointments/', housing.appointments),
+    path('api/housing/appointments/<str:appointment_id>/', housing.appointment_action),
     path('api/guided-inspections/', include('guided_inspections.urls')),
     path('api/maintenance/units/', maintenance_views.assigned_units),
     path('api/maintenance/', maintenance_views.requests),

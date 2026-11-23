@@ -1,6 +1,13 @@
 import { useNavigation } from '@react-navigation/native';
 import { useRef, useState, type ComponentRef } from 'react';
-import { Alert, Keyboard, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Keyboard,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import Button from '../../components/Button';
 import Header from '../../components/Header';
@@ -13,7 +20,7 @@ import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
 
 // Read-only field tint from the mockup (not in colors.ts yet).
-const READ_ONLY_BG = '#EAF0F6';
+const READ_ONLY_BG = colors.readOnly;
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
@@ -87,6 +94,12 @@ export default function ProfileScreen() {
         titleStyle={styles.title}
         style={styles.header}
       />
+
+      <View style={styles.previewNotice}>
+        <Text style={styles.previewText}>
+          Profile editing is a preview. Changes on this screen are not saved.
+        </Text>
+      </View>
 
       <View style={styles.form}>
         <Input
@@ -171,6 +184,14 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  previewNotice: {
+    padding: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.brandSoft,
+    borderWidth: 1,
+    borderColor: colors.brandSoftBorder,
+  },
+  previewText: { fontSize: 14, lineHeight: 21, color: colors.muted },
   container: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -178,10 +199,10 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginBottom: spacing.md,
+    marginBottom: 0,
   },
 
-  // The mockup shows a 24px title, smaller than Header's 32px default.
+  // Compact page heading.
   title: {
     fontSize: 24,
   },

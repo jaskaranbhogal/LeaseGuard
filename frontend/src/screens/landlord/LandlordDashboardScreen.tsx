@@ -1,240 +1,192 @@
+import { Text, View, StyleSheet } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { LandlordStackParamList } from '../../navigation/types';
+import ScreenContainer from '../../components/ScreenContainer';
+import ScreenTitle from '../../components/ScreenTitle';
+import ActionButton from '../../components/ActionButton';
+import NotificationBell from '../../components/NotificationBell';
+import Toast from '../../components/Toast';
 import GuidedRecords from '../../components/GuidedRecords';
 import { useAuth } from '../../context/AuthContext';
-import DemoNotice from '../../components/DemoNotice';
-import { properties } from '../../data/landlordMockData';
-import Header from '../../components/Header';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import Button from '../../components/Button';
-import Card from '../../components/Card';
-import ScreenContainer from '../../components/ScreenContainer';
-import type { LandlordStackParamList } from '../../navigation/types';
+import {
+  useLandlordDemo,
+  useRefreshProperties,
+} from '../../context/LandlordDemoContext';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-
-type Props = NativeStackScreenProps<LandlordStackParamList, 'Dashboard'>;
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) {
-    return 'Good morning';
-  }
-  return hour < 17 ? 'Good afternoon' : 'Good evening';
-}
-
-export default function LandlordDashboardScreen({ navigation }: Props) {
+export default function LandlordDashboardScreen({
+  navigation,
+}: NativeStackScreenProps<LandlordStackParamList, 'Dashboard'>) {
   const { user } = useAuth();
-  const landlordName = user?.name?.trim() || user?.email || 'Landlord';
-
+  const { properties, error, toast, dismissToast, refresh } = useLandlordDemo();
+  useRefreshProperties();
   return (
-    <ScreenContainer style={styles.content}>
-      <Header
-        title={`${greeting()}, ${landlordName}`}
-        subtitle="Saved inspections and maintenance for your managed units"
-        titleStyle={styles.greeting}
-        subtitleStyle={styles.subtitle}
-        style={styles.header}
-        onNotificationsPress={() => navigation.navigate('Notifications')}
-      />
-
-      <Button title="View saved maintenance requests" onPress={() => navigation.navigate('MaintenanceRequests')} />
-      <GuidedRecords onOpen={inspectionId => navigation.navigate('AIInspectionReview', { inspectionId })} />
-      <Button title="Create Move-In Baseline" onPress={() => navigation.navigate('MoveInBaseline')} />
-      <Button title="Assign photo inspection" onPress={() => navigation.navigate('ScheduleInspection')} />
-      <DemoNotice />
-      <Button title="Review inspections" onPress={() => navigation.navigate('AIInspectionReview')} />
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Properties</Text>
-        <Pressable
-          accessibilityRole="button"
+    <View style={styles.root}>
+      <ScreenContainer style={styles.content}>
+        <ScreenTitle
+          title={`Welcome, ${user?.name?.trim() || user?.email || 'landlord'}`}
+          subtitle={`${properties.length} ${
+            properties.length === 1 ? 'property' : 'properties'
+          }`}
+          right={
+            <NotificationBell
+              onPress={() => navigation.navigate('Notifications')}
+            />
+          }
+        />
+        {!!error && (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {error}
+          </Text>
+        )}
+        <ActionButton
+          title="+ Add property"
           onPress={() => navigation.navigate('AddProperty')}
-          style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}
-        >
-          <Text style={styles.addButtonText}>+ Add property</Text>
-        </Pressable>
-      </View>
-
-      {properties.map(property => (
-        <Card key={property.id} style={styles.propertyCard}>
-          <View style={styles.propertyHeader}>
-            <View style={styles.propertyTitle}>
-              <Text style={styles.propertyName}>{property.name}</Text>
-              <Text style={styles.propertyMeta}>
-                {property.location} • {property.unitCount} units
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.pill,
-                property.status === 'review' ? styles.pillError : styles.pillOk,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.pillText,
-                  property.status === 'review'
-                    ? styles.pillTextError
-                    : styles.pillTextOk,
-                ]}
-              >
-                {property.statusLabel}
-              </Text>
-            </View>
+        />
+        <ActionButton
+          title="Refresh properties"
+          variant="secondary"
+          onPress={refresh}
+        />
+        {!properties.length && (
+          <View style={styles.card}>
+            <Text style={styles.title}>Add your first property</Text>
+            <Text style={styles.body}>
+              Add a property and its units, then invite your tenant by email to
+              start tracking condition.
+            </Text>
           </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.propertyFooter}>
-            <View style={styles.propertyTitle}>
-              <Text style={styles.headline}>{property.headline}</Text>
-              <Text style={styles.detail}>{property.detail}</Text>
-            </View>
-            {property.tag && (
-              <View style={[styles.pill, styles.pillError]}>
-                <Text style={[styles.pillText, styles.pillTextError]}>
-                  {property.tag}
+        )}
+        {properties.map(property => (
+          <View key={property.id} style={styles.card}>
+            <Text style={styles.title}>{property.street}</Text>
+            <Text style={styles.body}>
+              {property.city ? `${property.city} · ` : ''}
+              {property.units.length}{' '}
+              {property.units.length === 1 ? 'unit' : 'units'}
+            </Text>
+            <ActionButton
+              title="+ Add unit"
+              compact
+              variant="secondary"
+              onPress={() =>
+                navigation.navigate('AddProperty', { propertyId: property.id })
+              }
+            />
+            {property.units.map(unit => (
+              <View key={unit.id} style={styles.unit}>
+                <Text style={styles.unitTitle}>Unit {unit.name}</Text>
+                <Text style={styles.body}>
+                  {unit.tenant?.status === 'joined'
+                    ? `${unit.tenant.name || unit.tenant.email} · Joined`
+                    : unit.tenant
+                    ? `${unit.tenant.email} · ${
+                        unit.tenant.status === 'declined'
+                          ? 'Invitation declined'
+                          : 'Pending invitation'
+                      }`
+                    : 'Vacant'}
                 </Text>
+                {unit.tenant?.status === 'pending' && (
+                  <Text style={styles.body}>
+                    Email:{' '}
+                    {unit.tenant.delivery === 'email-accepted'
+                      ? 'Accepted by email server'
+                      : unit.tenant.delivery === 'failed'
+                      ? 'Delivery failed; revoke and retry'
+                      : 'Delivery unavailable; configure email, then revoke and retry'}
+                  </Text>
+                )}
+                <Text style={styles.body}>
+                  {unit.baselineRecordedOn
+                    ? 'Approved baseline saved'
+                    : 'Baseline needed'}
+                </Text>
+                <ActionButton
+                  title={`Edit Unit ${unit.name}`}
+                  variant="secondary"
+                  compact
+                  onPress={() =>
+                    navigation.navigate('EditUnit', {
+                      propertyId: property.id,
+                      unitId: unit.id,
+                    })
+                  }
+                />
+                <ActionButton
+                  title="Record move-in baseline"
+                  compact
+                  onPress={() =>
+                    navigation.navigate('MoveInTour', {
+                      propertyId: property.id,
+                      unitId: unit.id,
+                    })
+                  }
+                />
               </View>
-            )}
+            ))}
           </View>
-        </Card>
-      ))}
-
-      <View style={styles.actions}>
-        <Button
-          title="Schedule inspection"
-          variant="reset"
-          onPress={() => navigation.navigate('ScheduleInspection')}
+        ))}
+        <View style={styles.card}>
+          <Text style={styles.title}>Inspections</Text>
+          <ActionButton
+            title="Create Move-In Baseline"
+            onPress={() => navigation.navigate('MoveInBaseline')}
+          />
+          <ActionButton
+            title="Schedule inspection"
+            onPress={() => navigation.navigate('ScheduleInspection')}
+          />
+          <ActionButton
+            title="In-person appointments"
+            variant="secondary"
+            onPress={() => navigation.navigate('Appointments')}
+          />
+          <ActionButton
+            title="Review inspections"
+            variant="secondary"
+            onPress={() => navigation.navigate('AIInspectionReview')}
+          />
+          <GuidedRecords
+            showTitle={false}
+            onOpen={inspectionId =>
+              navigation.navigate('AIInspectionReview', { inspectionId })
+            }
+          />
+        </View>
+        <ActionButton
+          title="Maintenance requests"
+          variant="secondary"
+          onPress={() => navigation.navigate('MaintenanceRequests')}
         />
-        <Button
-          title="Manage unit details"
-          variant="outline"
-          disabled
-          onPress={() => {}}
-        />
-      </View>
-    </ScreenContainer>
+      </ScreenContainer>
+      {toast && <Toast {...toast} onDismiss={dismissToast} />}
+    </View>
   );
 }
-
-const tints = {
-  error: '#FDECEC',
-  success: '#E4F6EB',
-};
-
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  header: { marginBottom: spacing.sm },
-  greeting: {
-    fontSize: 26,
-    fontWeight: typography.bold,
-    color: colors.headerNavy,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 20,
-  },
-  alertBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: tints.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertMark: {
-    fontSize: 18,
-    fontWeight: typography.bold,
-    color: colors.error,
-  },
-  bannerText: { flex: 1, gap: spacing.xs },
-  bannerTitle: {
-    fontSize: 17,
-    fontWeight: typography.semibold,
-    color: colors.text,
-  },
-  bannerSubtitle: {
-    fontSize: 14,
-    color: colors.error,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: typography.bold,
-    color: colors.headerNavy,
-  },
-  addButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
+  root: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 24, gap: 16 },
+  card: {
+    padding: 20,
+    gap: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.cardBorder,
+    borderRadius: 18,
     backgroundColor: colors.white,
   },
-  addButtonText: {
-    fontSize: 14,
+  title: { fontSize: 20, fontWeight: typography.bold, color: colors.ink },
+  body: { fontSize: 14, lineHeight: 21, color: colors.muted },
+  unit: {
+    borderTopWidth: 1,
+    borderColor: colors.divider,
+    paddingTop: 16,
+    gap: 10,
+  },
+  unitTitle: {
+    fontSize: 17,
     fontWeight: typography.semibold,
-    color: colors.actionBlue,
+    color: colors.navy,
   },
-  pressed: { opacity: 0.7 },
-  propertyCard: { paddingVertical: 20 },
-  propertyHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  propertyTitle: { flex: 1, gap: spacing.xs },
-  propertyName: {
-    fontSize: 18,
-    fontWeight: typography.bold,
-    color: colors.headerNavy,
-  },
-  propertyMeta: { fontSize: 14, color: colors.textSecondary },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.md,
-  },
-  propertyFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  headline: {
-    fontSize: 15,
-    fontWeight: typography.medium,
-    color: colors.text,
-  },
-  detail: { fontSize: 14, color: colors.textSecondary },
-  pill: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-  },
-  pillError: { backgroundColor: tints.error },
-  pillOk: { backgroundColor: tints.success },
-  pillText: { fontSize: 13, fontWeight: typography.semibold },
-  pillTextError: { color: colors.error },
-  pillTextOk: { color: colors.success },
-  actions: { gap: spacing.sm, marginTop: spacing.sm },
+  error: { color: colors.error },
 });

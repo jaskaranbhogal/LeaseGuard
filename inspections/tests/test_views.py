@@ -15,6 +15,8 @@ from .test_services import make_image
 
 class ComparisonAPITests(SimpleTestCase):
     def setUp(self):
+        access = patch('inspections.views.analysis_access', return_value=None)
+        access.start(); self.addCleanup(access.stop)
         self.factory = RequestFactory()
 
     def post(self):

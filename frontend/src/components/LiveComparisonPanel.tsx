@@ -1,6 +1,19 @@
+import { colors } from '../theme/colors';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { launchCamera, launchImageLibrary, type Asset } from 'react-native-image-picker';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import {
+  launchCamera,
+  launchImageLibrary,
+  type Asset,
+} from 'react-native-image-picker';
 import {
   type Comparison,
   recentComparisons,
@@ -31,7 +44,9 @@ export default function LiveComparisonPanel() {
         : await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1 });
       if (result.didCancel) return;
       if (result.errorCode || !result.assets?.[0]?.uri) {
-        setMessage('Unable to select that photo. Check permissions or try the gallery.');
+        setMessage(
+          'Unable to select that photo. Check permissions or try the gallery.',
+        );
         return;
       }
       if (which === 'baseline') setBaseline(result.assets[0]);
@@ -50,10 +65,20 @@ export default function LiveComparisonPanel() {
     setBusy(true);
     setMessage('');
     try {
-      const saved = await uploadComparison(baseline, current, room, area, notes);
+      const saved = await uploadComparison(
+        baseline,
+        current,
+        room,
+        area,
+        notes,
+      );
       setComparison(saved);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Comparison could not be completed.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Comparison could not be completed.',
+      );
     } finally {
       setBusy(false);
     }
@@ -70,7 +95,11 @@ export default function LiveComparisonPanel() {
         setMessage('No comparisons saved for this account.');
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to load recent comparisons.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to load recent comparisons.',
+      );
     } finally {
       setBusy(false);
     }
@@ -83,7 +112,9 @@ export default function LiveComparisonPanel() {
     try {
       setComparison(await setComparisonDecision(comparison.id, action));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save your review.');
+      setMessage(
+        error instanceof Error ? error.message : 'Could not save your review.',
+      );
     } finally {
       setBusy(false);
     }
@@ -93,50 +124,110 @@ export default function LiveComparisonPanel() {
     <View style={styles.panel}>
       <Text style={styles.heading}>Live photo comparison (experimental)</Text>
       <Text style={styles.note}>
-        Upload a move-in baseline and current photo. Photos are saved privately for at least
-        90 days. AI findings are suggestions only; final decisions require human review.
+        Upload a move-in baseline and current photo. Photos are saved privately
+        for at least 90 days. AI findings are suggestions only; final decisions
+        require human review.
       </Text>
-      <TextInput accessibilityLabel="Comparison room" style={styles.input}
-        value={room} onChangeText={setRoom} maxLength={100} placeholder="Room" />
-      <TextInput accessibilityLabel="Comparison area" style={styles.input}
-        value={area} onChangeText={setArea} maxLength={100} placeholder="Area" />
-      <TextInput accessibilityLabel="Comparison notes" style={styles.input}
-        value={notes} onChangeText={setNotes} maxLength={1200}
-        placeholder="Optional observations" multiline />
+      <TextInput
+        accessibilityLabel="Comparison room"
+        style={styles.input}
+        value={room}
+        onChangeText={setRoom}
+        maxLength={100}
+        placeholder="Room"
+      />
+      <TextInput
+        accessibilityLabel="Comparison area"
+        style={styles.input}
+        value={area}
+        onChangeText={setArea}
+        maxLength={100}
+        placeholder="Area"
+      />
+      <TextInput
+        accessibilityLabel="Comparison notes"
+        style={styles.input}
+        value={notes}
+        onChangeText={setNotes}
+        maxLength={1200}
+        placeholder="Optional observations"
+        multiline
+      />
 
       {(['baseline', 'current'] as const).map(which => {
         const photo = which === 'baseline' ? baseline : current;
         return (
           <View key={which} style={styles.photoCard}>
-            <Text style={styles.label}>{which === 'baseline' ? 'Move-in baseline' : 'Current photo'}</Text>
-            {photo?.uri ? <Image source={{ uri: photo.uri }} style={styles.preview} /> : (
+            <Text style={styles.label}>
+              {which === 'baseline' ? 'Move-in baseline' : 'Current photo'}
+            </Text>
+            {photo?.uri ? (
+              <Image source={{ uri: photo.uri }} style={styles.preview} />
+            ) : (
               <Text style={styles.note}>No photo selected</Text>
             )}
             <View style={styles.actions}>
-              <Pressable accessibilityRole="button" onPress={() => void selectPhoto(which, true)}
-                style={styles.button}><Text style={styles.buttonText}>Take photo</Text></Pressable>
-              <Pressable accessibilityRole="button" onPress={() => void selectPhoto(which, false)}
-                style={styles.button}><Text style={styles.buttonText}>Choose photo</Text></Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  selectPhoto(which, true);
+                }}
+                style={styles.button}
+              >
+                <Text style={styles.buttonText}>Take photo</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  selectPhoto(which, false);
+                }}
+                style={styles.button}
+              >
+                <Text style={styles.buttonText}>Choose photo</Text>
+              </Pressable>
             </View>
           </View>
         );
       })}
 
-      <Pressable accessibilityRole="button" accessibilityLabel="Compare uploaded photos"
-        disabled={busy} onPress={() => void compare()}
-        style={[styles.primary, busy && styles.disabled]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Compare uploaded photos"
+        disabled={busy}
+        onPress={() => {
+          compare();
+        }}
+        style={[styles.primary, busy && styles.disabled]}
+      >
         <Text style={styles.primaryText}>Compare and save photos</Text>
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Load most recent comparison"
-        disabled={busy} onPress={() => void loadRecent()} style={styles.secondary}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Load most recent comparison"
+        disabled={busy}
+        onPress={() => {
+          loadRecent();
+        }}
+        style={styles.secondary}
+      >
         <Text style={styles.secondaryText}>Load most recent comparison</Text>
       </Pressable>
-      {busy && <ActivityIndicator accessibilityLabel="Loading photo comparison" />}
-      {!!message && <Text accessibilityRole="alert" style={styles.error}>{message}</Text>}
+      {busy && (
+        <ActivityIndicator accessibilityLabel="Loading photo comparison" />
+      )}
+      {!!message && (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {message}
+        </Text>
+      )}
       {comparison && (
         <View style={styles.result}>
-          <Text style={styles.label}>Saved comparison · {comparison.status}</Text>
-          <Text style={styles.note}>{comparison.room} · {comparison.area}</Text>
+          <Text style={styles.label}>
+            Saved comparison · {comparison.status}
+          </Text>
+          <Text style={styles.note}>
+            {comparison.room} · {comparison.area}
+          </Text>
           {comparison.result ? (
             <>
               <Text style={styles.heading}>
@@ -144,30 +235,47 @@ export default function LiveComparisonPanel() {
                   ? 'AI unavailable — manual review required'
                   : `Suggested classification: ${comparison.result.classification}`}
               </Text>
-              <Text style={styles.note}>
-                {comparison.result.summary}
-              </Text>
+              <Text style={styles.note}>{comparison.result.summary}</Text>
               {comparison.result.severity && (
-                <Text style={styles.note}>Suggested severity: {comparison.result.severity}</Text>
+                <Text style={styles.note}>
+                  Suggested severity: {comparison.result.severity}
+                </Text>
               )}
               {comparison.result.findings.map((finding, index) => (
-                <Text key={index} style={styles.note}>• {finding.description}</Text>
+                <Text key={index} style={styles.note}>
+                  • {finding.description}
+                </Text>
               ))}
               <Text style={styles.note}>
                 Your review: {comparison.decision || 'Not reviewed'}
               </Text>
               <View style={styles.actions}>
-                {(['confirmed', 'dismissed', 'resolved'] as const).map(action => (
-                  <Pressable key={action} accessibilityRole="button"
-                    accessibilityLabel={`Save decision: ${action}`}
-                    disabled={busy || comparison.result?.analysis_status !== 'completed'}
-                    onPress={() => void decide(action)} style={styles.button}>
-                    <Text style={styles.buttonText}>{action}</Text>
-                  </Pressable>
-                ))}
+                {(['confirmed', 'dismissed', 'resolved'] as const).map(
+                  action => (
+                    <Pressable
+                      key={action}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Save decision: ${action}`}
+                      disabled={
+                        busy ||
+                        comparison.result?.analysis_status !== 'completed'
+                      }
+                      onPress={() => {
+                        decide(action);
+                      }}
+                      style={styles.button}
+                    >
+                      <Text style={styles.buttonText}>{action}</Text>
+                    </Pressable>
+                  ),
+                )}
               </View>
             </>
-          ) : <Text style={styles.note}>Processing; check recent comparisons shortly.</Text>}
+          ) : (
+            <Text style={styles.note}>
+              Processing; check recent comparisons shortly.
+            </Text>
+          )}
         </View>
       )}
     </View>
@@ -175,21 +283,63 @@ export default function LiveComparisonPanel() {
 }
 
 const styles = StyleSheet.create({
-  panel: { borderWidth: 1, borderColor: '#D6DEEB', borderRadius: 16, padding: 16, gap: 12, marginTop: 24 },
-  heading: { color: '#15263D', fontSize: 18, fontWeight: '700' },
-  note: { color: '#506176', fontSize: 13, lineHeight: 19 },
-  input: { borderWidth: 1, borderColor: '#D6DEEB', borderRadius: 8, padding: 10, color: '#15263D' },
-  photoCard: { borderWidth: 1, borderColor: '#E4E8EF', borderRadius: 8, padding: 12, gap: 8 },
-  label: { color: '#15263D', fontSize: 14, fontWeight: '600' },
+  panel: {
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    padding: 16,
+    gap: 12,
+  },
+  heading: { color: colors.navy, fontSize: 18, fontWeight: '700' },
+  note: { color: colors.muted, fontSize: 14, lineHeight: 21 },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 14,
+    padding: 10,
+    color: colors.navy,
+  },
+  photoCard: {
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: 14,
+    padding: 12,
+    gap: 8,
+  },
+  label: { color: colors.navy, fontSize: 14, fontWeight: '600' },
   preview: { width: '100%', height: 140, borderRadius: 8 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  button: { padding: 10, backgroundColor: '#EAF1FF', borderRadius: 8 },
-  buttonText: { color: '#174A9F', fontWeight: '600', fontSize: 13 },
-  primary: { padding: 14, backgroundColor: '#1459EB', borderRadius: 8, alignItems: 'center' },
-  primaryText: { color: 'white', fontSize: 14, fontWeight: '700' },
+  button: {
+    minHeight: 44,
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: colors.brandSoft,
+    borderRadius: 8,
+  },
+  buttonText: { color: colors.brand, fontWeight: '600', fontSize: 13 },
+  primary: {
+    minHeight: 52,
+    justifyContent: 'center',
+    padding: 14,
+    backgroundColor: colors.brand,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  primaryText: { color: colors.white, fontSize: 14, fontWeight: '700' },
   disabled: { opacity: 0.5 },
-  secondary: { padding: 10, alignItems: 'center' },
-  secondaryText: { color: '#1459EB', fontSize: 13 },
-  error: { color: '#A53030', fontSize: 13 },
-  result: { padding: 12, backgroundColor: '#F4F7FC', borderRadius: 10, gap: 10 },
+  secondary: {
+    minHeight: 44,
+    justifyContent: 'center',
+    padding: 10,
+    alignItems: 'center',
+  },
+  secondaryText: { color: colors.brand, fontSize: 13 },
+  error: { color: colors.error, fontSize: 13 },
+  result: {
+    padding: 12,
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    gap: 10,
+  },
 });

@@ -1,31 +1,34 @@
-import DemoNotice from '../../components/DemoNotice';
-import {
-  bedroomCountError,
-  bathroomCountError,
-} from '../../utils/landlordValidation';
-import Header from '../../components/Header';
-import { useState } from 'react';
-import { Alert, Keyboard, StyleSheet, Switch, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Keyboard, StyleSheet, Text, View } from 'react-native';
+import { layout } from '../../theme/layout';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import Button from '../../components/Button';
-import Card from '../../components/Card';
-import Input from '../../components/Input';
+import ActionButton from '../../components/ActionButton';
+import Field from '../../components/Field';
 import ScreenContainer from '../../components/ScreenContainer';
+import ScreenTitle from '../../components/ScreenTitle';
+import { useLandlordDemo } from '../../context/LandlordDemoContext';
 import type { LandlordStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
-import { typography } from '../../theme/typography';
+import {
+  bathroomCountError,
+  bedroomCountError,
+} from '../../utils/landlordValidation';
 import { emailError } from '../../utils/validation';
 
 type Props = NativeStackScreenProps<LandlordStackParamList, 'AddProperty'>;
 
-export default function AddPropertyScreen({ navigation }: Props) {
-  const [address, setAddress] = useState('');
+export default function AddPropertyScreen({ navigation, route }: Props) {
+  const key = useRef(
+    `property_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+  );
+  const { addProperty, addUnit, properties, busy, error } = useLandlordDemo();
+  const existingProperty = properties.find(
+    p => p.id === route.params?.propertyId,
+  );
+  const [address, setAddress] = useState(existingProperty?.street || '');
   const [unit, setUnit] = useState('');
   const [bedrooms, setBedrooms] = useState('');
   const [bathrooms, setBathrooms] = useState('');
   const [tenantEmail, setTenantEmail] = useState('');
-  const [assignTenant, setAssignTenant] = useState(true);
   const [submitted, setSubmitted] = useState(false);
 
   const errors = {
@@ -33,180 +36,118 @@ export default function AddPropertyScreen({ navigation }: Props) {
     unit: unit.trim() ? undefined : 'Enter a unit name or number.',
     bedrooms: bedroomCountError(bedrooms),
     bathrooms: bathroomCountError(bathrooms),
-    tenantEmail: assignTenant ? emailError(tenantEmail) : undefined,
+    tenantEmail: tenantEmail.trim() ? emailError(tenantEmail) : undefined,
   };
   const hasErrors = Object.values(errors).some(Boolean);
+  const show = (message?: string) => (submitted ? message : undefined);
 
-  function submit() {
+  async function save() {
     setSubmitted(true);
-    if (hasErrors) {
-      return;
-    }
+    if (hasErrors) return;
     Keyboard.dismiss();
-    Alert.alert(
-      'Demo property preview',
-      'The form is valid. No property or unit was saved, and no tenant was assigned.',
-    );
+    const input = { address, unit, bedrooms, bathrooms, tenantEmail };
+    const saved = existingProperty
+      ? await addUnit(existingProperty.id, input, key.current)
+      : await addProperty(input, key.current);
+    if (saved) navigation.popTo('Dashboard');
   }
 
   return (
     <ScreenContainer style={styles.content}>
-      <Header
-        title="Add property"
-        subtitle="Preview a property, unit, and tenant link."
-        style={styles.header}
+      <ScreenTitle
+        title={existingProperty ? 'Add unit' : 'Add property'}
+        subtitle="Create the property and unit, then invite your tenant."
+        onBack={() => navigation.popTo('Dashboard')}
       />
-
-      <DemoNotice />
-      <Input
+      {!!error && (
+        <Text accessibilityRole="alert" style={layout.error}>
+          {error}
+        </Text>
+      )}
+      <Field
+        editable={!existingProperty}
         label="Property address"
-        placeholder="Street, city, state"
+        placeholder="18 Cedar Ave, Farmingdale, NY"
         value={address}
         onChangeText={setAddress}
-        error={submitted ? errors.address : undefined}
+        error={show(errors.address)}
         autoCapitalize="words"
         autoComplete="street-address"
-        returnKeyType="next"
       />
-      <Input
+      <Field
         label="Unit"
         placeholder="1A"
         value={unit}
         onChangeText={setUnit}
-        error={submitted ? errors.unit : undefined}
+        error={show(errors.unit)}
         autoCapitalize="characters"
-        returnKeyType="next"
       />
       <View style={styles.row}>
-        <View style={styles.half}>
-          <Input
-            label="Bedrooms"
-            placeholder="1"
-            value={bedrooms}
-            onChangeText={setBedrooms}
-            error={submitted ? errors.bedrooms : undefined}
-            keyboardType="number-pad"
-          />
-        </View>
-        <View style={styles.half}>
-          <Input
-            label="Bathrooms"
-            placeholder="1"
-            value={bathrooms}
-            onChangeText={setBathrooms}
-            error={submitted ? errors.bathrooms : undefined}
-            keyboardType="decimal-pad"
-          />
-        </View>
-      </View>
-
-      <Card style={styles.tenantCard}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>T</Text>
-        </View>
-        <View style={styles.tenantText}>
-          <Text style={styles.tenantTitle}>Assign tenant to this unit</Text>
-          <Text style={styles.tenantDetail}>
-            Demo only. No invitation or inspection request will be sent.
-          </Text>
-        </View>
-        <Switch
-          accessibilityLabel="Assign tenant to this unit"
-          value={assignTenant}
-          onValueChange={setAssignTenant}
-          trackColor={{ true: colors.actionBlue }}
+        <Field
+          label="Bedrooms"
+          placeholder="1"
+          value={bedrooms}
+          onChangeText={setBedrooms}
+          error={show(errors.bedrooms)}
+          keyboardType="number-pad"
+          containerStyle={styles.half}
         />
-      </Card>
-
-      {assignTenant && (
-        <Input
+        <Field
+          label="Bathrooms"
+          placeholder="1"
+          value={bathrooms}
+          onChangeText={setBathrooms}
+          error={show(errors.bathrooms)}
+          keyboardType="decimal-pad"
+          containerStyle={styles.half}
+        />
+      </View>
+      {!existingProperty && (
+        <Field
           label="Tenant email"
           placeholder="tenant@example.com"
           value={tenantEmail}
           onChangeText={setTenantEmail}
-          error={submitted ? errors.tenantEmail : undefined}
+          error={show(errors.tenantEmail)}
+          hint="Optional. We'll email an invite, and they can accept the invitation after signing in."
           keyboardType="email-address"
+          autoCapitalize="none"
           autoComplete="email"
           textContentType="emailAddress"
           returnKeyType="done"
-          onSubmitEditing={submit}
+          onSubmitEditing={save}
         />
       )}
-
       <View style={styles.actions}>
-        <Button
-          title="Preview demo property"
-          variant="reset"
-          onPress={submit}
+        <ActionButton
+          title={
+            existingProperty
+              ? 'Save unit'
+              : tenantEmail.trim()
+              ? 'Save & send invite'
+              : 'Save property'
+          }
+          disabled={busy}
+          onPress={save}
         />
-        <Button
+        <ActionButton
           title="Cancel"
-          variant="outline"
+          variant="secondary"
           onPress={() => navigation.popTo('Dashboard')}
         />
       </View>
-      <Text style={styles.note}>
-        Demo preview only. Nothing is saved or assigned.
-      </Text>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 32,
+    gap: 16,
   },
-  header: { marginBottom: spacing.sm },
-  title: {
-    fontSize: 32,
-    fontWeight: typography.bold,
-    color: colors.headerNavy,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  row: { flexDirection: 'row', gap: spacing.md },
+  row: { flexDirection: 'row', gap: 12 },
   half: { flex: 1 },
-  tenantCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: 20,
-  },
-  badge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E0F7FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    fontSize: 16,
-    fontWeight: typography.bold,
-    color: '#1596B0',
-  },
-  tenantText: { flex: 1, gap: spacing.xs },
-  tenantTitle: {
-    fontSize: 17,
-    fontWeight: typography.semibold,
-    color: colors.text,
-  },
-  tenantDetail: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textSecondary,
-  },
-  actions: { gap: spacing.sm, marginTop: spacing.md },
-  note: {
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
-    color: colors.textSecondary,
-  },
+  actions: { gap: 10, marginTop: 16 },
 });

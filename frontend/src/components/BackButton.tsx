@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme/colors';
+import Icon from './Icon';
 
 type Props = {
   onPress?: () => void;
@@ -24,7 +25,7 @@ export default function BackButton({ onPress }: Props) {
       onPress={handleBack}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
-      <Text style={styles.arrow}>{'‹'}</Text>
+      <Icon name="back" size={22} color={colors.ink} />
     </Pressable>
   );
 }
@@ -33,19 +34,12 @@ const styles = StyleSheet.create({
   button: {
     width: 44,
     height: 44,
+    marginLeft: -12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
     backgroundColor: 'transparent',
   },
 
-  arrow: {
-    fontSize: 38,
-    lineHeight: 42,
-    color: colors.navy,
-  },
   pressed: {
     opacity: 0.5,
   },

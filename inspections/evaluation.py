@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 from PIL import Image, ImageDraw, ImageEnhance, ImageFilter
 
 from .services import AIComparisonError, compare_images
+from .prompts import PROMPT_VERSION
 
 GOLDEN = Path(__file__).parent / "evals" / "golden_cases.json"
 MIN_CASES = 15
@@ -155,7 +156,7 @@ def evaluate(live=False, cases=None, predictor=None):
     )
     return {
         "mode": "live" if live else "replay",
-        "version": "image_comparison_v1",
+        "version": PROMPT_VERSION,
         "cases": len(cases),
         "max_possible_provider_calls": len(cases) * REPEATS if live else 0,
         "thresholds": {

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
+import { layout } from '../theme/layout';
 
 export default function ScreenContainer({
   children,
@@ -26,7 +27,9 @@ export default function ScreenContainer({
           keyboardDismissMode="on-drag"
           contentContainerStyle={styles.scroll}
         >
-          <View style={[styles.content, style]}>{children}</View>
+          <View style={[layout.content, styles.content, style]}>
+            {children}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -36,5 +39,5 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   scroll: { flexGrow: 1, alignItems: 'center' },
-  content: { flexGrow: 1, width: '100%', maxWidth: 480 },
+  content: { flexGrow: 1 },
 });

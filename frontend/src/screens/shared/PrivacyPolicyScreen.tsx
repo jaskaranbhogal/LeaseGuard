@@ -7,7 +7,7 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
-const LAST_UPDATED = 'October 21, 2026';
+const LAST_UPDATED = 'November 21, 2026';
 
 type Section = {
   title: string;
@@ -16,7 +16,7 @@ type Section = {
 };
 
 const INTRO =
-  'LeaseGuard helps landlords and tenants document the condition of rental units through photo and video inspections, maintenance reports, and AI-assisted comparisons. This policy explains what information we collect, how we use it, and the choices you have.';
+  'LeaseGuard helps landlords and tenants document the condition of rental units through photo inspections, maintenance reports, and AI-assisted comparisons. This policy explains what information we collect, how we use it, and the choices you have.';
 
 const SECTIONS: Section[] = [
   {
@@ -24,7 +24,7 @@ const SECTIONS: Section[] = [
     bullets: [
       'Account information: your name, email address, password (stored in protected form), and whether you are a landlord or tenant.',
       'Property and unit information: addresses, unit details, and the link between a landlord and the tenant of a unit.',
-      'Photos and videos: images and videos you capture or upload during inspections or maintenance reports, with related notes, dates, and times.',
+      'Photos: images you capture or upload during inspections or maintenance reports, with related notes, dates, and times.',
       'Inspection and maintenance data: schedules, availability you choose, maintenance requests, condition history, and AI inspection results.',
       'Notifications: if enabled, a device token so we can send you notifications.',
     ],
@@ -33,7 +33,7 @@ const SECTIONS: Section[] = [
     title: '2. How we use your information',
     bullets: [
       'Create and manage your account and sign you in.',
-      'Store and show inspection photos, videos, and condition history to the landlord and tenant of the relevant unit.',
+      'Store and show inspection photos and condition history to the landlord and tenant of the relevant unit.',
       'Compare inspection photos and generate AI-assisted condition reports.',
       'Schedule inspections, process maintenance requests, and send notifications.',
       'Maintain security, prevent misuse, and fix bugs.',
@@ -44,13 +44,13 @@ const SECTIONS: Section[] = [
   {
     title: '3. AI-assisted comparisons',
     paragraphs: [
-      'LeaseGuard uses AI to compare photos and flag possible changes in unit condition. These results are advisory only. Landlords and tenants make the final decisions.',
+      'A landlord must explicitly request Google Gemini processing of inspection images to compare photos and flag possible changes in unit condition. These results are advisory only. Landlords and tenants make the final decisions.',
     ],
   },
   {
     title: '4. Who can see your information',
     bullets: [
-      'Landlords and tenants: photos, videos, and inspection records are visible only to the landlord and tenant of the unit they belong to.',
+      'Landlords and tenants: evidence is available to authorized managers and the relevant tenant through authenticated access controls. Authorized application services and processors also handle data.',
       'Service providers: we use trusted providers for hosting, storage, authentication, notifications, and AI processing. They may only use your information to provide services to us.',
       'Legal reasons: we may disclose information if required by law, court order, or to protect rights, safety, or security.',
       'Business transfers: if LeaseGuard is involved in a merger or sale, your information may be transferred as part of that process.',
@@ -59,19 +59,19 @@ const SECTIONS: Section[] = [
   {
     title: '5. Camera permission',
     paragraphs: [
-      'LeaseGuard asks for camera access so you can take inspection and maintenance photos and videos. The camera is used only when you choose to capture media in the app. You can turn camera access on or off at any time in your device Settings under LeaseGuard.',
+      'LeaseGuard asks for camera access so you can take inspection and maintenance photos. The camera is used only when you choose to capture media in the app. You can turn camera access on or off at any time in your device Settings under LeaseGuard.',
     ],
   },
   {
     title: '6. Data retention',
     paragraphs: [
-      'We keep your information while your account is active and as needed to provide the service. Inspection records may be kept for 30 days so both parties have a record of unit condition. When information is no longer needed, we delete or de-identify it.',
+      'We keep your information while your account is active and as needed to provide the service. Private photos have a minimum 90-day retention period. Guided inspection evidence is under a preservation hold to keep approved baseline versions and historical reports available. Automatic deletion after 90 days is not implemented. Deletion requests are reviewed against retention and evidence-preservation requirements.',
     ],
   },
   {
     title: '7. Security',
     paragraphs: [
-      'We use reasonable technical and organizational safeguards, including [encryption in transit and at rest, access controls]. No system is completely secure, so we cannot guarantee absolute security.',
+      'We use reasonable technical and organizational safeguards, including authenticated private image delivery, role and property access controls, and protected sessions. No system is completely secure, so we cannot guarantee absolute security.',
     ],
   },
   {
@@ -121,18 +121,18 @@ export default function PrivacyPolicyScreen() {
       <View>
         <Text style={styles.body}>{INTRO}</Text>
 
-        {SECTIONS.map((section) => (
+        {SECTIONS.map(section => (
           <View key={section.title} style={styles.section}>
             <Text accessibilityRole="header" style={styles.sectionTitle}>
               {section.title}
             </Text>
-            {section.bullets?.map((item) => (
+            {section.bullets?.map(item => (
               <View key={item} style={styles.bulletRow}>
                 <Text style={styles.bullet}>•</Text>
                 <Text style={[styles.body, styles.bulletText]}>{item}</Text>
               </View>
             ))}
-            {section.paragraphs?.map((text) => (
+            {section.paragraphs?.map(text => (
               <Text key={text} style={[styles.body, styles.paragraph]}>
                 {text}
               </Text>
@@ -146,19 +146,21 @@ export default function PrivacyPolicyScreen() {
 
 // Sizes and spacing mirror SettingsScreen so the screens feel consistent.
 const styles = StyleSheet.create({
+  policySection: { marginTop: 16 },
+  policyParagraph: { marginTop: 8 },
   container: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
 
-  // 24px like Settings, Profile, Login, and Register (Header defaults to 32).
+  // Compact page heading.
   title: {
     fontSize: 24,
   },
 
   header: {
-    marginBottom: spacing.lg,
+    marginBottom: 0,
   },
 
   section: {
@@ -198,3 +200,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+export function PrivacyPolicyContent() {
+  return (
+    <View>
+      <Text style={styles.sectionTitle} accessibilityRole="header">
+        LeaseGuard privacy policy · {LAST_UPDATED}
+      </Text>
+      <Text style={styles.body}>{INTRO}</Text>
+      {SECTIONS.map(section => (
+        <View key={section.title} style={styles.policySection}>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            {section.title}
+          </Text>
+          {[...(section.paragraphs || []), ...(section.bullets || [])].map(
+            text => (
+              <Text key={text} style={[styles.body, styles.policyParagraph]}>
+                {text}
+              </Text>
+            ),
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}

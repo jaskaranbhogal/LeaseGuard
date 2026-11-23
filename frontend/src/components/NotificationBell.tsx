@@ -1,3 +1,4 @@
+import { colors } from '../theme/colors';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -70,12 +71,12 @@ const styles = StyleSheet.create({
     borderRadius: 9,
     backgroundColor: '#E5484D',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   badgeText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 9,
     fontWeight: '700',
   },

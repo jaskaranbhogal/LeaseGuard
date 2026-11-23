@@ -1,3 +1,5 @@
+import { layout } from '../../theme/layout';
+import { colors } from '../../theme/colors';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,14 +17,22 @@ export function SavedMaintenanceList({
 }: NativeStackScreenProps<LandlordStackParamList, 'MaintenanceRequests'>) {
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Header title="Maintenance requests" />
+      <ScrollView contentContainerStyle={layout.content}>
+        <Header
+          title="Maintenance requests"
+          subtitle="Review repair requests and their saved evidence."
+          onBack={() => navigation.goBack()}
+        />
         <MaintenanceRecords
           onOpen={id =>
             navigation.navigate('SavedMaintenanceDetail', { requestId: id })
           }
         />
-        <Button title="Back" onPress={() => navigation.goBack()} />
+        <Button
+          title="Back"
+          variant="outline"
+          onPress={() => navigation.goBack()}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -33,15 +43,21 @@ export function SavedMaintenanceDetail({
 }: NativeStackScreenProps<LandlordStackParamList, 'SavedMaintenanceDetail'>) {
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Header title="Maintenance request" />
+      <ScrollView contentContainerStyle={layout.content}>
+        <Header
+          title="Maintenance request"
+          onBack={() => navigation.goBack()}
+        />
         <MaintenanceRecord id={route.params.requestId} landlord />
-        <Button title="Back" onPress={() => navigation.goBack()} />
+        <Button
+          title="Back"
+          variant="outline"
+          onPress={() => navigation.goBack()}
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F5F7FB' },
-  content: { padding: 24, gap: 16 },
+  screen: { flex: 1, backgroundColor: colors.background },
 });

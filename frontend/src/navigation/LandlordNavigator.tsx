@@ -1,5 +1,16 @@
-import { SavedMaintenanceList, SavedMaintenanceDetail } from '../screens/landlord/SavedMaintenanceScreens';
-import { type BottomTabBarProps, createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import MoveInTourScreen from '../screens/landlord/MoveInTourScreen';
+import EditUnitScreen from '../screens/landlord/EditUnitScreen';
+import AppointmentsScreen from '../screens/shared/AppointmentsScreen';
+import { LandlordDemoProvider } from '../context/LandlordDemoContext';
+import { LandlordGate } from '../components/HousingGate';
+import {
+  SavedMaintenanceList,
+  SavedMaintenanceDetail,
+} from '../screens/landlord/SavedMaintenanceScreens';
+import {
+  type BottomTabBarProps,
+  createBottomTabNavigator,
+} from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomNavigation from '../components/BottomNavigation';
 import PrivacySecurityScreen from '../screens/shared/PrivacySecurityScreen';
@@ -30,12 +41,22 @@ function HomeStack() {
       initialRouteName="Dashboard"
       screenOptions={{
         headerShown: false,
-      }}>
+      }}
+    >
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="MoveInBaseline" component={MoveInBaselineScreen} />
       <Stack.Screen name="Dashboard" component={LandlordDashboardScreen} />
-      <Stack.Screen name="MaintenanceRequests" component={SavedMaintenanceList} />
-      <Stack.Screen name="SavedMaintenanceDetail" component={SavedMaintenanceDetail} />
+      <Stack.Screen
+        name="MaintenanceRequests"
+        component={SavedMaintenanceList}
+      />
+      <Stack.Screen
+        name="SavedMaintenanceDetail"
+        component={SavedMaintenanceDetail}
+      />
+      <Stack.Screen name="MoveInTour" component={MoveInTourScreen} />
+      <Stack.Screen name="EditUnit" component={EditUnitScreen} />
+      <Stack.Screen name="Appointments" component={AppointmentsScreen} />
       <Stack.Screen name="AddProperty" component={AddPropertyScreen} />
       <Stack.Screen
         name="ScheduleInspection"
@@ -59,9 +80,7 @@ function SettingsStackScreen() {
       <SettingsStack.Screen name="SettingsHome">
         {({ navigation }) => (
           <SettingsScreen
-            onPrivacySecurity={() =>
-              navigation.navigate('PrivacySecurity')
-            }
+            onPrivacySecurity={() => navigation.navigate('PrivacySecurity')}
             onProfile={() => navigation.navigate('Profile')}
           />
         )}
@@ -91,21 +110,30 @@ const settingsOptions = { title: 'Settings' };
 
 export default function LandlordNavigator() {
   return (
-    <Tab.Navigator
-      initialRouteName="HomeStack"
-      tabBar={LandlordTabBar}
-      screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="HomeStack" component={HomeStack} options={homeOptions} />
-      <Tab.Screen
-        name="History"
-        component={ConditionHistoryScreen}
-        options={historyOptions}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsStackScreen}
-        options={settingsOptions}
-      />
-    </Tab.Navigator>
+    <LandlordDemoProvider>
+      <LandlordGate>
+        <Tab.Navigator
+          initialRouteName="HomeStack"
+          tabBar={LandlordTabBar}
+          screenOptions={{ headerShown: false }}
+        >
+          <Tab.Screen
+            name="HomeStack"
+            component={HomeStack}
+            options={homeOptions}
+          />
+          <Tab.Screen
+            name="History"
+            component={ConditionHistoryScreen}
+            options={historyOptions}
+          />
+          <Tab.Screen
+            name="Settings"
+            component={SettingsStackScreen}
+            options={settingsOptions}
+          />
+        </Tab.Navigator>
+      </LandlordGate>
+    </LandlordDemoProvider>
   );
 }

@@ -1,3 +1,1 @@
-export default function MaintenanceDetailScreen() {
-  return null;
-}
+export { SavedMaintenanceDetail as default } from './SavedMaintenanceScreens';
