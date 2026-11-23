@@ -30,8 +30,9 @@ export async function privatePhotoUpload<T>(
     xhr.setRequestHeader('X-CSRFToken', csrfToken);
     xhr.setRequestHeader('Accept', 'application/json');
     xhr.upload.onprogress = event => {
-      if (event.lengthComputable)
-        progress(Math.round((event.loaded / event.total) * 100));
+      // Android can report a total smaller than the multipart body it sends.
+      if (event.lengthComputable && event.total > 0)
+        progress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
     };
     xhr.onload = () => {
       try {

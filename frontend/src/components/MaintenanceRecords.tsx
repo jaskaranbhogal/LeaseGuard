@@ -7,6 +7,7 @@ import Button from './Button';
 import StateCard from './StateCard';
 import StatusBadge from './StatusBadge';
 import { layout } from '../theme/layout';
+import { typography } from '../theme/typography';
 
 export function MaintenanceRecords({
   onOpen,
@@ -154,6 +155,7 @@ export function MaintenanceRecord({
       setBusy(false);
     }
   }
+  const stepIndex = STEPS.findIndex(st => st.status === record?.status);
   return (
     <View style={styles.list}>
       {!!error && (
@@ -161,68 +163,127 @@ export function MaintenanceRecord({
           {error}
         </Text>
       )}
-      <Button
-        title="Refresh request"
-        variant="outline"
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Refresh request"
         disabled={busy}
         onPress={load}
-      />
+        hitSlop={8}
+        style={styles.refresh}
+      >
+        <Text style={styles.link}>Refresh</Text>
+      </Pressable>
       {busy && !record && <StateCard title="Loading request…" loading />}
       {record && (
         <>
           <View style={styles.card}>
-            <StatusBadge status={record.status} />
-            <Text style={styles.title}>{record.area}</Text>
-            <Text style={layout.muted}>
-              {record.property} · {record.unit}
-            </Text>
-            <Text style={layout.body}>{record.description}</Text>
-            <StatusBadge status={record.urgency} />
-            <Text style={layout.muted}>
+            <View style={styles.headRow}>
+              <Text style={styles.meta}>
+                {`${record.area} • ${record.unit}`}
+              </Text>
+              <Text
+                style={[
+                  styles.pill,
+                  record.urgency === 'urgent'
+                    ? styles.pillUrgent
+                    : styles.pillNormal,
+                ]}
+              >
+                {`${record.urgency.toUpperCase()} URGENCY`}
+              </Text>
+            </View>
+            <Text style={styles.description}>{record.description}</Text>
+            <Text style={styles.meta}>
               {record.submitted_at
-                ? `Submitted ${new Date(record.submitted_at).toLocaleString()}`
+                ? `Reported: ${formatDate(record.submitted_at)}`
                 : 'Unsubmitted draft'}
             </Text>
+            <Text style={styles.meta}>{record.property}</Text>
             {record.status === 'draft' && onResume && (
               <Button title="Resume draft" onPress={onResume} />
             )}
           </View>
-          <Text style={styles.title}>
-            Photo evidence · {record.photos.length} photos
-          </Text>
-          {!record.photos.length && (
-            <StateCard
-              title="No photos saved"
-              message="Accepted photos will appear here after secure storage is confirmed."
-            />
-          )}
-          {record.photos.map((p, index) => (
-            <View key={p.id} style={styles.card}>
-              <Text style={layout.label}>Photo {index + 1}</Text>
-              {p.available ? (
-                <PrivatePhoto
-                  uri={api.maintenancePhotoUrl(id, p.id)}
-                  index={index}
-                />
-              ) : (
-                <Text style={layout.muted}>
-                  Photo {index + 1}:{' '}
-                  {p.state === 'ready' ? 'retention period expired' : p.state}
-                </Text>
-              )}
-            </View>
-          ))}
+
           <View style={styles.card}>
-            <Text style={styles.title}>Request activity</Text>
+            <Text style={styles.section}>PHOTOS</Text>
+            {!record.photos.length && (
+              <Text style={layout.muted}>
+                Accepted photos will appear here after secure storage is
+                confirmed.
+              </Text>
+            )}
+            <View style={styles.grid}>
+              {record.photos.map((p, index) => (
+                <View key={p.id} style={styles.cell}>
+                  {p.available ? (
+                    <PrivatePhoto
+                      uri={api.maintenancePhotoUrl(id, p.id)}
+                      index={index}
+                    />
+                  ) : (
+                    <View style={[styles.photo, styles.photoGone]}>
+                      <Text style={styles.photoGoneText}>
+                        {p.state === 'ready' ? 'Retention expired' : p.state}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+            <Text style={styles.meta}>
+              {`${record.photos.length} photo${
+                record.photos.length === 1 ? '' : 's'
+              }`}
+            </Text>
+          </View>
+
+          {record.status !== 'draft' && (
+            <View style={styles.card}>
+              <View style={styles.headRow}>
+                <Text style={styles.section}>STATUS</Text>
+                <StatusBadge status={record.status} />
+              </View>
+              {STEPS.map((st, i) => {
+                const done = i < stepIndex || record.status === 'resolved';
+                const current = i === stepIndex && record.status !== 'resolved';
+                return (
+                  <View key={st.status} style={styles.stepRow}>
+                    <View
+                      style={[
+                        styles.dot,
+                        done && styles.dotDone,
+                        current && styles.dotCurrent,
+                      ]}
+                    >
+                      {done ? <Text style={styles.dotMark}>✓</Text> : null}
+                    </View>
+                    <Text
+                      style={[
+                        styles.stepText,
+                        (done || current) && styles.stepTextOn,
+                      ]}
+                    >
+                      {st.label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          <View style={styles.card}>
+            <Text style={styles.section}>WHAT'S HAPPENING</Text>
             {record.history.map((h, index) => (
               <View key={`${h.at}-${index}`} style={styles.activity}>
-                <StatusBadge status={h.status} />
-                <Text style={layout.muted}>
-                  {new Date(h.at).toLocaleString()}
+                <Text style={styles.activityDate}>{formatDate(h.at)}</Text>
+                <Text style={styles.activityText}>
+                  {STATUS_TEXT[h.status] || h.status.replace(/[-_]/g, ' ')}
                 </Text>
               </View>
             ))}
-            <Text style={layout.muted}>{record.comparison_limitation}</Text>
+            {!!record.comparison_limitation && (
+              <Text style={styles.meta}>{record.comparison_limitation}</Text>
+            )}
           </View>
           {landlord && next && (
             <Button title={`Mark ${next}`} disabled={busy} onPress={update} />
@@ -231,6 +292,29 @@ export function MaintenanceRecord({
       )}
     </View>
   );
+}
+
+const STEPS = [
+  { status: 'submitted', label: 'Submitted' },
+  { status: 'in-review', label: 'In review' },
+  { status: 'in-progress', label: 'In progress' },
+  { status: 'resolved', label: 'Resolved' },
+];
+
+const STATUS_TEXT: Record<string, string> = {
+  draft: 'Draft started',
+  submitted: 'Request submitted',
+  'in-review': 'Landlord reviewing the issue',
+  'in-progress': 'Repair in progress',
+  resolved: 'Marked resolved',
+};
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
@@ -264,7 +348,7 @@ function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
 const styles = StyleSheet.create({
   photoRetry: { minHeight: 44, justifyContent: 'center' },
   list: { gap: 16 },
-  activity: { gap: 8, paddingVertical: 8 },
+  activity: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
   title: { ...layout.sectionTitle },
   card: {
     padding: 16,
@@ -282,8 +366,61 @@ const styles = StyleSheet.create({
   },
   photo: {
     width: '100%',
-    height: 240,
-    backgroundColor: colors.cardBorder,
+    aspectRatio: 1,
+    backgroundColor: colors.readOnly,
     borderRadius: 12,
   },
+  refresh: { alignSelf: 'flex-end' },
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  meta: { fontSize: 13, color: colors.muted },
+  description: {
+    fontSize: 18,
+    lineHeight: 25,
+    fontWeight: typography.semibold,
+    color: colors.ink,
+  },
+  pill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    overflow: 'hidden',
+    fontSize: 11,
+    fontWeight: typography.bold,
+    letterSpacing: 0.3,
+  },
+  pillNormal: { backgroundColor: colors.warnBg, color: colors.warnText },
+  pillUrgent: { backgroundColor: colors.errorTint, color: colors.error },
+  section: {
+    fontSize: 12,
+    fontWeight: typography.bold,
+    letterSpacing: 0.5,
+    color: colors.muted,
+  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  cell: { width: '47%' },
+  photoGone: { alignItems: 'center', justifyContent: 'center' },
+  photoGoneText: { fontSize: 12, color: colors.muted },
+  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  dot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotDone: { borderColor: colors.brand, backgroundColor: colors.brand },
+  dotCurrent: { borderColor: colors.brand },
+  dotMark: { fontSize: 12, fontWeight: typography.bold, color: colors.white },
+  stepText: { fontSize: 15, color: colors.muted },
+  stepTextOn: { color: colors.ink, fontWeight: typography.medium },
+  activityDate: { width: 96, fontSize: 13, color: colors.muted },
+  activityText: { flex: 1, fontSize: 14, color: colors.ink },
 });

@@ -1,11 +1,13 @@
-import Button from '../../components/Button';
+import Icon from '../../components/Icon';
 import Field from '../../components/Field';
 import StateCard from '../../components/StateCard';
 import ProgressBar from '../../components/ProgressBar';
 import StatusBadge from '../../components/StatusBadge';
 import ScreenContainer from '../../components/ScreenContainer';
 import { layout } from '../../theme/layout';
-import Header from '../../components/Header';
+import ScreenTitle from '../../components/ScreenTitle';
+import ActionButton from '../../components/ActionButton';
+import { typography } from '../../theme/typography';
 import PhotoReview from '../../components/PhotoReview';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -34,17 +36,6 @@ import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 
 type Props = NativeStackScreenProps<TenantStackParamList, 'ReportMaintenance'>;
-const COLORS = {
-  background: colors.background,
-  white: colors.white,
-  primary: colors.brand,
-  primaryLight: colors.brandSoft,
-  text: colors.ink,
-  muted: colors.muted,
-  border: colors.cardBorder,
-  orange: colors.warnText,
-  orangeLight: colors.warnBg,
-};
 
 export default function ReportMaintenanceScreen({ navigation, route }: Props) {
   const [area, setArea] = useState('');
@@ -130,9 +121,16 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
     urgency,
   };
   function valid() {
-    if (!unitId || !fields.area || !fields.description) {
+    const missing = [
+      !unitId && 'choose your unit',
+      !fields.area && 'enter the area',
+      !fields.description && 'describe the problem',
+    ].filter(Boolean);
+    if (missing.length) {
       setError(
-        'Select an assigned unit and enter an area and description before saving photos.',
+        `Before adding photos, ${missing.join(
+          ' and ',
+        )}. Photos are saved to a draft request, which needs these first.`,
       );
       return false;
     }
@@ -283,13 +281,18 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
   }
   if (done && draft)
     return (
-      <ScreenContainer>
-        <Header title="Request submitted" />
-        <Text style={styles.subtitle}>
-          Your maintenance request is saved. Your authorized landlord can now
-          review it.
+      <ScreenContainer style={styles.doneContent}>
+        <View style={styles.check}>
+          <Icon name="check" size={34} color={colors.successText} />
+        </View>
+        <Text accessibilityRole="header" style={styles.doneTitle}>
+          Request submitted
         </Text>
-        <Button
+        <Text style={styles.doneBody}>
+          Your maintenance request is saved. Your landlord can now review it.
+        </Text>
+        <View style={styles.spacer} />
+        <ActionButton
           title="View saved request"
           onPress={() =>
             navigation.replace('MaintenanceDetail', { requestId: draft.id })
@@ -297,6 +300,7 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
         />
       </ScreenContainer>
     );
+  const blocked = busy || loading || full || !!retryAsset;
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
@@ -308,16 +312,30 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Header
+          <ScreenTitle
             title="Report maintenance"
+            subtitle="Tell your landlord what needs fixing. Add 5–20 photos so they can see the problem."
             onBack={() => {
               if (!busy) navigation.goBack();
             }}
+            right={
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Refresh / retry connection"
+                disabled={busy}
+                hitSlop={8}
+                onPress={() => {
+                  draft
+                    ? operation(async () => {
+                        setDraft(await maintenance.getMaintenance(draft.id));
+                      })
+                    : load();
+                }}
+              >
+                <Text style={styles.link}>Refresh</Text>
+              </Pressable>
+            }
           />
-          <Text style={styles.subtitle}>
-            Review and accept 5–20 photos. Each accepted photo is saved
-            privately to your draft.
-          </Text>
           {loading && (
             <StateCard title="Loading assigned units and draft…" loading />
           )}
@@ -326,84 +344,162 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
               {error}
             </Text>
           )}
-          <Pressable
-            style={styles.recoveryAction}
-            accessibilityRole="button"
-            disabled={busy}
-            onPress={() => {
-              draft
-                ? operation(async () => {
-                    setDraft(await maintenance.getMaintenance(draft.id));
-                  })
-                : load();
-            }}
-          >
-            <Text style={styles.removePhotoText}>
-              Refresh / retry connection
-            </Text>
-          </Pressable>
           {!draft &&
             drafts.map(d => (
               <Pressable
                 key={d.id}
-                style={layout.card}
+                style={styles.resume}
                 accessibilityRole="button"
                 onPress={() =>
                   navigation.replace('ReportMaintenance', { draftId: d.id })
                 }
               >
-                <Text style={layout.body}>
-                  Resume saved draft: {d.area} ({d.photos.length} photos)
+                <Text style={styles.resumeTitle}>Resume saved draft</Text>
+                <Text style={styles.resumeBody}>
+                  {`${d.area} • ${d.photos.length} photos`}
                 </Text>
               </Pressable>
             ))}
           {!loading && units.length === 0 && (
-            <Text>
+            <Text style={styles.warn}>
               No verified unit assignment. Contact your property manager.
             </Text>
           )}
-          <View style={layout.card}>
-            <Text style={layout.sectionTitle}>Request details</Text>
-            <Text style={layout.label}>Assigned unit</Text>
-            {units.map(u => (
+          {units.length > 1 && (
+            <View style={styles.group}>
+              <Text style={styles.label}>Unit</Text>
+              {units.map(u => (
+                <Pressable
+                  key={u.id}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${u.property} · ${u.label}`}
+                  accessibilityState={{
+                    checked: unitId === u.id,
+                    disabled: busy || !!draft,
+                  }}
+                  style={[styles.choice, unitId === u.id && styles.selected]}
+                  disabled={busy || !!draft}
+                  onPress={() => setUnitId(u.id)}
+                >
+                  <Text style={styles.choiceText}>
+                    {`${u.property} • ${u.label}`}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {units.length === 1 && (
+            <Text style={styles.unitLine}>
+              {`${units[0].property} • ${units[0].label}`}
+            </Text>
+          )}
+          <Field
+            label="Area"
+            value={area}
+            onChangeText={setArea}
+            maxLength={100}
+            editable={!busy && !loading}
+            placeholder="e.g. Kitchen • Sink"
+          />
+          <Field
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            maxLength={2000}
+            editable={!busy && !loading}
+            multiline
+            placeholder="Describe what needs repair…"
+          />
+          <View style={styles.group}>
+            <Text style={styles.label}>Photos</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Add photos"
+              disabled={blocked}
+              onPress={add}
+              style={[styles.mediaCard, blocked && styles.disabled]}
+            >
+              <View style={styles.plus}>
+                <Text style={styles.plusText}>+</Text>
+              </View>
+              <Text style={styles.mediaTitle}>Add photos</Text>
+              <Text style={styles.mediaSubtitle}>
+                {!draft && (!area.trim() || !description.trim())
+                  ? 'Fill in the area and description first'
+                  : `${readyCount} of 20 photos saved • minimum 5`}
+              </Text>
+            </Pressable>
+            {readyCount > 0 && <ProgressBar value={readyCount / 20} />}
+          </View>
+          {busy && (
+            <Text style={styles.status} accessibilityLiveRegion="polite">
+              {`Saving… photo transfer ${progress}% (waiting for server confirmation)`}
+            </Text>
+          )}
+          {retryAsset && !busy && (
+            <View style={styles.retryCard}>
+              <Text style={styles.resumeBody}>
+                That photo didn't finish uploading.
+              </Text>
               <Pressable
-                key={u.id}
-                accessibilityRole="radio"
-                accessibilityLabel={`${u.property} · ${u.label}`}
-                accessibilityState={{
-                  checked: unitId === u.id,
-                  disabled: busy || !!draft,
+                accessibilityRole="button"
+                onPress={() => {
+                  accept(retryAsset);
                 }}
-                style={[
-                  styles.unitChoice,
-                  unitId === u.id && styles.unitSelected,
-                ]}
-                disabled={busy || !!draft}
-                onPress={() => setUnitId(u.id)}
+                hitSlop={6}
               >
-                <Text style={layout.body}>
-                  {unitId === u.id ? '●' : '○'} {u.property} · {u.label}
+                <Text style={styles.link}>Retry accepted photo</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setRetryAsset(undefined)}
+                hitSlop={6}
+              >
+                <Text style={styles.linkMuted}>
+                  Discard local retry (remove any failed server entry below)
                 </Text>
               </Pressable>
-            ))}
-            <Field
-              label="Area"
-              value={area}
-              onChangeText={setArea}
-              maxLength={100}
-              editable={!busy && !loading}
-              placeholder="e.g. Kitchen, sink"
-            />
-            <Field
-              label="Description"
-              value={description}
-              onChangeText={setDescription}
-              maxLength={2000}
-              editable={!busy && !loading}
-              multiline
-              placeholder="Describe what needs repair"
-            />
-            <Text style={layout.label}>Priority</Text>
+            </View>
+          )}
+          {!!draft?.photos.length && (
+            <View style={styles.photos}>
+              {draft.photos.map((p, index) => (
+                <View key={p.id} style={styles.photoCard}>
+                  {p.available ? (
+                    <Image
+                      source={{
+                        uri: maintenance.maintenancePhotoUrl(draft.id, p.id),
+                      }}
+                      style={styles.photo}
+                      accessibilityLabel={`Accepted photo ${index + 1}`}
+                    />
+                  ) : (
+                    <View style={styles.photo} />
+                  )}
+                  <View style={styles.photoRow}>
+                    <StatusBadge status={p.state} />
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove photo ${index + 1}`}
+                      disabled={busy}
+                      hitSlop={8}
+                      onPress={() => {
+                        operation(async () =>
+                          setDraft(
+                            await maintenance.removePhoto(draft.id, p.id),
+                          ),
+                        );
+                      }}
+                    >
+                      <Text style={styles.link}>Remove</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+          <View style={styles.group}>
+            <Text style={styles.label}>Urgency</Text>
             <View style={styles.priorityRow}>
               {(['normal', 'urgent'] as const).map(value => (
                 <Pressable
@@ -416,106 +512,40 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
                   }}
                   disabled={busy}
                   style={[
-                    styles.unitChoice,
+                    styles.choice,
                     styles.priorityChoice,
-                    urgency === value && styles.unitSelected,
+                    urgency === value &&
+                      (value === 'urgent' ? styles.urgent : styles.selected),
                   ]}
                   onPress={() => setUrgency(value)}
                 >
-                  <Text style={layout.body}>
-                    {urgency === value ? '✓ ' : ''}
+                  <Text
+                    style={[
+                      styles.choiceText,
+                      urgency === value && styles.choiceTextOn,
+                      urgency === value &&
+                        value === 'urgent' &&
+                        styles.urgentText,
+                    ]}
+                  >
                     {value === 'normal' ? 'Normal' : 'Urgent'}
                   </Text>
                 </Pressable>
               ))}
             </View>
-            <Text style={layout.muted}>
+            <Text style={styles.hint}>
               Choose urgent when the issue needs prompt attention. For immediate
               danger, contact local emergency services.
             </Text>
           </View>
-          <View style={layout.card}>
-            <Text style={layout.sectionTitle}>Photo evidence</Text>
-            <Text style={layout.muted}>
-              {readyCount} of 20 photos saved · minimum 5
-            </Text>
-            <ProgressBar value={readyCount / 20} />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Add photos"
-              disabled={busy || loading || full || !!retryAsset}
-              onPress={add}
-              style={[
-                styles.mediaCard,
-                (busy || loading || full || !!retryAsset) && styles.disabled,
-              ]}
-            >
-              <Text style={styles.mediaTitle}>+ Add photos</Text>
-              <Text style={styles.mediaSubtitle}>
-                Camera or gallery · JPEG/PNG · up to 8 MB / 20 MP
-              </Text>
-            </Pressable>
-          </View>
-          {busy && (
-            <Text accessibilityLiveRegion="polite">
-              Saving… photo transfer {progress}% (waiting for server
-              confirmation)
-            </Text>
-          )}
-          {retryAsset && !busy && (
-            <View>
-              <Pressable
-                style={styles.recoveryAction}
-                accessibilityRole="button"
-                onPress={() => {
-                  accept(retryAsset);
-                }}
-              >
-                <Text style={styles.removePhotoText}>Retry accepted photo</Text>
-              </Pressable>
-              <Pressable
-                style={styles.recoveryAction}
-                accessibilityRole="button"
-                onPress={() => setRetryAsset(undefined)}
-              >
-                <Text>
-                  Discard local retry (remove any failed server entry below)
-                </Text>
-              </Pressable>
-            </View>
-          )}
-          <View style={styles.photos}>
-            {draft?.photos.map((p, index) => (
-              <View key={p.id} style={styles.photoCard}>
-                {p.available && (
-                  <Image
-                    source={{
-                      uri: maintenance.maintenancePhotoUrl(draft.id, p.id),
-                    }}
-                    style={styles.photo}
-                    accessibilityLabel={`Accepted photo ${index + 1}`}
-                  />
-                )}
-                <StatusBadge status={p.state} />
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove photo ${index + 1}`}
-                  disabled={busy}
-                  onPress={() => {
-                    operation(async () =>
-                      setDraft(await maintenance.removePhoto(draft.id, p.id)),
-                    );
-                  }}
-                  style={styles.removePhoto}
-                >
-                  <Text style={styles.removePhotoText}>Remove</Text>
-                </Pressable>
-              </View>
-            ))}
-          </View>
-          <Button
+          <ActionButton
+            title="Submit request"
+            disabled={busy || loading || readyCount < 5}
+            onPress={submit}
+          />
+          <ActionButton
             title="Save draft"
-            variant="outline"
+            variant="secondary"
             disabled={busy || loading}
             onPress={() => {
               if (valid())
@@ -524,14 +554,9 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
                 });
             }}
           />
-          <Button
-            title="Submit request"
-            disabled={busy || loading || readyCount < 5}
-            onPress={submit}
-          />
-          <Button
-            title="Back"
-            variant="outline"
+          <ActionButton
+            title="Cancel"
+            variant="secondary"
             disabled={busy}
             onPress={() => navigation.goBack()}
           />
@@ -539,8 +564,7 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
             {draft && !dirty
               ? 'Draft saved on server.'
               : 'Save your fields before leaving.'}{' '}
-            Uploaded evidence is retained for at least 90 days. For immediate
-            danger, contact local emergency services.
+            Uploaded photos are kept for at least 90 days.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -558,40 +582,109 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  safeArea: { flex: 1, backgroundColor: colors.background },
   content: { ...layout.content },
-  unitChoice: {
+  group: { gap: 8 },
+  label: {
+    fontSize: 13,
+    fontWeight: typography.medium,
+    color: colors.muted,
+  },
+  hint: { fontSize: 12, lineHeight: 18, color: colors.muted },
+  link: {
+    fontSize: 14,
+    fontWeight: typography.semibold,
+    color: colors.brand,
+  },
+  linkMuted: { fontSize: 13, color: colors.muted },
+  unitLine: { fontSize: 13, color: colors.muted, marginTop: -6 },
+  warn: {
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.warnBg,
+    color: colors.warnText,
+    fontSize: 14,
+  },
+  resume: {
+    padding: 14,
+    gap: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.brandSoftBorder,
+    backgroundColor: colors.brandSoft,
+  },
+  resumeTitle: {
+    fontSize: 15,
+    fontWeight: typography.semibold,
+    color: colors.ink,
+  },
+  resumeBody: { fontSize: 13, color: colors.muted },
+  choice: {
     minHeight: 48,
-    padding: 12,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     borderRadius: 14,
+    backgroundColor: colors.white,
     justifyContent: 'center',
   },
-  unitSelected: {
-    borderColor: colors.brand,
+  selected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
+  urgent: { borderColor: '#F2B8B5', backgroundColor: colors.errorTint },
+  choiceText: { fontSize: 15, color: colors.ink },
+  choiceTextOn: { fontWeight: typography.semibold, color: colors.brand },
+  urgentText: { color: colors.error },
+  priorityRow: { flexDirection: 'row', gap: 12 },
+  priorityChoice: { flex: 1, alignItems: 'center' },
+  disabled: { opacity: 0.6 },
+  mediaCard: {
+    minHeight: 128,
+    padding: 16,
+    gap: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plus: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  priorityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  priorityChoice: { flexGrow: 1, flexBasis: '40%' },
-  subtitle: {
-    ...layout.muted,
+  plusText: {
+    fontSize: 22,
+    lineHeight: 26,
+    fontWeight: typography.semibold,
+    color: colors.brand,
   },
-  disabled: { opacity: 0.65 },
+  mediaTitle: {
+    fontSize: 15,
+    fontWeight: typography.semibold,
+    color: colors.ink,
+  },
+  mediaSubtitle: { fontSize: 13, color: colors.muted },
+  status: { fontSize: 13, color: colors.muted },
+  retryCard: {
+    padding: 14,
+    gap: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F4D58A',
+    backgroundColor: colors.warnBg,
+  },
   photos: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   photoCard: {
-    flexBasis: 140,
-    flexGrow: 1,
+    width: '48%',
     gap: 8,
-    padding: 12,
+    padding: 8,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     borderRadius: 16,
@@ -600,45 +693,42 @@ const styles = StyleSheet.create({
   photo: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: 12,
-    backgroundColor: COLORS.border,
+    borderRadius: 10,
+    backgroundColor: colors.readOnly,
   },
-  recoveryAction: { minHeight: 44, justifyContent: 'center' },
-  removePhoto: {
-    minHeight: 44,
+  photoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  doneContent: { flexGrow: 1, paddingTop: 72, gap: 14 },
+  check: {
+    alignSelf: 'center',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.successTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removePhotoText: { color: COLORS.primary, fontSize: 12, fontWeight: '600' },
-  mediaCard: {
-    minHeight: 126,
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    gap: 8,
-  },
-  mediaTitle: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 12,
-  },
-  mediaSubtitle: {
-    color: COLORS.muted,
-    fontSize: 13,
-    lineHeight: 20,
-    textAlign: 'center',
+  doneTitle: {
     marginTop: 6,
+    textAlign: 'center',
+    fontSize: 26,
+    fontWeight: typography.bold,
+    color: colors.ink,
   },
+  doneBody: {
+    textAlign: 'center',
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.muted,
+  },
+  spacer: { flex: 1, minHeight: 24 },
   footer: {
-    color: COLORS.muted,
+    color: colors.muted,
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 24,
     lineHeight: 18,
   },
 });

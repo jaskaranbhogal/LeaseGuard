@@ -303,26 +303,26 @@ it('captures five real photos, discards previews, waits for uploads and submits'
   });
   await mount();
   await press('Start guided inspection');
-  await press('Take photo', app.root.findByType(GuidedInspectionScreen));
+  await press('Capture photo', app.root.findByType(GuidedInspectionScreen));
   await act(async () => app.root.findByType(PhotoReview).props.onDiscard());
   expect(guided.uploadGuided).not.toHaveBeenCalled();
   for (let i = 0; i < 5; i++) {
     await press(
-      i % 2 ? 'Choose from gallery' : 'Take photo',
+      i % 2 ? 'Choose from gallery' : 'Capture photo',
       app.root.findByType(GuidedInspectionScreen),
     );
     await act(async () => app.root.findByType(PhotoReview).props.onAccept());
   }
   expect(guided.uploadGuided).toHaveBeenCalledTimes(5);
+  expect(JSON.stringify(app.toJSON())).toContain('Review your photos');
+  await press('Retake Room 2', app.root.findByType(GuidedInspectionScreen));
   await press('Previous', app.root.findByType(GuidedInspectionScreen));
   await press('Next', app.root.findByType(GuidedInspectionScreen));
+  await press('Back to review', app.root.findByType(GuidedInspectionScreen));
   await press('Submit inspection', app.root.findByType(GuidedInspectionScreen));
   expect(navigation.getCurrentRoute()?.name).toBe('InspectionSubmitted');
   expect(JSON.stringify(app.toJSON())).toContain('Inspection submitted');
-  await press(
-    'Back to dashboard',
-    app.root.findByType(InspectionSubmittedScreen),
-  );
+  await press('Back to home', app.root.findByType(InspectionSubmittedScreen));
   expect(navigation.getCurrentRoute()?.name).toBe('Home');
 });
 
@@ -385,7 +385,7 @@ it('validates fields and requires five securely saved photos', async () => {
   const form = app.root.findByType(ReportMaintenanceScreen);
   await press('Save draft', form);
   expect(JSON.stringify(app.toJSON())).toContain(
-    'enter an area and description',
+    'describe the problem',
   );
   const submit = form
     .findAll(node => typeof node.props.onPress === 'function')
