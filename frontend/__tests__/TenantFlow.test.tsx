@@ -144,7 +144,11 @@ async function press(label: string, within?: ReactTestInstance) {
   });
 }
 async function signIn(user: User) {
-  jest.mocked(auth.login).mockResolvedValueOnce(user);
+  jest.requireMock('@react-native-firebase/auth').signInWithEmailAndPassword
+    .mockResolvedValueOnce({
+      user: { emailVerified: true, getIdToken: jest.fn().mockResolvedValue('firebase-token') },
+    });
+  jest.mocked(auth.synchronizeFirebaseUser).mockResolvedValueOnce(user);
   const screen = app.root.findByType(LoginScreen);
   await act(async () => {
     screen.findAllByType(TextInput)[0].props.onChangeText(user.email);

@@ -10,6 +10,7 @@ import {
 import { AppState } from 'react-native';
 import { getSession, logout } from '../services/authService';
 import { ApiError } from '../services/api';
+import { signOutFirebase, subscribeToFirebaseAuth } from '../services/firebaseAuthService';
 import type { User } from '../types/user';
 
 type AuthState = {
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState('');
   const pending = useRef<AbortController | null>(null);
   const signingOut = useRef(false);
+  const authInitialized = useRef(false);
 
   const cancelCheck = useCallback(() => {
     pending.current?.abort();
@@ -51,11 +53,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       if (!controller.signal.aborted) {
-        setSessionError(
-          error instanceof ApiError
-            ? error.message
-            : 'Unable to check your session. Please try again.',
-        );
+        if (error instanceof ApiError && error.code === 'account_link_required') {
+          setUser(null);
+          setSessionError('');
+        } else {
+          setSessionError(
+            error instanceof ApiError
+              ? error.message
+              : 'Unable to check your session. Please try again.',
+          );
+        }
       }
     } finally {
       if (!controller.signal.aborted) {
@@ -66,8 +73,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [cancelCheck]);
 
   useEffect(() => {
-    refreshSession();
-    return cancelCheck;
+    const unsubscribe = subscribeToFirebaseAuth(firebaseUser => {
+      if (!authInitialized.current) {
+        authInitialized.current = true;
+        // Ask the session service to restore/clear the app account after the
+        // native Firebase SDK has finished loading its persisted user.
+        refreshSession();
+      } else if (!firebaseUser && !signingOut.current) {
+        setUser(null);
+        setChecking(false);
+        setSessionError('');
+      }
+    });
+    return () => {
+      unsubscribe();
+      cancelCheck();
+    };
   }, [refreshSession, cancelCheck]);
 
   useEffect(() => {
@@ -110,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signingOut.current = true;
     try {
       await logout(signal);
+      await signOutFirebase();
       showLogin();
     } finally {
       signingOut.current = false;

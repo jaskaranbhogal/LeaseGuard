@@ -1,5 +1,6 @@
 import { ApiError, authPost, request } from './api';
 import type { User, UserRole } from '../types/user';
+import { currentFirebaseUser } from './firebaseAuthService';
 
 export type ResetDelivery = 'email' | 'console';
 
@@ -67,6 +68,54 @@ export async function logout(signal?: AbortSignal): Promise<void> {
   await authPost('/auth/logout/', {}, signal);
 }
 
+export async function chooseRole(
+  role: UserRole,
+  signal?: AbortSignal,
+): Promise<User> {
+  const result = await authPost<{ user: User }>(
+    '/auth/role/',
+    { role },
+    signal,
+  );
+  if (!isUser(result.user) || result.user.role !== role) {
+    throw new ApiError(
+      'LeaseGuard could not save your account type. Please try again.',
+    );
+  }
+  return result.user;
+}
+
+export async function synchronizeFirebaseUser(
+  idToken: string,
+  signal?: AbortSignal,
+): Promise<User> {
+  const result = await authPost<{ user: User }>(
+    '/auth/firebase/session/',
+    { idToken },
+    signal,
+  );
+  if (!isUser(result.user)) {
+    throw new ApiError('LeaseGuard could not load your account. Please try again.');
+  }
+  return result.user;
+}
+
+export async function linkLegacyAccount(
+  idToken: string,
+  legacyPassword: string,
+  signal?: AbortSignal,
+): Promise<User> {
+  const result = await authPost<{ user: User }>(
+    '/auth/firebase/link/',
+    { idToken, legacyPassword },
+    signal,
+  );
+  if (!isUser(result.user)) {
+    throw new ApiError('LeaseGuard could not link your account. Please try again.');
+  }
+  return result.user;
+}
+
 function isUser(value: unknown): value is User {
   if (!value || typeof value !== 'object') {
     return false;
@@ -74,6 +123,7 @@ function isUser(value: unknown): value is User {
   const user = value as Partial<User>;
   return (
     typeof user.id === 'string' &&
+    user.id.length === 24 &&
     /^[0-9a-f]{24}$/i.test(user.id) &&
     typeof user.email === 'string' &&
     typeof user.name === 'string' &&
@@ -83,7 +133,15 @@ function isUser(value: unknown): value is User {
 
 export async function getSession(signal?: AbortSignal): Promise<User | null> {
   try {
-    const result = await request<{ user: User }>('/auth/session/', { signal });
+    const firebaseUser = currentFirebaseUser();
+    if (firebaseUser) {
+      if (!firebaseUser.emailVerified && firebaseUser.providerData.some(provider => provider.providerId === 'password')) {
+        return null;
+      }
+      return await synchronizeFirebaseUser(await firebaseUser.getIdToken(), signal);
+    }
+    const result = await request<{ user: User; firebaseSession?: boolean }>('/auth/session/', { signal });
+    if (result.firebaseSession) return null;
     if (!isUser(result.user)) {
       throw new ApiError(
         'The server returned an invalid session. Please sign in again.',

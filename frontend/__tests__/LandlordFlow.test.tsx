@@ -130,7 +130,11 @@ async function fill(scope: ReactTestInstance, values: Record<string, string>) {
 
 it('logs a landlord in, shows the authenticated name, and labels sample records', async () => {
   await mount(null);
-  jest.mocked(auth.login).mockResolvedValueOnce(landlord);
+  jest.requireMock('@react-native-firebase/auth').signInWithEmailAndPassword
+    .mockResolvedValueOnce({
+      user: { emailVerified: true, getIdToken: jest.fn().mockResolvedValue('firebase-token') },
+    });
+  jest.mocked(auth.synchronizeFirebaseUser).mockResolvedValueOnce(landlord);
   const login = app.root.findByType(LoginScreen);
   await fill(login, { Email: landlord.email, Password: 'fixture-password' });
   await act(async () => login.findByType(Button).props.onPress());

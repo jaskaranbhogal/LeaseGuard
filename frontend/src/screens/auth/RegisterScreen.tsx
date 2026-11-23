@@ -1,5 +1,5 @@
 import Header from '../../components/Header';
-import { useRef, useState, type ComponentRef } from 'react';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import {
   Keyboard,
   Pressable,
@@ -9,31 +9,46 @@ import {
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { UserRole } from '../../types/user';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
-import { register } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
+import { useAuth } from '../../context/AuthContext';
+import { linkLegacyAccount, synchronizeFirebaseUser } from '../../services/authService';
+import {
+  currentFirebaseUser,
+  firebaseErrorMessage,
+  refreshEmailVerification,
+  registerWithEmail,
+  resendVerificationEmail,
+} from '../../services/firebaseAuthService';
 import { useAuthRequest } from '../../utils/useAuthRequest';
+import { ApiError } from '../../services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 export default function RegisterScreen({ navigation }: Props) {
-  const [role, setRole] = useState<UserRole | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [createdEmail, setCreatedEmail] = useState('');
+  const [working, setLoading] = useState(false);
+  const registration = useAuthRequest();
+  const loading = working || registration.loading;
+  const [error, setError] = useState('');
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [linkRequired, setLinkRequired] = useState(false);
+  const [legacyPassword, setLegacyPassword] = useState('');
+  const { completeSignIn } = useAuth();
   const emailInput = useRef<ComponentRef<typeof TextInput>>(null);
   const passwordInput = useRef<ComponentRef<typeof TextInput>>(null);
   const confirmInput = useRef<ComponentRef<typeof TextInput>>(null);
-  const request = useAuthRequest();
   const invalidName =
     !name.trim() || name.trim().length > 150
       ? 'Enter your full name (up to 150 characters).'
@@ -51,27 +66,90 @@ export default function RegisterScreen({ navigation }: Props) {
     ? 'Passwords do not match.'
     : undefined;
 
-  function submit() {
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(value => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  async function submit() {
     setSubmitted(true);
-    if (
-      !role ||
-      invalidName ||
-      invalidEmail ||
-      invalidPassword ||
-      invalidConfirmation
-    ) {
+    if (invalidName || invalidEmail || invalidPassword || invalidConfirmation) {
       return;
     }
     Keyboard.dismiss();
-    request.run(
-      signal =>
-        register({ name, email, password, confirmPassword, role }, signal),
-      user => {
-        setPassword('');
-        setConfirmPassword('');
-        setCreatedEmail(user.email);
-      },
-    );
+    setError('');
+    registration.run(async () => {
+      try {
+        return await registerWithEmail(email, password, name);
+      } catch (failure) {
+        throw new ApiError(firebaseErrorMessage(failure));
+      }
+    }, result => {
+      setPendingVerification(true);
+      setVerificationSent(result.verificationSent);
+      setResendCooldown(result.verificationSent ? 30 : 0);
+      if (!result.profileUpdated) {
+        setError('Your account was created, but we could not save your name. You can update it later.');
+      }
+    });
+  }
+
+  async function resendVerification() {
+    setLoading(true);
+    setError('');
+    try {
+      await resendVerificationEmail();
+      setVerificationSent(true);
+      setResendCooldown(30);
+    } catch (failure) {
+      setError(firebaseErrorMessage(failure));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function checkVerification() {
+    setLoading(true);
+    setError('');
+    try {
+      const firebaseUser = await refreshEmailVerification();
+      if (!firebaseUser) {
+        setError('Your email is not verified yet. Open the link we sent, then try again.');
+        return;
+      }
+      try {
+        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken(true)));
+      } catch (failure) {
+        if (failure instanceof ApiError && failure.code === 'account_link_required') {
+          setLinkRequired(true);
+          setError(failure.message);
+        } else {
+          throw failure;
+        }
+      }
+    } catch (failure) {
+      setError(firebaseErrorMessage(failure));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function linkAccount() {
+    const firebaseUser = currentFirebaseUser();
+    if (!firebaseUser || !legacyPassword) {
+      setError('Enter the password for your existing LeaseGuard account.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      completeSignIn(await linkLegacyAccount(await firebaseUser.getIdToken(), legacyPassword));
+    } catch (failure) {
+      setError(firebaseErrorMessage(failure));
+    } finally {
+      setLoading(false);
+    }
   }
   function signIn() {
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
@@ -80,159 +158,128 @@ export default function RegisterScreen({ navigation }: Props) {
   return (
     <ScreenContainer style={styles.container}>
       <Text style={styles.brand}>LeaseGuard</Text>
-      <Header
-        title={createdEmail ? 'Account created' : 'Create an account'}
-        titleStyle={styles.title}
-      />
-      {createdEmail ? (
-        <View style={styles.form}>
-          <Text accessibilityRole="alert" style={styles.subtitle}>
-            Your account for {createdEmail} is ready. Sign in to continue.
-          </Text>
-          <Button title="Back to sign in" onPress={signIn} />
-        </View>
-      ) : (
-        <>
-          <Text style={styles.subtitle}>Get started with LeaseGuard</Text>
-          <View style={styles.form}>
-            <Text style={styles.roleLabel}>Select role</Text>
-            <View style={styles.roles} accessibilityRole="radiogroup">
-              {(['landlord', 'tenant'] as const).map(option => (
-                <Pressable
-                  key={option}
-                  accessibilityRole="radio"
-                  accessibilityLabel={
-                    option === 'tenant' ? 'Tenant' : 'Landlord'
-                  }
-                  accessibilityState={{
-                    checked: role === option,
-                    disabled: request.loading,
-                  }}
-                  disabled={request.loading}
-                  onPress={() => {
-                    setRole(option);
-                    request.clearError();
-                  }}
-                  style={[
-                    styles.roleCard,
-                    role === option && styles.selectedRole,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.roleText,
-                      role === option && styles.selectedRoleText,
-                    ]}
-                  >
-                    <Text
-                      accessibilityElementsHidden
-                      importantForAccessibility="no"
-                    >
-                      {option === 'tenant' ? '⌂' : '▥'}{' '}
-                    </Text>
-                    {option === 'tenant' ? 'Tenant' : 'Landlord'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            {submitted && !role ? (
-              <Text accessibilityRole="alert" style={styles.error}>
-                Select Tenant or Landlord.
-              </Text>
-            ) : null}
-            <Input
-              label="Full name"
-              placeholder="Enter your full name"
-              value={name}
-              onChangeText={value => {
-                setName(value);
-                request.clearError();
-              }}
-              error={submitted ? invalidName : undefined}
-              autoCapitalize="words"
-              autoComplete="name"
-              textContentType="name"
-              editable={!request.loading}
-              returnKeyType="next"
-              onSubmitEditing={() => emailInput.current?.focus()}
-            />
-            <Input
-              ref={emailInput}
-              label="Email"
-              placeholder="Enter your email"
-              value={email}
-              onChangeText={value => {
-                setEmail(value);
-                request.clearError();
-              }}
-              error={submitted ? invalidEmail : undefined}
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-              editable={!request.loading}
-              returnKeyType="next"
-              onSubmitEditing={() => passwordInput.current?.focus()}
-            />
-            <Input
-              ref={passwordInput}
-              label="Password"
-              placeholder="Create a password"
-              value={password}
-              onChangeText={value => {
-                setPassword(value);
-                request.clearError();
-              }}
-              error={submitted ? invalidPassword : undefined}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-              editable={!request.loading}
-              returnKeyType="next"
-              onSubmitEditing={() => confirmInput.current?.focus()}
-            />
-            <Text style={styles.hint}>
-              Use at least 8 characters. Avoid common passwords, only numbers,
-              and passwords similar to your name or email.
+      <Header title="Create an account" titleStyle={styles.title} />
+      <Text style={styles.subtitle}>Get started with LeaseGuard</Text>
+      <View style={styles.form}>
+        <Input
+          label="Full name"
+          placeholder="Enter your full name"
+          value={name}
+          onChangeText={value => {
+            setName(value);
+          }}
+          error={submitted ? invalidName : undefined}
+          autoCapitalize="words"
+          autoComplete="name"
+          textContentType="name"
+          editable={!pendingVerification && !loading}
+          returnKeyType="next"
+          onSubmitEditing={() => emailInput.current?.focus()}
+        />
+        <Input
+          ref={emailInput}
+          label="Email"
+          placeholder="Enter your email"
+          value={email}
+          onChangeText={value => {
+            setEmail(value);
+          }}
+          error={submitted ? invalidEmail : undefined}
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
+          editable={!pendingVerification && !loading}
+          returnKeyType="next"
+          onSubmitEditing={() => passwordInput.current?.focus()}
+        />
+        <Input
+          ref={passwordInput}
+          label="Password"
+          placeholder="Create a password"
+          value={password}
+          onChangeText={value => {
+            setPassword(value);
+          }}
+          error={submitted ? invalidPassword : undefined}
+          secureTextEntry
+          autoComplete="new-password"
+          textContentType="newPassword"
+          editable={!pendingVerification && !loading}
+          returnKeyType="next"
+          onSubmitEditing={() => confirmInput.current?.focus()}
+        />
+        <Text style={styles.hint}>
+          Use at least 8 characters. Avoid common passwords, only numbers, and
+          passwords similar to your name or email.
+        </Text>
+        <Input
+          ref={confirmInput}
+          label="Confirm password"
+          placeholder="Re-enter your password"
+          value={confirmPassword}
+          onChangeText={value => {
+            setConfirmPassword(value);
+          }}
+          error={submitted ? invalidConfirmation : undefined}
+          secureTextEntry
+          autoComplete="new-password"
+          textContentType="newPassword"
+          editable={!pendingVerification && !loading}
+          returnKeyType="go"
+          onSubmitEditing={submit}
+        />
+        {pendingVerification ? (
+          <View style={styles.verification}>
+            <Text style={styles.notice}>
+              {verificationSent
+                ? `We sent a verification link to ${email.trim()}. Verify your email, then return here.`
+                : `Your account was created, but we could not send the verification email to ${email.trim()}. Try sending it again.`}
             </Text>
-            <Input
-              ref={confirmInput}
-              label="Confirm password"
-              placeholder="Re-enter your password"
-              value={confirmPassword}
-              onChangeText={value => {
-                setConfirmPassword(value);
-                request.clearError();
-              }}
-              error={submitted ? invalidConfirmation : undefined}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-              editable={!request.loading}
-              returnKeyType="go"
-              onSubmitEditing={submit}
-            />
-            {request.error ? (
-              <Text accessibilityRole="alert" style={styles.error}>
-                {request.error}
-              </Text>
-            ) : null}
             <Button
-              title="Create account"
-              loading={request.loading}
-              onPress={submit}
+              title={resendCooldown ? `Resend email in ${resendCooldown}s` : 'Resend verification email'}
+              onPress={resendVerification}
+              loading={loading && !linkRequired}
+              disabled={loading || resendCooldown > 0}
+              variant="outline"
             />
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel="Sign in"
-              disabled={request.loading}
-              style={styles.signIn}
-              onPress={signIn}
-            >
-              <Text style={styles.link}>Already have an account? Sign in</Text>
-            </Pressable>
+            <Button
+              title="I verified my email"
+              onPress={checkVerification}
+              loading={loading && !linkRequired}
+              disabled={loading}
+            />
           </View>
-        </>
-      )}
+        ) : (
+          <Button title="Create account" disabled={loading} loading={loading} onPress={submit} />
+        )}
+        {error || registration.error ? (
+          <Text accessibilityRole="alert" style={styles.error}>{error || registration.error}</Text>
+        ) : null}
+        {linkRequired ? (
+          <View style={styles.verification}>
+            <Input
+              label="Previous LeaseGuard password"
+              placeholder="Enter your previous password"
+              value={legacyPassword}
+              onChangeText={setLegacyPassword}
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              editable
+            />
+            <Button title="Link existing account" onPress={linkAccount} loading={loading} disabled={loading || !legacyPassword} />
+          </View>
+        ) : null}
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Sign in"
+          disabled={loading}
+          style={styles.signIn}
+          onPress={signIn}
+        >
+          <Text style={styles.link}>Already have an account? Sign in</Text>
+        </Pressable>
+      </View>
     </ScreenContainer>
   );
 }
@@ -256,35 +303,10 @@ const styles = StyleSheet.create({
   },
   subtitle: { fontSize: 14, color: colors.textSecondary, lineHeight: 21 },
   form: { marginTop: spacing.xl, gap: spacing.md },
-  roleLabel: {
-    color: colors.label,
-    fontSize: 14,
-    fontWeight: typography.semibold,
-  },
-  roles: { flexDirection: 'row', gap: 10 },
-  roleCard: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.sm,
-  },
-  selectedRole: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
-  },
-  roleText: {
-    color: colors.label,
-    fontSize: 15,
-    fontWeight: typography.semibold,
-  },
-  selectedRoleText: { color: colors.white },
   hint: { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-  error: { color: colors.error, fontSize: 14, lineHeight: 20 },
+  notice: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  error: { color: colors.error, fontSize: 13, lineHeight: 18, textAlign: 'center' },
+  verification: { gap: spacing.md },
   signIn: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   link: { color: colors.primary, fontSize: 14, textAlign: 'center' },
 });

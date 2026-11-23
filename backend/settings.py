@@ -140,6 +140,8 @@ MIGRATION_MODULES = {
 }
 
 
+FIREBASE_PROJECT_ID = os.environ.get('FIREBASE_PROJECT_ID', 'leaseguard-9141a').strip()
+
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.5-flash-lite').strip() or 'gemini-3.5-flash-lite'
 

@@ -8,14 +8,21 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+# Keep the Firebase iOS SDK on the app's existing CocoaPods workflow.
+$RNFirebaseDisableSPM = true
+
+# Firebase's Swift-generated headers need framework module boundaries.
+use_frameworks! :linkage => :static
+$RNFirebaseAsStaticFramework = true
 
 target 'frontend' do
   config = use_native_modules!
+
+  # Firebase Auth's Swift pods import these Objective-C dependencies as modules.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+  pod 'FirebaseAuthInterop', :modular_headers => true
+  pod 'FirebaseAppCheckInterop', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -41,6 +48,15 @@ target 'frontend' do
       end
 
       if target.name == 'RNSVG-RNSVGFilters'
+        target.build_configurations.each do |config|
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+        end
+      end
+      if [
+        'PromisesSwift-Promises_Privacy',
+        'PromisesObjC-FBLPromises_Privacy',
+        'GoogleUtilities-GoogleUtilities_Privacy'
+      ].include?(target.name)
         target.build_configurations.each do |config|
           config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
         end
