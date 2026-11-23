@@ -154,13 +154,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
 
-  // 24px like Settings, Profile, Login, and Register (Header defaults to 32).
+  // Compact page heading.
   title: {
     fontSize: 24,
   },
 
   header: {
-    marginBottom: spacing.lg,
+    marginBottom: 0,
   },
 
   section: {
@@ -203,16 +203,18 @@ const styles = StyleSheet.create({
 export function PrivacyPolicyContent() {
   return (
     <View>
-      <Text accessibilityRole="header">
+      <Text style={styles.sectionTitle} accessibilityRole="header">
         LeaseGuard privacy policy · {LAST_UPDATED}
       </Text>
-      <Text>{INTRO}</Text>
+      <Text style={styles.body}>{INTRO}</Text>
       {SECTIONS.map(section => (
         <View key={section.title} style={styles.policySection}>
-          <Text accessibilityRole="header">{section.title}</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">
+            {section.title}
+          </Text>
           {[...(section.paragraphs || []), ...(section.bullets || [])].map(
             text => (
-              <Text key={text} style={styles.policyParagraph}>
+              <Text key={text} style={[styles.body, styles.policyParagraph]}>
                 {text}
               </Text>
             ),

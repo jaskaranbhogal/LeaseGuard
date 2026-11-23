@@ -48,6 +48,7 @@ export default function Field({
         }}
         style={[
           styles.input,
+          props.multiline && styles.multiline,
           focused && styles.focused,
           error ? styles.invalid : undefined,
           style,
@@ -72,7 +73,8 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   input: {
-    height: 48,
+    minHeight: 48,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     borderRadius: 14,
@@ -82,6 +84,7 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   focused: { borderColor: colors.brand, borderWidth: 1.5 },
+  multiline: { minHeight: 112, textAlignVertical: 'top' },
   invalid: { borderColor: colors.error },
   hint: { fontSize: 12, lineHeight: 17, color: colors.muted, marginTop: 2 },
   error: { fontSize: 12, lineHeight: 17, color: colors.error, marginTop: 2 },

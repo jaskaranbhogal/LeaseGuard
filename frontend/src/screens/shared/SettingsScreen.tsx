@@ -46,9 +46,9 @@ export default function SettingsScreen({
       />
 
       <Text style={styles.notice}>
-        Prototype settings. Notification preferences are local to this screen
-        and reset when the screen unmounts or the app restarts. They are not
-        saved or synchronized with Django.
+        Notification preferences are a preview and are not saved. They reset
+        when you leave this screen or restart the app. Email and push delivery
+        are not enabled.
       </Text>
       <Text style={styles.sectionTitle}>ACCOUNT</Text>
 
@@ -167,6 +167,7 @@ export default function SettingsScreen({
 
 const styles = StyleSheet.create({
   content: {
+    gap: 0,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,

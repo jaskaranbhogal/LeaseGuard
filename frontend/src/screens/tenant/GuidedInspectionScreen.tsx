@@ -1,3 +1,7 @@
+import EvidenceImage from '../../components/EvidenceImage';
+import { layout } from '../../theme/layout';
+import StatusBadge from '../../components/StatusBadge';
+import StateCard from '../../components/StateCard';
 import CameraFrame from '../../components/CameraFrame';
 import ScreenTitle from '../../components/ScreenTitle';
 import PhotoTile from '../../components/PhotoTile';
@@ -5,7 +9,7 @@ import { colors } from '../../theme/colors';
 import EvidenceNotes from '../../components/EvidenceNotes';
 import ProgressBar from '../../components/ProgressBar';
 import React, { useCallback, useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -123,7 +127,7 @@ export default function GuidedInspectionScreen({
     <SafeAreaView style={styles.root}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={layout.content}
       >
         <ScreenTitle
           title="Guided photo inspection"
@@ -138,44 +142,59 @@ export default function GuidedInspectionScreen({
           />
         ) : (
           <>
-            {!!error && <Text accessibilityRole="alert">{error}</Text>}
+            {!!error && (
+              <Text style={layout.error} accessibilityRole="alert">
+                {error}
+              </Text>
+            )}
             <Button
               title="Refresh saved progress"
               disabled={busy}
               variant="outline"
               onPress={refresh}
             />
+            {!record && !error && (
+              <StateCard title="Loading inspection…" loading />
+            )}
             {record && (
               <>
-                <Text>
-                  {record.property} · {record.unit} · {record.inspection_type}
-                </Text>
-                <Text>
-                  Due {new Date(record.due_at).toLocaleDateString()} ·{' '}
-                  {record.status}
-                </Text>
-                <ProgressBar value={record.progress / record.required} />
-                <Text>
-                  {record.progress}/{record.required} photos securely saved
-                </Text>
+                <View style={layout.card}>
+                  <StatusBadge status={record.status} />
+                  <Text style={layout.sectionTitle}>
+                    {record.property} · {record.unit} · {record.inspection_type}
+                  </Text>
+                  <Text style={layout.body}>
+                    Due {new Date(record.due_at).toLocaleDateString()} ·{' '}
+                    {record.status}
+                  </Text>
+                  <ProgressBar value={record.progress / record.required} />
+                  <Text style={layout.body}>
+                    {record.progress}/{record.required} photos securely saved
+                  </Text>
+                </View>
                 {record.history
                   .filter(h => h.reason)
                   .map((h, i) => (
                     <Text key={i}>Retake request: {h.reason}</Text>
                   ))}
                 {step && (
-                  <>
-                    <Text style={styles.title}>
-                      {index + 1}. {step.room} · Photo {step.slot + 1}
-                    </Text>
-                    <Text>{step.instructions}</Text>
+                  <View style={layout.card}>
+                    <View style={layout.notice}>
+                      <Text style={layout.label}>
+                        PHOTO GUIDE · STEP {index + 1} OF {slots.length}
+                      </Text>
+                      <Text style={styles.title}>
+                        {index + 1}. {step.room} · Photo {step.slot + 1}
+                      </Text>
+                      <Text style={layout.body}>{step.instructions}</Text>
+                    </View>
                     {record.baseline_photos
                       .filter(
                         p => p.step_id === step.id && p.slot === step.slot,
                       )
                       .map(p => (
                         <View key={p.id}>
-                          <Text>
+                          <Text style={layout.body}>
                             Approved baseline reference · static preview
                           </Text>
                           <CameraFrame
@@ -186,7 +205,7 @@ export default function GuidedInspectionScreen({
                         </View>
                       ))}
                     {photo && (
-                      <Image
+                      <EvidenceImage
                         accessibilityLabel="Saved inspection photo"
                         source={{ uri: guidedPhotoUrl(record.id, photo.id) }}
                         style={styles.photo}
@@ -219,7 +238,7 @@ export default function GuidedInspectionScreen({
                       />
                     )}
                     {busy && (
-                      <Text>
+                      <Text style={layout.body}>
                         {progress < 100
                           ? `Transferring ${progress}%`
                           : 'Waiting for secure storage confirmation…'}
@@ -236,6 +255,7 @@ export default function GuidedInspectionScreen({
                         />
                         <Button
                           title="Choose from gallery"
+                          variant="outline"
                           disabled={busy}
                           onPress={() => pick(false)}
                         />
@@ -251,6 +271,8 @@ export default function GuidedInspectionScreen({
                     <View style={styles.row}>
                       <Button
                         title="Previous"
+                        variant="outline"
+                        style={styles.stepButton}
                         disabled={busy || index === 0}
                         onPress={() => {
                           setIndex(index - 1);
@@ -259,6 +281,8 @@ export default function GuidedInspectionScreen({
                       />
                       <Button
                         title="Next"
+                        variant="outline"
+                        style={styles.stepButton}
                         disabled={busy || index === slots.length - 1}
                         onPress={() => {
                           setIndex(index + 1);
@@ -266,10 +290,10 @@ export default function GuidedInspectionScreen({
                         }}
                       />
                     </View>
-                  </>
+                  </View>
                 )}
                 {!!record.uploads.length && (
-                  <Text>
+                  <Text style={layout.body}>
                     Some uploads need recovery. Re-select the same photo and
                     retry after the upload lease expires.
                   </Text>
@@ -374,8 +398,14 @@ export default function GuidedInspectionScreen({
 const styles = StyleSheet.create({
   reviewList: { gap: 12 },
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24, gap: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
-  photo: { width: '100%', height: 260, resizeMode: 'contain' },
-  row: { flexDirection: 'row', justifyContent: 'space-between' },
+  title: { ...layout.sectionTitle },
+  photo: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    resizeMode: 'contain',
+    borderRadius: 14,
+    backgroundColor: colors.readOnly,
+  },
+  row: { flexDirection: 'row', gap: 12 },
+  stepButton: { flex: 1 },
 });

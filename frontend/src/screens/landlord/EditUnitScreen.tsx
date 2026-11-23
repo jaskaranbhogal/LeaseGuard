@@ -21,13 +21,21 @@ import {
   bedroomCountError,
 } from '../../utils/landlordValidation';
 import AddAreaSheet from './AddAreaSheet';
+import { layout } from '../../theme/layout';
 
 type Props = NativeStackScreenProps<LandlordStackParamList, 'EditUnit'>;
 
 export default function EditUnitScreen({ navigation, route }: Props) {
   const { propertyId, unitId } = route.params;
-  const { findUnit, updateUnit, removeTenant, sendInvite, cancelInvite, busy } =
-    useLandlordDemo();
+  const {
+    findUnit,
+    updateUnit,
+    removeTenant,
+    sendInvite,
+    cancelInvite,
+    busy,
+    error,
+  } = useLandlordDemo();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const found = findUnit(propertyId, unitId);
@@ -104,7 +112,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
     });
     if (!saved) return;
     if ((pending || !tenant) && inviteEmail.trim() && emailChanged) {
-      await sendInvite(propertyId, unitId, inviteEmail);
+      if (!(await sendInvite(propertyId, unitId, inviteEmail))) return;
     }
     navigation.goBack();
   }
@@ -125,8 +133,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
           text: 'Cancel invite',
           style: 'destructive',
           onPress: async () => {
-            await cancelInvite(propertyId, unitId);
-            setInviteEmail('');
+            if (await cancelInvite(propertyId, unitId)) setInviteEmail('');
           },
         },
       ],
@@ -144,9 +151,8 @@ export default function EditUnitScreen({ navigation, route }: Props) {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            removeTenant(propertyId, unitId);
-            navigation.goBack();
+          onPress: async () => {
+            if (await removeTenant(propertyId, unitId)) navigation.goBack();
           },
         },
       ],
@@ -161,6 +167,12 @@ export default function EditUnitScreen({ navigation, route }: Props) {
           subtitle={`${property.street} • Unit ${unit.name}`}
           onBack={() => navigation.goBack()}
         />
+
+        {!!error && (
+          <Text accessibilityRole="alert" style={layout.error}>
+            {error}
+          </Text>
+        )}
 
         <View style={styles.row}>
           <Field
@@ -247,6 +259,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
                   title="Resend invite"
                   variant="secondary"
                   compact
+                  disabled={busy}
                   onPress={resendInvite}
                   style={styles.flexButton}
                 />
@@ -254,6 +267,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
                   title="Cancel invite"
                   variant="dangerOutline"
                   compact
+                  disabled={busy}
                   onPress={confirmCancelInvite}
                   style={styles.flexButton}
                 />
@@ -395,6 +409,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
           <ActionButton
             title="Remove tenant from unit"
             variant="danger"
+            disabled={busy}
             onPress={confirmRemoveTenant}
           />
         ) : null}

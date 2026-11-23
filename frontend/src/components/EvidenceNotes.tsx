@@ -83,5 +83,12 @@ export default function EvidenceNotes({
 
 const styles = StyleSheet.create({
   content: { gap: 8 },
-  note: { color: colors.muted },
+  note: {
+    color: colors.muted,
+    fontSize: 13,
+    lineHeight: 20,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: colors.brandSoft,
+  },
 });

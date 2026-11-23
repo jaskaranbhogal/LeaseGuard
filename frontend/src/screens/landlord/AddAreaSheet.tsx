@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -79,7 +80,12 @@ export default function AddAreaSheet({
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
-        <View accessibilityViewIsModal style={styles.sheet}>
+        <ScrollView
+          accessibilityViewIsModal
+          style={styles.sheet}
+          contentContainerStyle={styles.sheetContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.handle} />
           <View style={styles.heading}>
             <Text accessibilityRole="header" style={styles.title}>
@@ -91,6 +97,7 @@ export default function AddAreaSheet({
           </View>
           <Field
             label="Area name"
+            maxLength={60}
             placeholder="Entry door"
             value={name}
             onChangeText={setName}
@@ -131,7 +138,7 @@ export default function AddAreaSheet({
           </Text>
           <ActionButton title="Add area" onPress={add} />
           <ActionButton title="Cancel" variant="link" onPress={onClose} />
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -144,6 +151,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
   sheet: {
+    maxHeight: '90%',
+    flexGrow: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.white,
+  },
+  sheetContent: {
     gap: 16,
     paddingTop: 12,
     paddingHorizontal: 24,
@@ -170,7 +184,8 @@ const styles = StyleSheet.create({
   },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
-    height: 36,
+    minHeight: 44,
+    paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 18,
     borderWidth: 1,

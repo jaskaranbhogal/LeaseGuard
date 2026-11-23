@@ -46,14 +46,14 @@ export default function ResetEmailSentScreen({ navigation, route }: Props) {
 }
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: colors.success,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
-    paddingTop: 68,
+    paddingTop: 24,
     paddingBottom: 18,
     paddingHorizontal: spacing.lg,
-    minHeight: 300,
   },
   circle: {
     width: 112,
@@ -66,20 +66,20 @@ const styles = StyleSheet.create({
   },
   envelope: { fontSize: 36 },
   title: {
-    color: colors.white,
+    color: colors.ink,
     fontSize: 26,
     fontWeight: typography.bold,
     textAlign: 'center',
     marginBottom: 10,
   },
   subtitle: {
-    color: colors.white,
+    color: colors.ink,
     fontSize: 14,
     lineHeight: 19,
     textAlign: 'center',
   },
   email: {
-    color: colors.white,
+    color: colors.ink,
     fontSize: 14,
     lineHeight: 19,
     textAlign: 'center',
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   },
   body: {
     paddingHorizontal: spacing.lg,
-    paddingTop: 60,
+    paddingTop: 8,
     paddingBottom: spacing.xl,
   },
   note: {

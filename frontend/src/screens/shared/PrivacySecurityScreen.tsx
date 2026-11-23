@@ -77,8 +77,10 @@ export default function PrivacySecurityScreen() {
         </TouchableOpacity>
 
         {/* Consent acknowledgments are versioned and stored by the server. */}
-        <View style={styles.menuItem}>
-          <Text style={styles.menuText}>Consent and data handling</Text>
+        <View style={[styles.menuItem, styles.consentCard]}>
+          <Text style={[styles.menuText, styles.consentHeading]}>
+            Consent and data handling
+          </Text>
           <Text style={styles.infoText}>
             Required acknowledgment is recorded against your account and policy
             version. Guided evidence is preserved for historical review.
@@ -114,13 +116,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
   },
 
-  // 24px like Settings, Profile, Login, and Register (Header defaults to 32).
+  // Compact page heading.
   title: {
     fontSize: 24,
   },
 
   header: {
-    marginBottom: spacing.lg,
+    marginBottom: 0,
   },
 
   infoCard: {
@@ -145,6 +147,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.label,
   },
+  consentCard: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+  },
+  consentHeading: { flex: 0 },
 
   menuItem: {
     minHeight: 64,

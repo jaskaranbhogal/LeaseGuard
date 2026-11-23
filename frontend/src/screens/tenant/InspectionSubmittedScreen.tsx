@@ -4,6 +4,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { TenantStackParamList } from '../../navigation/types';
 import Button from '../../components/Button';
 import { getGuided } from '../../services/guidedInspectionService';
+import ScreenContainer from '../../components/ScreenContainer';
+import ScreenTitle from '../../components/ScreenTitle';
+import { layout } from '../../theme/layout';
 export default function InspectionSubmittedScreen({
   route,
   navigation,
@@ -26,12 +29,15 @@ export default function InspectionSubmittedScreen({
       .catch(e => setMessage(e.message));
   }, [route.params?.inspectionId]);
   return (
-    <View>
-      <Text>{message}</Text>
+    <ScreenContainer>
+      <ScreenTitle title="Inspection status" />
+      <View style={layout.card}>
+        <Text style={layout.body}>{message}</Text>
+      </View>
       <Button
         title="Back to dashboard"
         onPress={() => navigation.popTo('TenantTabs', { screen: 'Home' })}
       />
-    </View>
+    </ScreenContainer>
   );
 }

@@ -57,9 +57,10 @@ const styles = StyleSheet.create({
   title: {
     flexShrink: 1,
     fontSize: 26,
+    lineHeight: 34,
     fontWeight: typography.bold,
     letterSpacing: -0.4,
     color: colors.ink,
   },
-  subtitle: { fontSize: 13, color: colors.muted },
+  subtitle: { fontSize: 14, lineHeight: 21, color: colors.muted },
 });

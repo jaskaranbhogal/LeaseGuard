@@ -1,3 +1,6 @@
+import EvidenceImage from '../../components/EvidenceImage';
+import { layout } from '../../theme/layout';
+import StateCard from '../../components/StateCard';
 import ScreenTitle from '../../components/ScreenTitle';
 import PhotoTile from '../../components/PhotoTile';
 import { View } from 'react-native';
@@ -5,7 +8,7 @@ import { colors } from '../../theme/colors';
 import EvidenceNotes from '../../components/EvidenceNotes';
 import ProgressBar from '../../components/ProgressBar';
 import React, { useCallback, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -130,7 +133,7 @@ export default function MoveInBaselineScreen({
     <SafeAreaView style={styles.root}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={layout.content}
       >
         <ScreenTitle
           title="Move-in baselines"
@@ -138,9 +141,17 @@ export default function MoveInBaselineScreen({
             if (!busy) navigation.goBack();
           }}
         />
-        {!!error && <Text accessibilityRole="alert">{error}</Text>}
+        {!!error && (
+          <Text style={layout.error} accessibilityRole="alert">
+            {error}
+          </Text>
+        )}
+        {!options && !error && (
+          <StateCard title="Loading units and baselines…" loading />
+        )}
         <Button
           title="Refresh units"
+          variant="outline"
           disabled={busy}
           onPress={() =>
             run(async () => {
@@ -148,20 +159,21 @@ export default function MoveInBaselineScreen({
             })
           }
         />
-        <Text>Select an authorized property and unit</Text>
+        <Text style={layout.body}>Select an authorized property and unit</Text>
         {options?.units.map(u => (
           <Button
             key={u.id}
+            variant={unit === u.id ? 'primary' : 'outline'}
             title={`${u.property} · ${u.label}${unit === u.id ? ' ✓' : ''}`}
             disabled={busy}
             onPress={() => run(() => selectUnit(u.id))}
           />
         ))}
         {history && (
-          <>
-            <Text>Baseline status: {history.status}</Text>
+          <View style={layout.card}>
+            <Text style={layout.body}>Baseline status: {history.status}</Text>
             {history.active_id && (
-              <Text>
+              <Text style={layout.body}>
                 Replacing this baseline requires explicit confirmation. All
                 previous evidence is preserved.
               </Text>
@@ -182,7 +194,9 @@ export default function MoveInBaselineScreen({
             ))}
             {(!draft || draft.status === 'reviewed') && (
               <>
-                <Text>Create Move-In Baseline — select a saved template</Text>
+                <Text style={layout.body}>
+                  Create Move-In Baseline — select a saved template
+                </Text>
                 {options?.templates.map(t => (
                   <Button
                     key={t.id}
@@ -213,17 +227,18 @@ export default function MoveInBaselineScreen({
                 />
               </>
             )}
-          </>
+          </View>
         )}
         {draft && (
-          <>
+          <View style={layout.card}>
             <ProgressBar value={draft.progress / draft.required} />
-            <Text>
+            <Text style={layout.body}>
               {draft.status} · {draft.progress}/{draft.required} photos securely
               saved
             </Text>
             <Button
               title="Refresh saved draft"
+              variant="outline"
               disabled={busy}
               onPress={() =>
                 run(async () => setDraft(await getBaselineDraft(draft.id)))
@@ -234,9 +249,9 @@ export default function MoveInBaselineScreen({
                 <Text style={styles.title}>
                   {index + 1}. {step.room} · Photo {step.slot + 1}
                 </Text>
-                <Text>{step.instructions}</Text>
+                <Text style={layout.body}>{step.instructions}</Text>
                 {saved && (
-                  <Image
+                  <EvidenceImage
                     accessibilityLabel="Saved baseline photo"
                     style={styles.photo}
                     source={{ uri: baselinePhotoUrl(draft.id, saved.id) }}
@@ -265,7 +280,7 @@ export default function MoveInBaselineScreen({
                   />
                 )}
                 {busy && (
-                  <Text>
+                  <Text style={layout.body}>
                     {progress < 100
                       ? `Transferring ${progress}%`
                       : 'Waiting for secure storage confirmation…'}
@@ -280,6 +295,7 @@ export default function MoveInBaselineScreen({
                     />
                     <Button
                       title="Choose from gallery"
+                      variant="outline"
                       disabled={busy}
                       onPress={() => run(() => pick(false))}
                     />
@@ -294,6 +310,7 @@ export default function MoveInBaselineScreen({
                 )}
                 <Button
                   title="Previous"
+                  variant="outline"
                   disabled={busy || index === 0}
                   onPress={() => {
                     setIndex(index - 1);
@@ -302,6 +319,7 @@ export default function MoveInBaselineScreen({
                 />
                 <Button
                   title="Next"
+                  variant="outline"
                   disabled={busy || index === slots.length - 1}
                   onPress={() => {
                     setIndex(index + 1);
@@ -315,7 +333,7 @@ export default function MoveInBaselineScreen({
                 <EvidenceNotes key={p.id} notes={p.notes} />
               ))}
             {!!draft.uploads.length && (
-              <Text>
+              <Text style={layout.body}>
                 Recover interrupted uploads by selecting the same photo after
                 the 90-second lease expires.
               </Text>
@@ -372,18 +390,18 @@ export default function MoveInBaselineScreen({
                 />
               </>
             )}
-          </>
+          </View>
         )}
         {history?.versions.map(v => (
-          <React.Fragment key={v.id}>
-            <Text>
+          <View key={v.id} style={layout.card}>
+            <Text style={layout.body}>
               {v.status} baseline · {new Date(v.approved_at).toLocaleString()} ·{' '}
               {v.source}
             </Text>
             {v.photos.map(p => (
               <View key={p.id}>
                 <EvidenceNotes notes={p.notes} />
-                <Image
+                <EvidenceImage
                   key={p.id}
                   accessibilityLabel={`${v.status} baseline evidence`}
                   style={styles.photo}
@@ -391,7 +409,7 @@ export default function MoveInBaselineScreen({
                 />
               </View>
             ))}
-          </React.Fragment>
+          </View>
         ))}
       </ScrollView>
       <PhotoReview
@@ -406,7 +424,6 @@ export default function MoveInBaselineScreen({
 const styles = StyleSheet.create({
   reviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24, gap: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
+  title: { ...layout.sectionTitle },
   photo: { width: '100%', height: 260, resizeMode: 'contain' },
 });

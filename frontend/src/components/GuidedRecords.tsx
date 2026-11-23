@@ -3,6 +3,10 @@ import React, { useCallback, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import Button from './Button';
+import StateCard from './StateCard';
+import StatusBadge from './StatusBadge';
+import ProgressBar from './ProgressBar';
+import { layout } from '../theme/layout';
 import {
   listGuided,
   GuidedInspection,
@@ -10,9 +14,11 @@ import {
 export default function GuidedRecords({
   onOpen,
   tenant = false,
+  showTitle = true,
 }: {
   onOpen: (id: string) => void;
   tenant?: boolean;
+  showTitle?: boolean;
 }) {
   const [records, setRecords] = useState<GuidedInspection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,15 +46,21 @@ export default function GuidedRecords({
   );
   return (
     <View style={styles.list}>
-      <Text style={styles.title}>Photo inspections</Text>
-      {!!error && <Text accessibilityRole="alert">{error}</Text>}
+      {showTitle && <Text style={styles.title}>Photo inspections</Text>}
+      {!!error && (
+        <Text style={layout.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
       <Button
         title="Refresh inspections"
         variant="outline"
         disabled={loading}
         onPress={() => load()}
       />
-      {loading && <Text>Loading inspections…</Text>}
+      {loading && !records.length && (
+        <StateCard title="Loading inspections…" loading />
+      )}
       {!loading && !records.length && !error && (
         <View style={styles.card}>
           <Text style={styles.title}>No assigned inspections yet</Text>
@@ -67,17 +79,22 @@ export default function GuidedRecords({
       )}
       {records.map(r => (
         <View key={r.id} style={styles.card}>
+          <View style={styles.statusRow}>
+            <StatusBadge status={r.status} />
+            {r.overdue && <StatusBadge status="overdue" />}
+          </View>
           <Text style={styles.title}>
             {r.property} · {r.unit}
           </Text>
-          <Text>
+          <Text style={layout.muted}>
             {r.inspection_type} · {r.status}
             {r.overdue ? ' · Overdue' : r.upcoming ? ' · Upcoming' : ''}
           </Text>
-          <Text>
+          <Text style={layout.muted}>
             Due {new Date(r.due_at).toLocaleDateString()} · {r.progress}/
             {r.required} photos saved
           </Text>
+          <ProgressBar value={r.required ? r.progress / r.required : 0} />
           <Button
             title={
               tenant
@@ -101,11 +118,14 @@ export default function GuidedRecords({
 const styles = StyleSheet.create({
   list: { gap: 12 },
   card: {
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
     padding: 16,
     gap: 10,
     backgroundColor: colors.white,
     borderRadius: 16,
   },
-  title: { fontSize: 20, fontWeight: '600', color: colors.ink },
-  description: { fontSize: 16, lineHeight: 24, color: colors.muted },
+  statusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  title: { ...layout.sectionTitle },
+  description: { ...layout.muted },
 });

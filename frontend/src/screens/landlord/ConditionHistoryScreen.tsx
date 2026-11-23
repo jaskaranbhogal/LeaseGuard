@@ -43,5 +43,5 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.xl,
   },
-  header: { marginBottom: spacing.lg },
+  header: { marginBottom: 0 },
 });

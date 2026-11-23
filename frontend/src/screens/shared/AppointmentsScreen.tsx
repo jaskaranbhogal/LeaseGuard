@@ -1,3 +1,6 @@
+import { layout } from '../../theme/layout';
+import StateCard from '../../components/StateCard';
+import StatusBadge from '../../components/StatusBadge';
 import { useCallback, useRef, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -78,8 +81,8 @@ export default function AppointmentsScreen() {
       />
       {landlord && (
         <View style={styles.card}>
-          <Text>Offer appointment times</Text>
-          <Text>
+          <Text style={layout.body}>Offer appointment times</Text>
+          <Text style={layout.body}>
             To reschedule, cancel the old appointment and offer new times.
             Previous offers and responses stay in history.
           </Text>
@@ -139,14 +142,24 @@ export default function AppointmentsScreen() {
           />
         </View>
       )}
-      {!records.length && <Text>No appointments scheduled.</Text>}
+      {!records.length && !error && (
+        <StateCard
+          title="No appointments scheduled."
+          message={
+            landlord
+              ? 'Choose a unit and offer times to arrange an in-person visit.'
+              : 'Your landlord’s appointment offers will appear here. Remote photo inspections are available separately.'
+          }
+        />
+      )}
       {records.map(a => (
         <View key={a.id} style={styles.card}>
-          <Text>Appointment · {a.status}</Text>
-          <Text>Time zone: {a.timezone}</Text>
+          <StatusBadge status={a.status} />
+          <Text style={layout.body}>Appointment · {a.status}</Text>
+          <Text style={layout.body}>Time zone: {a.timezone}</Text>
           {a.slots.map(s => (
             <View key={s.id}>
-              <Text>
+              <Text style={layout.body}>
                 {new Date(s.at).toLocaleString(undefined, {
                   timeZone: a.timezone,
                 })}
@@ -213,7 +226,7 @@ export default function AppointmentsScreen() {
               }
             />
           )}
-          <Text>
+          <Text style={layout.body}>
             {a.history
               .map(h => `${h.action} · ${new Date(h.at).toLocaleString()}`)
               .join('\n')}

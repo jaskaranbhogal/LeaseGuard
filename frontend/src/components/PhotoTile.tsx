@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import EvidenceImage from './EvidenceImage';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 
@@ -21,7 +22,7 @@ export default function PhotoTile({
     <View style={styles.tile}>
       <View style={styles.photo}>
         {uri ? (
-          <Image
+          <EvidenceImage
             source={{ uri }}
             style={StyleSheet.absoluteFill}
             resizeMode="contain"
@@ -50,8 +51,7 @@ export default function PhotoTile({
 
 const styles = StyleSheet.create({
   tile: {
-    flexBasis: '47%',
-    flexGrow: 1,
+    width: '100%',
     gap: 8,
     padding: 8,
     paddingBottom: 12,
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   photo: {
-    height: 110,
+    aspectRatio: 4 / 3,
     borderRadius: 10,
     backgroundColor: '#CDD6E2',
     alignItems: 'center',
@@ -76,6 +76,8 @@ const styles = StyleSheet.create({
   },
   area: { paddingHorizontal: 4, fontSize: 13, color: colors.ink },
   retake: {
+    minHeight: 44,
+    paddingTop: 12,
     paddingHorizontal: 4,
     fontSize: 13,
     fontWeight: typography.semibold,

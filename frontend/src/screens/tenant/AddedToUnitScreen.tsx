@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 72,
+    paddingTop: 32,
     paddingBottom: 32,
     gap: 24,
   },

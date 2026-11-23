@@ -16,6 +16,8 @@ import SettingsScreen from '../screens/shared/SettingsScreen';
 import ScreenContainer from '../components/ScreenContainer';
 import GuidedRecords from '../components/GuidedRecords';
 import Button from '../components/Button';
+import ScreenTitle from '../components/ScreenTitle';
+import { layout } from '../theme/layout';
 
 const Tab = createBottomTabNavigator<TenantTabParamList>();
 
@@ -27,6 +29,10 @@ function InspectionsScreen({
 >) {
   return (
     <ScreenContainer style={styles.inspections}>
+      <ScreenTitle
+        title="Inspections"
+        subtitle="Your assigned photo inspections and saved progress."
+      />
       <GuidedRecords
         tenant
         onOpen={inspectionId =>
@@ -35,7 +41,7 @@ function InspectionsScreen({
       />
       <View style={styles.help}>
         <Text style={styles.title}>Need a repair?</Text>
-        <Text>
+        <Text style={layout.muted}>
           You can report maintenance without an assigned inspection. A verified
           unit assignment is required.
         </Text>
@@ -83,6 +89,6 @@ export default function TenantTabs() {
 
 const styles = StyleSheet.create({
   inspections: { padding: 24, gap: 24 },
-  help: { gap: 12 },
-  title: { fontSize: 20, fontWeight: '600', color: '#131824' },
+  help: { ...layout.card },
+  title: { ...layout.sectionTitle },
 });

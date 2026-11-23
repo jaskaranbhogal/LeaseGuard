@@ -6,6 +6,7 @@ import { useTenantDemo } from '../../context/TenantDemoContext';
 import Field from '../../components/Field';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { layout } from '../../theme/layout';
 
 function rooms(count: string, word: string) {
   return `${count} ${word}${count === '1' ? '' : 's'}`;
@@ -97,7 +98,11 @@ export default function TenantInvitePromptScreen() {
         secureTextEntry
         hint="Enter the single-use code from your invitation email."
       />
-      {!!error && <Text accessibilityRole="alert">{error}</Text>}
+      {!!error && (
+        <Text style={layout.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
       <ActionButton
         title="Accept invite"
         disabled={busy || !token.trim()}
@@ -119,7 +124,7 @@ export default function TenantInvitePromptScreen() {
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
-    paddingTop: 56,
+    paddingTop: 24,
     paddingBottom: 32,
     gap: 14,
   },

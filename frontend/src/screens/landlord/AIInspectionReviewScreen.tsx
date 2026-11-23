@@ -1,10 +1,13 @@
+import EvidenceImage from '../../components/EvidenceImage';
+import { layout } from '../../theme/layout';
+import StateCard from '../../components/StateCard';
+import StatusBadge from '../../components/StatusBadge';
 import ScreenTitle from '../../components/ScreenTitle';
 import { colors } from '../../theme/colors';
 import EvidenceNotes from '../../components/EvidenceNotes';
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
-  Image,
   ScrollView,
   Text,
   TextInput,
@@ -66,7 +69,7 @@ export default function AIInspectionReviewScreen({
     <SafeAreaView style={styles.root}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={layout.content}
       >
         <ScreenTitle
           title="Inspection review"
@@ -74,34 +77,48 @@ export default function AIInspectionReviewScreen({
             if (!busy) navigation.goBack();
           }}
         />
-        {!!error && <Text accessibilityRole="alert">{error}</Text>}
+        {!!error && (
+          <Text style={layout.error} accessibilityRole="alert">
+            {error}
+          </Text>
+        )}
         {!id ? (
           <>
             <GuidedRecords
               onOpen={inspectionId => navigation.setParams({ inspectionId })}
             />
-            <Text>Standalone photo comparison</Text>
+            <Text style={layout.body}>Standalone photo comparison</Text>
             <LiveComparisonPanel />
           </>
         ) : (
           <>
             <Button
               title="Refresh inspection"
+              variant="outline"
               disabled={busy}
               onPress={refresh}
             />
             {record && (
               <>
-                <Text>
+                <StatusBadge status={record.status} />
+                <Text style={layout.body}>
                   {record.property} · {record.unit} · {record.inspection_type} ·{' '}
                   {record.status}
                 </Text>
-                <Text>
+                <Text style={layout.body}>
                   Due {new Date(record.due_at).toLocaleDateString()} ·{' '}
                   {record.progress}/{record.required} photos
                 </Text>
                 {!record.baseline_available && (
-                  <Text>No compatible approved baseline. Review manually.</Text>
+                  <Text style={layout.body}>
+                    No compatible approved baseline. Review manually.
+                  </Text>
+                )}
+                {!record.photos.length && (
+                  <StateCard
+                    title="Waiting for photo evidence"
+                    message="The tenant's saved photos will appear here. AI analysis is available after submission and requires your explicit request."
+                  />
                 )}
                 {record.photos.map(p => {
                   const previous = record.baseline_photos.find(
@@ -119,8 +136,8 @@ export default function AIInspectionReviewScreen({
                       <View style={styles.pair}>
                         {previous && (
                           <View style={styles.half}>
-                            <Text>Approved baseline</Text>
-                            <Image
+                            <Text style={layout.body}>Approved baseline</Text>
+                            <EvidenceImage
                               accessibilityLabel="Approved baseline photo"
                               style={styles.photo}
                               source={{
@@ -134,8 +151,8 @@ export default function AIInspectionReviewScreen({
                           </View>
                         )}
                         <View style={styles.half}>
-                          <Text>Current evidence</Text>
-                          <Image
+                          <Text style={layout.body}>Current evidence</Text>
+                          <EvidenceImage
                             accessibilityLabel="Current inspection photo"
                             style={styles.photo}
                             source={{ uri: guidedPhotoUrl(record.id, p.id) }}
@@ -153,10 +170,10 @@ export default function AIInspectionReviewScreen({
                       )}
                       {comparisons.map(c => (
                         <View key={c.id} style={styles.card}>
-                          <Text>
+                          <Text style={layout.body}>
                             AI advisory · Human review required · {c.status}
                           </Text>
-                          <Text>
+                          <Text style={layout.body}>
                             {c.result?.summary ||
                               'Analysis pending. Refresh to recover its result.'}
                           </Text>
@@ -164,11 +181,11 @@ export default function AIInspectionReviewScreen({
                           <EvidenceNotes notes={c.current_notes} />
                           {c.result && (
                             <View style={styles.assessment}>
-                              <Text>
+                              <Text style={layout.body}>
                                 AI photo-quality assessment:{' '}
                                 {c.result.photo_quality || 'Unknown'}
                               </Text>
-                              <Text>
+                              <Text style={layout.body}>
                                 Same-area assessment:{' '}
                                 {c.result.same_area === true
                                   ? 'Likely same area'
@@ -176,18 +193,18 @@ export default function AIInspectionReviewScreen({
                                   ? 'Different area'
                                   : 'Uncertain'}
                               </Text>
-                              <Text>
+                              <Text style={layout.body}>
                                 Classification:{' '}
                                 {c.result.analysis_status === 'unavailable'
                                   ? 'Unavailable · manual review required'
                                   : c.result.classification}
                               </Text>
-                              <Text>
+                              <Text style={layout.body}>
                                 Severity: {c.result.severity || 'Not assessed'}{' '}
                                 · Confidence: {c.result.confidence}
                               </Text>
                               {!!c.result.obstructed_areas && (
-                                <Text>
+                                <Text style={layout.body}>
                                   Obstructions / retake guidance:{' '}
                                   {c.result.obstructed_areas}
                                 </Text>
@@ -197,8 +214,10 @@ export default function AIInspectionReviewScreen({
                           {c.baseline_photo_id && c.current_photo_id && (
                             <View style={styles.pair}>
                               <View style={styles.half}>
-                                <Text>Baseline used for this analysis</Text>
-                                <Image
+                                <Text style={layout.body}>
+                                  Baseline used for this analysis
+                                </Text>
+                                <EvidenceImage
                                   accessibilityLabel="Analyzed baseline"
                                   style={styles.photo}
                                   source={{
@@ -211,10 +230,10 @@ export default function AIInspectionReviewScreen({
                                 />
                               </View>
                               <View style={styles.half}>
-                                <Text>
+                                <Text style={layout.body}>
                                   Current photo used for this analysis
                                 </Text>
-                                <Image
+                                <EvidenceImage
                                   accessibilityLabel="Analyzed current photo"
                                   style={styles.photo}
                                   source={{
@@ -238,15 +257,8 @@ export default function AIInspectionReviewScreen({
                                 }
                               />
                             )}
-                          <EvidenceNotes notes={c.baseline_notes} />
-                          <EvidenceNotes notes={c.current_notes} />
                           {c.result && (
                             <>
-                              <Text>
-                                {c.result.classification} ·{' '}
-                                {c.result.severity || 'No severity'} ·
-                                Confidence: {c.result.confidence}
-                              </Text>
                               {c.result.findings.map(
                                 (finding, findingIndex) => {
                                   const status =
@@ -257,11 +269,11 @@ export default function AIInspectionReviewScreen({
                                       key={findingIndex}
                                       style={styles.card}
                                     >
-                                      <Text>
+                                      <Text style={layout.body}>
                                         {finding.description} ·{' '}
                                         {finding.classification}
                                       </Text>
-                                      <Text>
+                                      <Text style={layout.body}>
                                         Finding decision:{' '}
                                         {status || 'Awaiting review'}
                                       </Text>
@@ -280,6 +292,7 @@ export default function AIInspectionReviewScreen({
                                         ).map(decision => (
                                           <Button
                                             key={decision}
+                                            variant="outline"
                                             title={`Finding ${
                                               findingIndex + 1
                                             }: ${decision}`}
@@ -299,7 +312,7 @@ export default function AIInspectionReviewScreen({
                               )}
                             </>
                           )}
-                          <Text>
+                          <Text style={layout.body}>
                             Pair decision:{' '}
                             {c.decision ||
                               (c.finding_decisions?.every(d => d) &&
@@ -331,6 +344,7 @@ export default function AIInspectionReviewScreen({
                                   <Button
                                     key={decision}
                                     title={decision}
+                                    variant="outline"
                                     disabled={busy}
                                     onPress={() =>
                                       action('decision', {
@@ -343,7 +357,7 @@ export default function AIInspectionReviewScreen({
                                 {c.decision === 'confirmed' && (
                                   <>
                                     <TextInput
-                                      style={styles.input}
+                                      style={layout.input}
                                       accessibilityLabel="Submitted maintenance request ID"
                                       placeholder="Submitted maintenance request ID"
                                       value={maintenance}
@@ -385,15 +399,15 @@ export default function AIInspectionReviewScreen({
                       <Text style={styles.title}>
                         Historical analysis · replaced evidence
                       </Text>
-                      <Text>
+                      <Text style={layout.body}>
                         {c.result?.summary || 'Analysis pending'} ·{' '}
                         {c.decision || 'Awaiting human review'}
                       </Text>
                       {c.baseline_photo_id && c.current_photo_id && (
                         <View style={styles.pair}>
                           <View style={styles.half}>
-                            <Text>Baseline used</Text>
-                            <Image
+                            <Text style={layout.body}>Baseline used</Text>
+                            <EvidenceImage
                               style={styles.photo}
                               source={{
                                 uri: comparisonPhotoUrl(
@@ -405,8 +419,8 @@ export default function AIInspectionReviewScreen({
                             />
                           </View>
                           <View style={styles.half}>
-                            <Text>Previous evidence</Text>
-                            <Image
+                            <Text style={layout.body}>Previous evidence</Text>
+                            <EvidenceImage
                               style={styles.photo}
                               source={{
                                 uri: comparisonPhotoUrl(
@@ -469,7 +483,7 @@ export default function AIInspectionReviewScreen({
                 {record.status === 'submitted' && (
                   <>
                     <TextInput
-                      style={styles.input}
+                      style={layout.input}
                       accessibilityLabel="Retake reason"
                       placeholder="Clarification or retake instructions"
                       value={reason}
@@ -504,22 +518,10 @@ export default function AIInspectionReviewScreen({
 }
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24, gap: 16 },
-  title: { fontSize: 22, fontWeight: '700' },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 12,
-    gap: 12,
-  },
-  assessment: { gap: 8 },
-  pair: { flexDirection: 'row', gap: 8 },
-  half: { flex: 1 },
-  photo: { width: '100%', height: 220, resizeMode: 'contain' },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    padding: 12,
-    borderRadius: 12,
-  },
+  title: { ...layout.sectionTitle },
+  card: { ...layout.card },
+  assessment: { ...layout.notice },
+  pair: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  half: { flexGrow: 1, flexBasis: 140, minWidth: 0, gap: 8 },
+  photo: { width: '100%', aspectRatio: 1, resizeMode: 'contain' },
 });

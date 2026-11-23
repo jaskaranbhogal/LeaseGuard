@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { Keyboard, StyleSheet, View } from 'react-native';
+import { Keyboard, StyleSheet, Text, View } from 'react-native';
+import { layout } from '../../theme/layout';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ActionButton from '../../components/ActionButton';
 import Field from '../../components/Field';
@@ -19,7 +20,7 @@ export default function AddPropertyScreen({ navigation, route }: Props) {
   const key = useRef(
     `property_${Date.now()}_${Math.random().toString(36).slice(2)}`,
   );
-  const { addProperty, addUnit, properties, busy } = useLandlordDemo();
+  const { addProperty, addUnit, properties, busy, error } = useLandlordDemo();
   const existingProperty = properties.find(
     p => p.id === route.params?.propertyId,
   );
@@ -58,6 +59,11 @@ export default function AddPropertyScreen({ navigation, route }: Props) {
         subtitle="Create the property and unit, then invite your tenant."
         onBack={() => navigation.popTo('Dashboard')}
       />
+      {!!error && (
+        <Text accessibilityRole="alert" style={layout.error}>
+          {error}
+        </Text>
+      )}
       <Field
         editable={!existingProperty}
         label="Property address"

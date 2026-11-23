@@ -1,3 +1,4 @@
+import { layout } from '../../theme/layout';
 import { colors } from '../../theme/colors';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
@@ -12,8 +13,11 @@ type Props = NativeStackScreenProps<TenantStackParamList, 'MaintenanceDetail'>;
 export default function MaintenanceDetailScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Header title="Maintenance request" />
+      <ScrollView contentContainerStyle={layout.content}>
+        <Header
+          title="Maintenance request"
+          onBack={() => navigation.replace('History')}
+        />
         <MaintenanceRecord
           id={route.params.requestId}
           onResume={() =>
@@ -24,6 +28,7 @@ export default function MaintenanceDetailScreen({ route, navigation }: Props) {
         />
         <Button
           title="Back to my requests"
+          variant="outline"
           onPress={() => navigation.replace('History')}
         />
       </ScrollView>
@@ -32,5 +37,4 @@ export default function MaintenanceDetailScreen({ route, navigation }: Props) {
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 24, gap: 16 },
 });

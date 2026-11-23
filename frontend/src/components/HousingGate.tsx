@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 import ConsentScreen from './ConsentScreen';
 import ScreenContainer from './ScreenContainer';
 import ActionButton from './ActionButton';
@@ -17,12 +17,14 @@ function Gate({
   consented,
   acceptConsent,
   refresh,
+  busy = false,
 }: PropsWithChildren<{
   loading: boolean;
   error: string;
   consented: boolean;
   acceptConsent: () => Promise<void>;
   refresh: () => Promise<unknown>;
+  busy?: boolean;
 }>) {
   const [policy, setPolicy] = useState(false);
   if (loading) return <LoadingView />;
@@ -40,6 +42,9 @@ function Gate({
     return (
       <>
         <ConsentScreen
+          error={error}
+          busy={busy}
+          onRetry={refresh}
           intro="LeaseGuard keeps a shared record of rental condition. Policy version: November 21, 2026."
           sections={[
             {
@@ -59,12 +64,6 @@ function Gate({
           onAccept={acceptConsent}
           onReadPolicy={() => setPolicy(true)}
         />
-        {!!error && (
-          <ScreenContainer>
-            <Text accessibilityRole="alert">{error}</Text>
-            <ActionButton title="Retry loading account" onPress={refresh} />
-          </ScreenContainer>
-        )}
       </>
     );
   return children;

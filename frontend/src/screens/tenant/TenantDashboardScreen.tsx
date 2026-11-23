@@ -76,6 +76,7 @@ export default function TenantDashboardScreen({ navigation }: Props) {
           suggestions require landlord initiation and human review.
         </Text>
         <GuidedRecords
+          showTitle={false}
           tenant
           onOpen={inspectionId =>
             navigation.navigate('GuidedInspection', { inspectionId })
@@ -90,6 +91,7 @@ export default function TenantDashboardScreen({ navigation }: Props) {
       <View style={styles.card}>
         <Text style={styles.title}>Maintenance</Text>
         <MaintenanceRecords
+          showTitle={false}
           onOpen={requestId =>
             navigation.navigate('MaintenanceDetail', { requestId })
           }

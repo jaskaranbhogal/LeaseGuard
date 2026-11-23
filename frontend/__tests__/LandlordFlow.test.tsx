@@ -423,6 +423,56 @@ it.each([landlord, tenant])(
   },
 );
 
+it.each([landlord, tenant])(
+  'shows notification errors without a false empty state for $role and recovers on refresh',
+  async user => {
+    jest
+      .mocked(guided.guidedNotifications)
+      .mockRejectedValue(new Error('Unable to load notifications.'));
+    await mount(user);
+    await act(async () =>
+      app.root.findByType(NotificationBell).props.onPress(),
+    );
+    expect(json()).toContain('Unable to load notifications.');
+    expect(json()).not.toContain("You're all caught up");
+    jest
+      .mocked(guided.guidedNotifications)
+      .mockResolvedValue({ notifications: [] });
+    await press(
+      'Refresh notifications',
+      app.root.findByType(NotificationsScreen),
+    );
+    expect(json()).not.toContain('Unable to load notifications.');
+    expect(json()).toContain("You're all caught up");
+  },
+);
+
+it('keeps an unread notification actionable when saving its read state fails', async () => {
+  jest.mocked(guided.guidedNotifications).mockResolvedValue({
+    notifications: [
+      {
+        id: 'notice',
+        inspection_id: guidedFixture.id,
+        message: 'Ready for review.',
+        read: false,
+        created_at: '2026-11-18T12:00:00Z',
+      },
+    ],
+  });
+  jest
+    .mocked(guided.readNotification)
+    .mockRejectedValueOnce(new Error('Read status was not saved.'));
+  await mount();
+  await act(async () => app.root.findByType(NotificationBell).props.onPress());
+  await press('Mark read', app.root.findByType(NotificationsScreen));
+  expect(json()).toContain('Read status was not saved.');
+  expect(json()).toContain('Mark read');
+  await press('Open inspection', app.root.findByType(NotificationsScreen));
+  expect(navigation.getCurrentRoute()?.params).toEqual({
+    inspectionId: guidedFixture.id,
+  });
+});
+
 const baselineDraft: baselines.BaselineDraft = {
   id: 'd'.repeat(32),
   unit_id: guidedFixture.unit_id,
@@ -684,29 +734,27 @@ it('records an individual finding decision using its saved result index', async 
 });
 
 it('starts Jon’s move-in tour and resumes the canonical baseline workflow for that unit', async () => {
-  jest
-    .mocked(housing.landlordApi.state)
-    .mockResolvedValue({
-      consented: true,
-      activity: [],
-      properties: [
-        {
-          id: 'a'.repeat(24),
-          street: 'Verified property',
-          city: 'NY',
-          units: [
-            {
-              id: guidedFixture.unit_id,
-              name: '101',
-              bedrooms: '1',
-              bathrooms: '1',
-              revision: 0,
-              areas: guidedFixture.steps.map(s => s.room),
-            },
-          ],
-        },
-      ],
-    });
+  jest.mocked(housing.landlordApi.state).mockResolvedValue({
+    consented: true,
+    activity: [],
+    properties: [
+      {
+        id: 'a'.repeat(24),
+        street: 'Verified property',
+        city: 'NY',
+        units: [
+          {
+            id: guidedFixture.unit_id,
+            name: '101',
+            bedrooms: '1',
+            bathrooms: '1',
+            revision: 0,
+            areas: guidedFixture.steps.map(s => s.room),
+          },
+        ],
+      },
+    ],
+  });
   jest.mocked(baselines.getBaselines).mockResolvedValue(baselineHistory);
   await mount();
   await press('Record move-in baseline');

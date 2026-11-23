@@ -14,6 +14,9 @@ type Props = {
   footnote: string;
   onAccept: () => void;
   onReadPolicy?: () => void;
+  error?: string;
+  busy?: boolean;
+  onRetry?: () => void;
 };
 
 export default function ConsentScreen({
@@ -22,6 +25,9 @@ export default function ConsentScreen({
   footnote,
   onAccept,
   onReadPolicy,
+  error,
+  busy = false,
+  onRetry,
 }: Props) {
   const [agreed, setAgreed] = useState(false);
 
@@ -31,6 +37,18 @@ export default function ConsentScreen({
         Before you start
       </Text>
       <Text style={styles.intro}>{intro}</Text>
+      {!!error && (
+        <Text accessibilityRole="alert" style={styles.error}>
+          {error}
+        </Text>
+      )}
+      {!!error && onRetry && (
+        <ActionButton
+          title="Retry loading account"
+          variant="secondary"
+          onPress={onRetry}
+        />
+      )}
 
       <View style={styles.card}>
         {sections.map((section, index) => (
@@ -69,7 +87,8 @@ export default function ConsentScreen({
 
       <ActionButton
         title="Accept and continue"
-        disabled={!agreed}
+        disabled={!agreed || busy}
+        loading={busy}
         onPress={onAccept}
         style={styles.accept}
       />
@@ -79,7 +98,13 @@ export default function ConsentScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 32 },
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 32,
+    gap: 16,
+  },
+  error: { color: colors.error, fontSize: 14, lineHeight: 21 },
   title: {
     fontSize: 28,
     fontWeight: typography.bold,
@@ -87,13 +112,13 @@ const styles = StyleSheet.create({
     color: colors.ink,
   },
   intro: {
-    marginTop: 8,
+    marginTop: 0,
     fontSize: 14,
     lineHeight: 20,
     color: colors.muted,
   },
   card: {
-    marginTop: 20,
+    marginTop: 0,
     paddingHorizontal: 16,
     borderRadius: 18,
     borderWidth: 1,
@@ -109,13 +134,15 @@ const styles = StyleSheet.create({
   },
   rowBody: { fontSize: 13, lineHeight: 18, color: colors.muted },
   link: {
-    marginTop: 16,
+    marginTop: 0,
+    minHeight: 44,
+    paddingTop: 12,
     fontSize: 14,
     fontWeight: typography.semibold,
     color: colors.brand,
   },
   agree: {
-    marginTop: 18,
+    marginTop: 0,
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
@@ -133,9 +160,9 @@ const styles = StyleSheet.create({
   },
   boxChecked: { backgroundColor: colors.brand, borderColor: colors.brand },
   agreeText: { flex: 1, fontSize: 14, color: colors.ink },
-  accept: { marginTop: 14 },
+  accept: { marginTop: 0 },
   footnote: {
-    marginTop: 12,
+    marginTop: 0,
     fontSize: 12,
     lineHeight: 17,
     textAlign: 'center',

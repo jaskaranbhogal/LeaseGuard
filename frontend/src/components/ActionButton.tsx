@@ -1,5 +1,6 @@
 import {
   Pressable,
+  ActivityIndicator,
   StyleSheet,
   Text,
   type StyleProp,
@@ -16,6 +17,7 @@ type Props = {
   variant?: Variant;
   compact?: boolean;
   disabled?: boolean;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -25,14 +27,15 @@ export default function ActionButton({
   variant = 'primary',
   compact = false,
   disabled = false,
+  loading = false,
   style,
 }: Props) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => [
         styles.base,
@@ -43,29 +46,36 @@ export default function ActionButton({
         style,
       ]}
     >
-      <Text
-        style={[
-          styles.label,
-          compact && styles.compactLabel,
-          labelStyles[variant],
-          disabled && styles.disabledLabel,
-        ]}
-      >
-        {title}
-      </Text>
+      {loading ? (
+        <ActivityIndicator
+          color={variant === 'primary' ? colors.white : colors.brand}
+        />
+      ) : (
+        <Text
+          style={[
+            styles.label,
+            compact && styles.compactLabel,
+            labelStyles[variant],
+            disabled && styles.disabledLabel,
+          ]}
+        >
+          {title}
+        </Text>
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    height: 52,
+    minHeight: 52,
+    paddingVertical: 13,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  compact: { height: 44, borderRadius: 12 },
+  compact: { minHeight: 44, paddingVertical: 10, borderRadius: 12 },
   primary: { backgroundColor: colors.brand },
   secondary: {
     backgroundColor: colors.white,
@@ -77,11 +87,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F3C7C2',
   },
-  danger: { height: 44, backgroundColor: 'transparent' },
-  link: { height: 44, backgroundColor: 'transparent' },
+  danger: { minHeight: 44, backgroundColor: 'transparent' },
+  link: { minHeight: 44, backgroundColor: 'transparent' },
   disabled: { backgroundColor: colors.disabledBg, borderWidth: 0 },
   pressed: { opacity: 0.8 },
-  label: { fontSize: 15, fontWeight: typography.semibold },
+  label: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: typography.semibold,
+    textAlign: 'center',
+    flexShrink: 1,
+  },
   compactLabel: { fontSize: 14 },
   disabledLabel: { color: colors.disabledText },
 });

@@ -15,6 +15,8 @@ import EvidenceNotes from '../../components/EvidenceNotes';
 import type { TenantStackParamList } from '../../navigation/types';
 import { colors } from '../../theme/colors';
 import { typography } from '../../theme/typography';
+import { layout } from '../../theme/layout';
+import StateCard from '../../components/StateCard';
 
 type Props = NativeStackScreenProps<TenantStackParamList, 'TenantBaseline'>;
 
@@ -43,20 +45,24 @@ export default function TenantBaselineScreen({ navigation, route }: Props) {
         }
         onBack={() => navigation.goBack()}
       />
-      {!!error && <Text accessibilityRole="alert">{error}</Text>}
+      {!!error && (
+        <Text style={layout.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
       <ActionButton
         title="Refresh baseline"
         variant="secondary"
         onPress={refresh}
       />
       {baseline === undefined && !error && (
-        <Text>Loading approved baseline…</Text>
+        <StateCard title="Loading approved baseline…" loading />
       )}
       {baseline === null && (
-        <Text>
-          No approved baseline is available for this unit yet. Your landlord can
-          create one or assign a move-in inspection.
-        </Text>
+        <StateCard
+          title="No approved baseline yet"
+          message="Your landlord can create one or assign a move-in inspection. Approved photos will appear here."
+        />
       )}
       {baseline && (
         <>

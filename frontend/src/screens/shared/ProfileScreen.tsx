@@ -95,6 +95,12 @@ export default function ProfileScreen() {
         style={styles.header}
       />
 
+      <View style={styles.previewNotice}>
+        <Text style={styles.previewText}>
+          Profile editing is a preview. Changes on this screen are not saved.
+        </Text>
+      </View>
+
       <View style={styles.form}>
         <Input
           label="Full name"
@@ -178,6 +184,14 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  previewNotice: {
+    padding: spacing.md,
+    borderRadius: 14,
+    backgroundColor: colors.brandSoft,
+    borderWidth: 1,
+    borderColor: colors.brandSoftBorder,
+  },
+  previewText: { fontSize: 14, lineHeight: 21, color: colors.muted },
   container: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -185,10 +199,10 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginBottom: spacing.md,
+    marginBottom: 0,
   },
 
-  // The mockup shows a 24px title, smaller than Header's 32px default.
+  // Compact page heading.
   title: {
     fontSize: 24,
   },

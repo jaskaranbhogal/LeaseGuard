@@ -3,7 +3,9 @@ import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CameraFrame from './CameraFrame';
 import ActionButton from './ActionButton';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import ScreenTitle from './ScreenTitle';
+import { layout } from '../theme/layout';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { Asset } from 'react-native-image-picker';
 
 export default function PhotoReview({
@@ -20,16 +22,25 @@ export default function PhotoReview({
   return (
     <Modal visible={!!asset} onRequestClose={onDiscard} animationType="slide">
       <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Review photo · {remaining} remaining</Text>
-        {asset?.uri && <CameraFrame uri={asset.uri} />}
-        <View style={styles.actions}>
-          <ActionButton
-            title="Discard / retake"
-            variant="secondary"
-            onPress={onDiscard}
+        <ScrollView contentContainerStyle={layout.content}>
+          <ScreenTitle
+            title="Review photo"
+            subtitle={`${remaining} remaining`}
           />
-          <ActionButton title="Accept photo" onPress={onAccept} />
-        </View>
+          <Text style={layout.muted}>
+            Check that the area is clear and in focus before accepting.
+            Accepting uploads this photo to your saved draft.
+          </Text>
+          {asset?.uri && <CameraFrame uri={asset.uri} />}
+          <View style={styles.actions}>
+            <ActionButton
+              title="Discard / retake"
+              variant="secondary"
+              onPress={onDiscard}
+            />
+            <ActionButton title="Accept photo" onPress={onAccept} />
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </Modal>
   );
@@ -37,16 +48,9 @@ export default function PhotoReview({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
-    paddingTop: 64,
     backgroundColor: colors.background,
   },
-  title: { fontSize: 20, color: colors.ink },
-  preview: { flex: 1, width: '100%' },
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 30,
+    gap: 12,
   },
-  button: { padding: 16, backgroundColor: colors.brandSoft, borderRadius: 12 },
 });

@@ -1,22 +1,21 @@
 import { colors } from '../theme/colors';
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as api from '../services/maintenanceService';
+import Button from './Button';
+import StateCard from './StateCard';
+import StatusBadge from './StatusBadge';
+import { layout } from '../theme/layout';
 
 export function MaintenanceRecords({
   onOpen,
   onResume,
+  showTitle = true,
 }: {
   onOpen: (id: string) => void;
   onResume?: (id: string) => void;
+  showTitle?: boolean;
 }) {
   const [records, setRecords] = useState<api.MaintenanceRequest[]>([]);
   const [next, setNext] = useState<string | null>(null);
@@ -42,19 +41,28 @@ export function MaintenanceRecords({
   );
   return (
     <View style={styles.list}>
-      <Text style={styles.title}>Saved maintenance requests</Text>
-      {busy && <ActivityIndicator accessibilityLabel="Loading maintenance" />}
-      {!!error && <Text accessibilityRole="alert">{error}</Text>}
-      <Pressable
+      {showTitle && (
+        <Text style={styles.title}>Saved maintenance requests</Text>
+      )}
+      {!!error && (
+        <Text style={layout.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
+      <Button
+        title="Refresh requests"
+        variant="outline"
         disabled={busy}
-        onPress={() => {
-          load();
-        }}
-      >
-        <Text style={styles.link}>Refresh requests</Text>
-      </Pressable>
+        onPress={() => load()}
+      />
+      {busy && !records.length && (
+        <StateCard title="Loading maintenance…" loading />
+      )}
       {!busy && !error && !records.length && (
-        <Text>No saved maintenance requests.</Text>
+        <StateCard
+          title="No saved maintenance requests."
+          message="Saved drafts and submitted repair requests will appear here."
+        />
       )}
       {records.map(r => (
         <Pressable
@@ -64,32 +72,37 @@ export function MaintenanceRecords({
             r.status === 'draft' && onResume ? onResume(r.id) : onOpen(r.id)
           }
           accessibilityRole="button"
+          accessibilityLabel={r.area}
         >
+          <StatusBadge status={r.status} />
           <Text style={styles.title}>{r.area}</Text>
-          <Text>
+          <Text style={layout.muted}>
             {r.property} · {r.unit}
           </Text>
-          <Text>{r.description}</Text>
-          <Text>
-            {r.status} · {r.photos.filter(p => p.state === 'ready').length}{' '}
-            photos
+          <Text style={layout.body}>{r.description}</Text>
+          <Text style={layout.muted}>
+            {r.photos.filter(p => p.state === 'ready').length} photos ·{' '}
+            {r.urgency} priority
           </Text>
-          <Text>
+          <Text style={layout.muted}>
             {r.submitted_at
               ? `Submitted ${new Date(r.submitted_at).toLocaleDateString()}`
               : 'Draft — tap to resume'}
           </Text>
+          <Text style={styles.link}>
+            {r.status === 'draft' && onResume
+              ? 'Resume saved draft →'
+              : 'View request →'}
+          </Text>
         </Pressable>
       ))}
       {next && (
-        <Pressable
+        <Button
+          title="Load older requests"
+          variant="outline"
           disabled={busy}
-          onPress={() => {
-            load(next);
-          }}
-        >
-          <Text style={styles.link}>Load older requests</Text>
-        </Pressable>
+          onPress={() => load(next)}
+        />
       )}
     </View>
   );
@@ -143,73 +156,83 @@ export function MaintenanceRecord({
   }
   return (
     <View style={styles.list}>
-      {busy && <ActivityIndicator accessibilityLabel="Loading request" />}
-      {!!error && <Text accessibilityRole="alert">{error}</Text>}
-      <Pressable
+      {!!error && (
+        <Text style={layout.error} accessibilityRole="alert">
+          {error}
+        </Text>
+      )}
+      <Button
+        title="Refresh request"
+        variant="outline"
         disabled={busy}
-        onPress={() => {
-          load();
-        }}
-      >
-        <Text style={styles.link}>Refresh request</Text>
-      </Pressable>
+        onPress={load}
+      />
+      {busy && !record && <StateCard title="Loading request…" loading />}
       {record && (
         <>
-          <Text style={styles.title}>{record.area}</Text>
-          <Text>
-            {record.property} · {record.unit}
+          <View style={styles.card}>
+            <StatusBadge status={record.status} />
+            <Text style={styles.title}>{record.area}</Text>
+            <Text style={layout.muted}>
+              {record.property} · {record.unit}
+            </Text>
+            <Text style={layout.body}>{record.description}</Text>
+            <StatusBadge status={record.urgency} />
+            <Text style={layout.muted}>
+              {record.submitted_at
+                ? `Submitted ${new Date(record.submitted_at).toLocaleString()}`
+                : 'Unsubmitted draft'}
+            </Text>
+            {record.status === 'draft' && onResume && (
+              <Button title="Resume draft" onPress={onResume} />
+            )}
+          </View>
+          <Text style={styles.title}>
+            Photo evidence · {record.photos.length} photos
           </Text>
-          <Text>{record.description}</Text>
-          <Text>Urgency: {record.urgency}</Text>
-          <Text>Status: {record.status}</Text>
-          <Text>
-            {record.submitted_at
-              ? `Submitted ${new Date(record.submitted_at).toLocaleString()}`
-              : 'Unsubmitted draft'}
-          </Text>
-          <Text>{record.photos.length} photos</Text>
-          {record.status === 'draft' && onResume && (
-            <Pressable onPress={onResume}>
-              <Text style={styles.link}>Resume draft</Text>
-            </Pressable>
+          {!record.photos.length && (
+            <StateCard
+              title="No photos saved"
+              message="Accepted photos will appear here after secure storage is confirmed."
+            />
           )}
           {record.photos.map((p, index) => (
-            <View key={p.id}>
+            <View key={p.id} style={styles.card}>
+              <Text style={layout.label}>Photo {index + 1}</Text>
               {p.available ? (
                 <PrivatePhoto
                   uri={api.maintenancePhotoUrl(id, p.id)}
                   index={index}
                 />
               ) : (
-                <Text>
+                <Text style={layout.muted}>
                   Photo {index + 1}:{' '}
                   {p.state === 'ready' ? 'retention period expired' : p.state}
                 </Text>
               )}
             </View>
           ))}
-          {record.history.map(h => (
-            <Text key={`${h.at}-${h.status}`}>
-              {h.status} · {new Date(h.at).toLocaleString()}
-            </Text>
-          ))}
-          <Text>{record.comparison_limitation}</Text>
+          <View style={styles.card}>
+            <Text style={styles.title}>Request activity</Text>
+            {record.history.map((h, index) => (
+              <View key={`${h.at}-${index}`} style={styles.activity}>
+                <StatusBadge status={h.status} />
+                <Text style={layout.muted}>
+                  {new Date(h.at).toLocaleString()}
+                </Text>
+              </View>
+            ))}
+            <Text style={layout.muted}>{record.comparison_limitation}</Text>
+          </View>
           {landlord && next && (
-            <Pressable
-              disabled={busy}
-              onPress={() => {
-                update();
-              }}
-              style={styles.card}
-            >
-              <Text style={styles.link}>Mark {next}</Text>
-            </Pressable>
+            <Button title={`Mark ${next}`} disabled={busy} onPress={update} />
           )}
         </>
       )}
     </View>
   );
 }
+
 function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -237,8 +260,9 @@ function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
   );
 }
 const styles = StyleSheet.create({
-  list: { gap: 16, marginTop: 20 },
-  title: { fontSize: 18, fontWeight: '600', color: colors.ink },
+  list: { gap: 16 },
+  activity: { gap: 8, paddingVertical: 8 },
+  title: { ...layout.sectionTitle },
   card: {
     padding: 16,
     backgroundColor: colors.white,
@@ -247,7 +271,12 @@ const styles = StyleSheet.create({
     borderColor: colors.cardBorder,
     gap: 8,
   },
-  link: { color: colors.brand, paddingVertical: 12 },
+  link: {
+    color: colors.brand,
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: '600',
+  },
   photo: {
     width: '100%',
     height: 240,

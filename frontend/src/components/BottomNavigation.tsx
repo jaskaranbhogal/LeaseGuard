@@ -1,8 +1,9 @@
+import Icon, { type IconName } from './Icon';
 import {
   BottomTabBar,
   type BottomTabBarProps,
 } from '@react-navigation/bottom-tabs';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { UserRole } from '../types/user';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -17,13 +18,21 @@ const tabIcons: Record<
   string,
   (props: { focused: boolean }) => React.ReactNode
 > = {};
+const names: Record<string, IconName> = {
+  H: 'home',
+  I: 'inspection',
+  T: 'history',
+  S: 'settings',
+};
 for (const letter of ['H', 'I', 'T', 'S']) {
   tabIcons[letter] = function TabIcon({ focused }) {
     return (
       <View style={[styles.icon, focused && styles.iconActive]}>
-        <Text style={[styles.iconLetter, focused && styles.iconLetterActive]}>
-          {letter}
-        </Text>
+        <Icon
+          name={names[letter]}
+          size={22}
+          color={focused ? colors.brand : colors.muted}
+        />
       </View>
     );
   };
@@ -64,15 +73,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#ECEEF3',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconActive: { backgroundColor: '#EAF1FE' },
-  iconLetter: {
-    fontSize: 15,
-    fontWeight: typography.bold,
-    color: colors.textSecondary,
-  },
-  iconLetterActive: { color: colors.actionBlue },
+  iconActive: { backgroundColor: colors.brandSoft },
 });

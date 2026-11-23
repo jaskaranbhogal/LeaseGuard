@@ -8,7 +8,10 @@ export type IconName =
   | 'home'
   | 'grip'
   | 'close'
-  | 'bell';
+  | 'bell'
+  | 'history'
+  | 'settings'
+  | 'inspection';
 
 type Props = {
   name: IconName;
@@ -47,6 +50,26 @@ export default function Icon({
         <>
           <Path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" {...stroke} />
           <Path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" {...stroke} />
+        </>
+      )}
+      {name === 'history' && (
+        <>
+          <Path d="M3 12a9 9 0 1 0 3-6.7M3 3v6h6" {...stroke} />
+          <Path d="M12 7v5l3 2" {...stroke} />
+        </>
+      )}
+      {name === 'settings' && (
+        <>
+          <Circle cx={12} cy={12} r={3} {...stroke} />
+          <Path
+            d="m10 3 4 0 .7 2.2 2 .9 2.1-.5 2 3.5-1.5 1.7v2.4l1.5 1.7-2 3.5-2.1-.5-2 .9L14 21h-4l-.7-2.2-2-.9-2.1.5-2-3.5L4.7 13v-2.4L3.2 8.9l2-3.5 2.1.5 2-.9L10 3Z"
+            {...stroke}
+          />
+        </>
+      )}
+      {name === 'inspection' && (
+        <>
+          <Path d="M8 4H5v17h14V4h-3M9 2h6v5H9zM8 12h8M8 16h5" {...stroke} />
         </>
       )}
       {name === 'grip' &&

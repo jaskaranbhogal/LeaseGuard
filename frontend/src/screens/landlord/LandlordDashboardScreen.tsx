@@ -61,7 +61,9 @@ export default function LandlordDashboardScreen({
           <View key={property.id} style={styles.card}>
             <Text style={styles.title}>{property.street}</Text>
             <Text style={styles.body}>
-              {property.city} · {property.units.length} units
+              {property.city ? `${property.city} · ` : ''}
+              {property.units.length}{' '}
+              {property.units.length === 1 ? 'unit' : 'units'}
             </Text>
             <ActionButton
               title="+ Add unit"
@@ -146,6 +148,7 @@ export default function LandlordDashboardScreen({
             onPress={() => navigation.navigate('AIInspectionReview')}
           />
           <GuidedRecords
+            showTitle={false}
             onOpen={inspectionId =>
               navigation.navigate('AIInspectionReview', { inspectionId })
             }
