@@ -242,3 +242,109 @@ it('keeps consent gate closed until the server acknowledges the current policy',
   expect(JSON.stringify(app.toJSON())).toContain('Offline');
   expect(JSON.stringify(app.toJSON())).not.toContain('Private dashboard');
 });
+
+it('requires confirmation to revoke a pending invitation before reissuing it', async () => {
+  const EditUnitScreen =
+    require('../src/screens/landlord/EditUnitScreen').default;
+  const linked = {
+    ...property,
+    units: [
+      {
+        ...property.units[0],
+        tenant: {
+          email: 'tenant@example.com',
+          status: 'pending' as const,
+          invitedOn: '2026-11-22T12:00:00Z',
+        },
+      },
+    ],
+  };
+  jest
+    .mocked(api.landlordApi.state)
+    .mockResolvedValue({ ...empty, properties: [linked] });
+  jest
+    .mocked(api.landlordApi.removeTenant)
+    .mockResolvedValue({ ...empty, properties: [property] });
+  jest
+    .mocked(api.landlordApi.invite)
+    .mockResolvedValue({ ...empty, properties: [linked] });
+  await mount(
+    <LandlordDemoProvider>
+      <LandlordGate>
+        <EditUnitScreen
+          navigation={{ goBack: jest.fn() }}
+          route={{
+            params: { propertyId: property.id, unitId: property.units[0].id },
+          }}
+        />
+      </LandlordGate>
+    </LandlordDemoProvider>,
+  );
+  await act(async () => button('Resend invite').props.onPress());
+  expect(api.landlordApi.removeTenant).not.toHaveBeenCalled();
+  expect(api.landlordApi.invite).not.toHaveBeenCalled();
+  const options = jest
+    .mocked(Alert.alert)
+    .mock.calls.find(c => c[0] === 'Replace pending invitation?')?.[2];
+  await act(async () =>
+    options?.find(o => o.text === 'Revoke and reissue')?.onPress?.(),
+  );
+  expect(api.landlordApi.removeTenant).toHaveBeenCalledWith(
+    property.units[0].id,
+    { action: 'revoke' },
+  );
+  expect(api.landlordApi.invite).toHaveBeenCalledWith(
+    property.units[0].id,
+    'tenant@example.com',
+  );
+  expect(
+    jest.mocked(api.landlordApi.removeTenant).mock.invocationCallOrder[0],
+  ).toBeLessThan(
+    jest.mocked(api.landlordApi.invite).mock.invocationCallOrder[0],
+  );
+});
+
+it('does not issue another invitation if revoking the pending one fails', async () => {
+  const EditUnitScreen =
+    require('../src/screens/landlord/EditUnitScreen').default;
+  const linked = {
+    ...property,
+    units: [
+      {
+        ...property.units[0],
+        tenant: {
+          email: 'tenant@example.com',
+          status: 'pending' as const,
+          invitedOn: '2026-11-22T12:00:00Z',
+        },
+      },
+    ],
+  };
+  jest
+    .mocked(api.landlordApi.state)
+    .mockResolvedValue({ ...empty, properties: [linked] });
+  jest
+    .mocked(api.landlordApi.removeTenant)
+    .mockRejectedValue(new Error('Revoke failed.'));
+  await mount(
+    <LandlordDemoProvider>
+      <LandlordGate>
+        <EditUnitScreen
+          navigation={{ goBack: jest.fn() }}
+          route={{
+            params: { propertyId: property.id, unitId: property.units[0].id },
+          }}
+        />
+      </LandlordGate>
+    </LandlordDemoProvider>,
+  );
+  await act(async () => button('Resend invite').props.onPress());
+  const options = jest
+    .mocked(Alert.alert)
+    .mock.calls.find(c => c[0] === 'Replace pending invitation?')?.[2];
+  await act(async () =>
+    options?.find(o => o.text === 'Revoke and reissue')?.onPress?.(),
+  );
+  expect(api.landlordApi.invite).not.toHaveBeenCalled();
+  expect(JSON.stringify(app.toJSON())).toContain('Revoke failed.');
+});

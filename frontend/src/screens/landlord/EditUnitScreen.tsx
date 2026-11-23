@@ -112,6 +112,10 @@ export default function EditUnitScreen({ navigation, route }: Props) {
     });
     if (!saved) return;
     if ((pending || !tenant) && inviteEmail.trim() && emailChanged) {
+      if (tenant?.status === 'pending') {
+        resendInvite();
+        return;
+      }
       if (!(await sendInvite(propertyId, unitId, inviteEmail))) return;
     }
     navigation.goBack();
@@ -120,7 +124,24 @@ export default function EditUnitScreen({ navigation, route }: Props) {
   async function resendInvite() {
     setSubmitted(true);
     if (errors.invite) return;
-    sendInvite(propertyId, unitId, inviteEmail);
+    if (tenant?.status !== 'pending') {
+      await sendInvite(propertyId, unitId, inviteEmail);
+      return;
+    }
+    Alert.alert(
+      'Replace pending invitation?',
+      `The previous code will stop working. A new invitation will be created for ${inviteEmail.trim()}. Email delivery depends on the configured mail service.`,
+      [
+        { text: 'Keep invitation', style: 'cancel' },
+        {
+          text: 'Revoke and reissue',
+          onPress: async () => {
+            if (await cancelInvite(propertyId, unitId))
+              await sendInvite(propertyId, unitId, inviteEmail);
+          },
+        },
+      ],
+    );
   }
 
   function confirmCancelInvite() {
@@ -248,7 +269,9 @@ export default function EditUnitScreen({ navigation, route }: Props) {
                 hint={
                   declined
                     ? `Declined ${tenant.declinedOn}. Check the email and resend, or invite someone else.`
-                    : `Invite sent ${tenant.invitedOn}. Fix a typo here and we'll send a new invite.`
+                    : `Invitation created ${new Date(
+                        tenant.invitedOn,
+                      ).toLocaleDateString()}. Reissuing revokes the previous code. Check email delivery status on your dashboard.`
                 }
                 keyboardType="email-address"
                 autoCapitalize="none"
