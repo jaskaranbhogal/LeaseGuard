@@ -8,10 +8,17 @@ type Props = {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  backLabel?: string;
   right?: ReactNode;
 };
 
-export default function ScreenTitle({ title, subtitle, onBack, right }: Props) {
+export default function ScreenTitle({
+  title,
+  subtitle,
+  onBack,
+  right,
+  backLabel = 'Back',
+}: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -19,7 +26,7 @@ export default function ScreenTitle({ title, subtitle, onBack, right }: Props) {
           {onBack ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={backLabel}
               onPress={onBack}
               hitSlop={8}
               style={styles.back}

@@ -39,7 +39,7 @@ export default function AddPropertyScreen({ navigation, route }: Props) {
     tenantEmail: tenantEmail.trim() ? emailError(tenantEmail) : undefined,
   };
   const hasErrors = Object.values(errors).some(Boolean);
-  const show = (error?: string) => (submitted ? error : undefined);
+  const show = (message?: string) => (submitted ? message : undefined);
 
   async function save() {
     setSubmitted(true);

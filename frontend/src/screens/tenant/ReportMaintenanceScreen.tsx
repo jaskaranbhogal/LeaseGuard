@@ -327,6 +327,8 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
             </Text>
           )}
           <Pressable
+            style={styles.recoveryAction}
+            accessibilityRole="button"
             disabled={busy}
             onPress={() => {
               draft
@@ -463,13 +465,19 @@ export default function ReportMaintenanceScreen({ navigation, route }: Props) {
           {retryAsset && !busy && (
             <View>
               <Pressable
+                style={styles.recoveryAction}
+                accessibilityRole="button"
                 onPress={() => {
                   accept(retryAsset);
                 }}
               >
                 <Text style={styles.removePhotoText}>Retry accepted photo</Text>
               </Pressable>
-              <Pressable onPress={() => setRetryAsset(undefined)}>
+              <Pressable
+                style={styles.recoveryAction}
+                accessibilityRole="button"
+                onPress={() => setRetryAsset(undefined)}
+              >
                 <Text>
                   Discard local retry (remove any failed server entry below)
                 </Text>
@@ -595,6 +603,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: COLORS.border,
   },
+  recoveryAction: { minHeight: 44, justifyContent: 'center' },
   removePhoto: {
     minHeight: 44,
     alignItems: 'center',

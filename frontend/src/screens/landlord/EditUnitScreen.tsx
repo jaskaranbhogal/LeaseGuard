@@ -78,7 +78,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
   };
   const emailChanged =
     inviteEmail.trim().toLowerCase() !== (tenant?.email ?? '').toLowerCase();
-  const show = (error?: string) => (submitted ? error : undefined);
+  const show = (message?: string) => (submitted ? message : undefined);
   const atLimit = areas.length >= MAX_AREAS;
 
   const draftTaken = areas.some(
@@ -365,7 +365,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
                     accessibilityRole="button"
                     accessibilityLabel={`Move ${area} up`}
                     onPress={() => moveUp(index)}
-                    hitSlop={8}
+                    style={styles.areaAction}
                   >
                     <Icon name="grip" size={18} color="#94A3B8" />
                   </Pressable>
@@ -388,7 +388,7 @@ export default function EditUnitScreen({ navigation, route }: Props) {
                     onPress={() =>
                       setAreas(current => current.filter(a => a !== area))
                     }
-                    hitSlop={8}
+                    style={styles.areaAction}
                   >
                     <Icon name="close" size={16} color={colors.muted} />
                   </Pressable>
@@ -522,16 +522,22 @@ const styles = StyleSheet.create({
   area: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 6,
     minHeight: 48,
     paddingHorizontal: 8,
   },
   divider: { borderBottomWidth: 1, borderBottomColor: colors.divider },
   areaName: { fontSize: 15, color: colors.ink },
-  areaNameButton: { flex: 1 },
+  areaNameButton: { flex: 1, minHeight: 44, justifyContent: 'center' },
+  areaAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   renameArea: { gap: 10, paddingVertical: 12 },
   renameButtons: { flexDirection: 'row', gap: 10 },
-  addArea: { paddingVertical: 12 },
+  addArea: { minHeight: 44, paddingVertical: 12 },
   addAreaText: {
     fontSize: 14,
     fontWeight: typography.semibold,

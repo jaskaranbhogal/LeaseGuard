@@ -248,6 +248,8 @@ function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
       />
       {failed && (
         <Pressable
+          style={styles.photoRetry}
+          accessibilityRole="button"
           onPress={() => {
             setFailed(false);
             setAttempt(v => v + 1);
@@ -260,6 +262,7 @@ function PrivatePhoto({ uri, index }: { uri: string; index: number }) {
   );
 }
 const styles = StyleSheet.create({
+  photoRetry: { minHeight: 44, justifyContent: 'center' },
   list: { gap: 16 },
   activity: { gap: 8, paddingVertical: 8 },
   title: { ...layout.sectionTitle },

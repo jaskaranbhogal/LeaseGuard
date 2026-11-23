@@ -58,9 +58,10 @@ function Gate({
   if (policy)
     return (
       <ScreenContainer style={styles.policy}>
-        <ActionButton
-          title="Back to consent"
-          onPress={() => setPolicy(false)}
+        <ScreenTitle
+          title="Privacy policy"
+          backLabel="Back to consent"
+          onBack={() => setPolicy(false)}
         />
         <PrivacyPolicyContent />
       </ScreenContainer>
