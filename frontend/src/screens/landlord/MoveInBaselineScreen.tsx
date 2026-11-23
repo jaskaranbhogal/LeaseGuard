@@ -351,6 +351,7 @@ export default function MoveInBaselineScreen({
                   {draft.photos.map(p => (
                     <PhotoTile
                       key={p.id}
+                      style={styles.reviewTile}
                       area={
                         draft.steps.find(s => s.id === p.step_id)?.room ||
                         p.step_id
@@ -422,6 +423,7 @@ export default function MoveInBaselineScreen({
   );
 }
 const styles = StyleSheet.create({
+  reviewTile: { width: '47%', minWidth: 130, flexGrow: 1 },
   reviewGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   root: { flex: 1, backgroundColor: colors.background },
   title: { ...layout.sectionTitle },

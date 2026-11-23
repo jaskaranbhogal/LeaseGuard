@@ -69,11 +69,11 @@ export default function TenantInvitePromptScreen() {
       <Text style={styles.intro}>
         {invite.previewLocked
           ? `An invitation is waiting for ${invite.email}. Enter the code from your email to verify it. Property details stay private until the code is accepted.`
-          : `${invite.landlordName} added you as the tenant for ${invite.street}, Unit ${invite.unit}.`}
+          : `${invite.landlordName} invited you to ${invite.street}, Unit ${invite.unit}.`}
       </Text>
-      <View style={styles.card}>
-        {!invite.previewLocked &&
-          rows.map(([label, value], index) => (
+      {!invite.previewLocked && (
+        <View style={styles.card}>
+          {rows.map(([label, value], index) => (
             <View
               key={label}
               style={[styles.row, index < rows.length - 1 && styles.divider]}
@@ -82,7 +82,8 @@ export default function TenantInvitePromptScreen() {
               <Text style={styles.value}>{value}</Text>
             </View>
           ))}
-      </View>
+        </View>
+      )}
       <View style={styles.note}>
         <Text style={styles.noteText}>
           {`Accepting links your account to this unit. ${landlordFirst} will see the photos and repair requests you add for it.`}

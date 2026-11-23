@@ -1,4 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import EvidenceImage from './EvidenceImage';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -9,6 +16,7 @@ type Props = {
   placeholder: string;
   onRetake?: () => void;
   retakeLabel?: string;
+  style?: StyleProp<ViewStyle>;
 };
 
 export default function PhotoTile({
@@ -17,9 +25,10 @@ export default function PhotoTile({
   placeholder,
   onRetake,
   retakeLabel = 'Retake',
+  style,
 }: Props) {
   return (
-    <View style={styles.tile}>
+    <View style={[styles.tile, style]}>
       <View style={styles.photo}>
         {uri ? (
           <EvidenceImage
@@ -32,9 +41,7 @@ export default function PhotoTile({
           <Text style={styles.placeholder}>{placeholder}</Text>
         )}
       </View>
-      <Text numberOfLines={2} style={styles.area}>
-        {area}
-      </Text>
+      <Text style={styles.area}>{area}</Text>
       {onRetake ? (
         <Pressable
           accessibilityRole="button"
