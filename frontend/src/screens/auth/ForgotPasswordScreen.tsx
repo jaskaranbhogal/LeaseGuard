@@ -6,34 +6,40 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
+import { ApiError } from '../../services/api';
+import { firebaseErrorMessage, sendPasswordReset } from '../../services/firebaseAuthService';
+import { requestPasswordReset } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { emailError } from '../../utils/validation';
-import { firebaseErrorMessage, sendPasswordReset } from '../../services/firebaseAuthService';
+import { useAuthRequest } from '../../utils/useAuthRequest';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 export default function ForgotPasswordScreen({ navigation, route }: Props) {
   const [email, setEmail] = useState(route.params?.email ?? '');
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  async function submit() {
+  const request = useAuthRequest();
+  function submit() {
     setSubmitted(true);
     if (emailError(email)) {
       return;
     }
     Keyboard.dismiss();
-    setLoading(true);
-    setError('');
-    try {
-      await sendPasswordReset(email);
-      navigation.navigate('ResetEmailSent', { email: email.trim(), delivery: 'email' });
-    } catch (failure) {
-      setError(firebaseErrorMessage(failure));
-    } finally {
-      setLoading(false);
-    }
+    const address = email.trim();
+    request.run(
+      async signal => {
+        if (route.params?.legacy) return requestPasswordReset(address, signal);
+        try {
+          await sendPasswordReset(address);
+          return 'email' as const;
+        } catch (error) {
+          throw new ApiError(firebaseErrorMessage(error));
+        }
+      },
+      delivery =>
+        navigation.replace('ResetEmailSent', { email: address, delivery }),
+    );
   }
   return (
     <ScreenContainer>
@@ -51,27 +57,32 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
           value={email}
           onChangeText={value => {
             setEmail(value);
+            request.clearError();
           }}
           error={submitted ? emailError(email) : undefined}
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
-          editable
+          editable={!request.loading}
           returnKeyType="send"
           onSubmitEditing={submit}
         />
-        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+        {request.error ? (
+          <Text accessibilityRole="alert" style={styles.error}>
+            {request.error}
+          </Text>
+        ) : null}
         <Button
           title="Send reset email"
           variant="reset"
-          disabled={loading}
-          loading={loading}
+          loading={request.loading}
           onPress={submit}
           style={styles.send}
         />
         <Button
           title="Back to sign in"
           variant="outline"
+          disabled={request.loading}
           onPress={() =>
             navigation.reset({ index: 0, routes: [{ name: 'Login' }] })
           }

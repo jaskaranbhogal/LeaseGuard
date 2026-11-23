@@ -4,6 +4,7 @@ from datetime import timedelta
 from io import StringIO
 from unittest.mock import patch
 
+from bson import ObjectId
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
@@ -11,8 +12,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .firebase_auth import FirebaseAuthenticationError, verify_firebase_id_token
-from .models import AccountProfile, FirebaseIdentity, PasswordResetRequest
+from .models import AccountProfile, PasswordResetRequest
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -31,22 +31,9 @@ class AuthenticationTests(TestCase):
     def test_real_login_and_logout(self):
         response = self.post('login', {'email': ' RESIDENT@example.com ', 'password': self.password})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(int(self.client.session['_auth_user_id']), self.user.pk)
+        self.assertEqual(self.client.session['_auth_user_id'], str(self.user.pk))
         self.assertEqual(self.post('logout', {}).status_code, 200)
         self.assertNotIn('_auth_user_id', self.client.session)
-
-    def test_role_selection_requires_session_and_is_one_time_but_idempotent(self):
-        self.assertEqual(self.post('role', {'role': 'tenant'}).status_code, 401)
-        self.client.force_login(self.user)
-        for role in [None, '', 'admin', 'Tenant', [], {}]:
-            self.assertEqual(self.post('role', {'role': role}).status_code, 400)
-        first = self.post('role', {'role': 'tenant'})
-        repeat = self.post('role', {'role': 'tenant'})
-        change = self.post('role', {'role': 'landlord'})
-        self.assertEqual(first.status_code, 200)
-        self.assertEqual(repeat.status_code, 200)
-        self.assertEqual(change.status_code, 409)
-        self.assertEqual(self.client.get('/api/auth/session/').json()['user']['role'], 'tenant')
 
     def test_invalid_unknown_inactive_and_ambiguous_login(self):
         responses = [self.post('login', {'email': 'unknown@example.com', 'password': self.password}),
@@ -168,14 +155,17 @@ class RegistrationTests(TestCase):
     def test_registration_creates_hashed_account_that_can_sign_in(self):
         response = self.post()
         self.assertEqual(response.status_code, 201)
+        self.assertIsInstance(response.json()['user']['id'], str)
+        self.assertRegex(response.json()['user']['id'], r'^[0-9a-f]{24}$')
         user = get_user_model().objects.get(pk=response.json()['user']['id'])
+        self.assertIsInstance(user.pk, ObjectId)
         self.assertEqual(user.email, 'new@example.com')
         self.assertEqual(user.get_full_name(), 'New Resident')
         self.assertTrue(user.check_password(self.data['password']))
         self.assertNotEqual(user.password, self.data['password'])
         self.assertFalse(user.is_staff)
         self.assertFalse(user.is_superuser)
-        self.assertEqual(int(self.client.session['_auth_user_id']), user.pk)
+        self.assertNotIn('_auth_user_id', self.client.session)
         response = self.client.post('/api/auth/login/', json.dumps({
             'email': user.email, 'password': self.data['password']}), content_type='application/json')
         self.assertEqual(response.status_code, 200)
@@ -237,19 +227,14 @@ class RegistrationTests(TestCase):
                 self.client.post('/api/auth/logout/')
                 self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
 
-    def test_missing_role_creates_pending_account_and_invalid_roles_are_rejected(self):
+    def test_missing_and_invalid_roles_are_rejected(self):
         missing = {key: value for key, value in self.data.items() if key != 'role'}
-        response = self.post(missing)
-        self.assertEqual(response.status_code, 201)
-        self.assertIsNone(response.json()['user']['role'])
-        self.assertTrue(self.client.get('/api/auth/session/').json()['user'])
-        get_user_model().objects.all().delete()
-        cache.clear()
-        for data in [{**self.data, 'role': role}
-                     for role in ['', 'admin', 'Tenant', [], {}, 1]]:
+        for data in [missing] + [{**self.data, 'role': role}
+                                for role in [None, '', 'admin', 'Tenant', [], {}, 1]]:
             with self.subTest(data=data):
                 cache.clear()
                 self.assertEqual(self.post(data).status_code, 400)
+        self.assertFalse(get_user_model().objects.exists())
         self.assertFalse(AccountProfile.objects.exists())
 
     def test_profile_failure_rolls_back_user_creation(self):
@@ -258,11 +243,20 @@ class RegistrationTests(TestCase):
             self.assertEqual(self.post().status_code, 409)
         self.assertFalse(get_user_model().objects.exists())
 
-    def test_database_rejects_invalid_role(self):
-        from django.db import IntegrityError, transaction
-        self.post()
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            AccountProfile.objects.update(role='admin')
+    def test_model_rejects_invalid_role_on_save(self):
+        from django.core.exceptions import ValidationError
+        user = get_user_model().objects.create_user(username='role-validation')
+        profile = AccountProfile(user=user, role='admin')
+        with self.assertRaises(ValidationError):
+            profile.save()
+        self.assertFalse(AccountProfile.objects.filter(user=user).exists())
+
+    def test_one_profile_per_user_is_unique(self):
+        from django.db import IntegrityError
+        user = get_user_model().objects.create_user(username='one-profile')
+        AccountProfile.objects.create(user=user, role=AccountProfile.Role.TENANT)
+        with self.assertRaises(IntegrityError):
+            AccountProfile.objects.create(user=user, role=AccountProfile.Role.LANDLORD)
 
 
 class SessionTests(TestCase):
@@ -308,106 +302,3 @@ class SessionTests(TestCase):
         token = client.get('/api/auth/csrf/').json()['csrfToken']
         self.assertEqual(client.post('/api/auth/logout/', HTTP_X_CSRFTOKEN=token).status_code, 200)
         self.assertEqual(client.get('/api/auth/session/').status_code, 401)
-
-
-class FirebaseSessionTests(TestCase):
-    def setUp(self):
-        cache.clear()
-        self.claims = {
-            'uid': 'firebase-user-123',
-            'email': 'firebase@example.com',
-            'email_verified': True,
-            'name': 'Firebase Resident',
-            'aud': 'leaseguard-9141a',
-            'iss': 'https://securetoken.google.com/leaseguard-9141a',
-        }
-
-    def post(self, endpoint, data):
-        return self.client.post(
-            f'/api/auth/firebase/{endpoint}/', json.dumps(data),
-            content_type='application/json',
-        )
-
-    @patch('accounts.views.verify_firebase_id_token')
-    def test_new_verified_firebase_user_gets_one_pending_profile_and_session(self, verify):
-        verify.return_value = self.claims
-        response = self.post('session', {'idToken': 'mock-token'})
-        self.assertEqual(response.status_code, 201)
-        user = get_user_model().objects.get(pk=response.json()['user']['id'])
-        self.assertEqual(user.email, 'firebase@example.com')
-        self.assertEqual(user.get_full_name(), 'Firebase Resident')
-        self.assertFalse(user.has_usable_password())
-        self.assertIsNone(user.account_profile.role)
-        self.assertEqual(user.firebase_identity.uid, self.claims['uid'])
-        self.assertEqual(self.client.get('/api/auth/session/').status_code, 200)
-        verify.assert_called_once_with('mock-token')
-
-    @patch('accounts.views.verify_firebase_id_token')
-    def test_returning_firebase_user_keeps_existing_role_and_record(self, verify):
-        verify.return_value = self.claims
-        user = get_user_model().objects.create_user(
-            username='firebase_user', email='firebase@example.com')
-        AccountProfile.objects.create(user=user, role='tenant')
-        FirebaseIdentity.objects.create(user=user, uid=self.claims['uid'], email=user.email)
-        response = self.post('session', {'idToken': 'mock-token'})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['user']['id'], user.pk)
-        self.assertEqual(response.json()['user']['role'], 'tenant')
-        self.assertEqual(get_user_model().objects.count(), 1)
-
-    @patch('accounts.views.verify_firebase_id_token')
-    def test_existing_email_is_not_automatically_linked(self, verify):
-        verify.return_value = self.claims
-        user = get_user_model().objects.create_user(
-            username='legacy', email='firebase@example.com', password='Original-Passphrase-957!')
-        AccountProfile.objects.create(user=user, role='landlord')
-        response = self.post('session', {'idToken': 'mock-token'})
-        self.assertEqual(response.status_code, 409)
-        self.assertEqual(response.json()['code'], 'account_link_required')
-        self.assertFalse(FirebaseIdentity.objects.exists())
-        self.assertEqual(get_user_model().objects.count(), 1)
-        self.assertEqual(user.account_profile.role, 'landlord')
-
-    @patch('accounts.views.verify_firebase_id_token')
-    def test_legacy_account_link_requires_existing_password_and_preserves_role(self, verify):
-        verify.return_value = self.claims
-        user = get_user_model().objects.create_user(
-            username='legacy', email='firebase@example.com', password='Original-Passphrase-957!')
-        AccountProfile.objects.create(user=user, role='tenant')
-        bad = self.post('link', {'idToken': 'mock-token', 'legacyPassword': 'wrong'})
-        self.assertEqual(bad.status_code, 401)
-        linked = self.post('link', {
-            'idToken': 'mock-token', 'legacyPassword': 'Original-Passphrase-957!',
-        })
-        self.assertEqual(linked.status_code, 200)
-        self.assertEqual(linked.json()['user']['id'], user.pk)
-        self.assertEqual(user.account_profile.role, 'tenant')
-        self.assertEqual(FirebaseIdentity.objects.get().user, user)
-        self.assertEqual(get_user_model().objects.count(), 1)
-
-    def test_missing_or_invalid_token_is_rejected(self):
-        response = self.post('session', {})
-        self.assertEqual(response.status_code, 401)
-        with patch('accounts.views.verify_firebase_id_token', side_effect=FirebaseAuthenticationError):
-            response = self.post('session', {'idToken': 'expired-or-invalid'})
-        self.assertEqual(response.status_code, 401)
-        self.assertFalse(get_user_model().objects.exists())
-
-    def test_unverified_email_is_rejected(self):
-        claims = {**self.claims, 'email_verified': False}
-        with patch('accounts.views.verify_firebase_id_token', return_value=claims):
-            response = self.post('session', {'idToken': 'unverified'})
-        self.assertEqual(response.status_code, 401)
-        self.assertFalse(get_user_model().objects.exists())
-
-    @patch('accounts.firebase_auth.auth.verify_id_token')
-    @patch('accounts.firebase_auth._firebase_app')
-    @override_settings(FIREBASE_PROJECT_ID='leaseguard-9141a')
-    def test_token_for_another_project_is_rejected(self, app, verify):
-        verify.return_value = {
-            **self.claims,
-            'aud': 'other-firebase-project',
-            'iss': 'https://securetoken.google.com/other-firebase-project',
-        }
-        with self.assertRaises(FirebaseAuthenticationError):
-            verify_firebase_id_token('signed-token')

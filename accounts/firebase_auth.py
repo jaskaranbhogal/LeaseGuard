@@ -1,5 +1,7 @@
 """Verify Firebase ID tokens for Django."""
 
+from threading import Lock
+
 import firebase_admin
 import google.auth.exceptions
 from firebase_admin import auth
@@ -11,13 +13,17 @@ class FirebaseAuthenticationError(Exception):
     """Raised when Firebase cannot verify a client ID token."""
 
 
+_app_lock = Lock()
+
+
 def get_firebase_app():
-    try:
-        return firebase_admin.get_app()
-    except ValueError:
-        return firebase_admin.initialize_app(
-            options={"projectId": settings.FIREBASE_PROJECT_ID}
-        )
+    with _app_lock:
+        try:
+            return firebase_admin.get_app()
+        except ValueError:
+            return firebase_admin.initialize_app(
+                options={"projectId": settings.FIREBASE_PROJECT_ID}
+            )
 
 
 # Keep the previous private helper name for existing integrations and tests.
@@ -53,6 +59,6 @@ def verify_firebase_id_token(id_token):
         != f"https://securetoken.google.com/{settings.FIREBASE_PROJECT_ID}"
     ):
         raise FirebaseAuthenticationError("Firebase ID token is for another project.")
-    if not isinstance(decoded.get("uid"), str) or not decoded["uid"]:
+    if not isinstance(decoded.get("uid"), str) or not 1 <= len(decoded["uid"]) <= 128:
         raise FirebaseAuthenticationError("Firebase ID token has no user ID.")
     return decoded

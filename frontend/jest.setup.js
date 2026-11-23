@@ -8,7 +8,6 @@ jest.mock('react-native-image-picker', () => ({
   launchImageLibrary: jest.fn(),
 }));
 
-// Firebase SDKs use native modules and are exercised through mocked responses.
 jest.mock('@react-native-firebase/auth', () => {
   const instance = {
     currentUser: null,

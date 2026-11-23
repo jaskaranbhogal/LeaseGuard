@@ -9,7 +9,10 @@ function baseUrl(): string {
     return config.developmentBaseUrl.replace(/\/$/, '');
   }
   // Physical devices use Metro's LAN host; simulators use their host loopback.
-  const scriptURL = NativeModules.SourceCode?.scriptURL as string | undefined;
+  // New Architecture exposes SourceCode constants through getConstants().
+  const sourceCode = NativeModules.SourceCode;
+  const scriptURL = (sourceCode?.getConstants?.()?.scriptURL ??
+    sourceCode?.scriptURL) as string | undefined;
   const host = scriptURL ? new URL(scriptURL).hostname : '';
   const localHost = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
   return `http://${
@@ -19,11 +22,7 @@ function baseUrl(): string {
 export const API_BASE_URL = baseUrl();
 
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status?: number,
-    public readonly code?: string,
-  ) {
+  constructor(message: string, public readonly status?: number, public readonly code?: string) {
     super(message);
   }
 }

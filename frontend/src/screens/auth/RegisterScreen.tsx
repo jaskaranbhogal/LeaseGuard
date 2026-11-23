@@ -26,6 +26,7 @@ import {
   registerWithEmail,
   resendVerificationEmail,
 } from '../../services/firebaseAuthService';
+import { useAuthRequest } from '../../utils/useAuthRequest';
 import { ApiError } from '../../services/api';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -35,7 +36,9 @@ export default function RegisterScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [working, setLoading] = useState(false);
+  const registration = useAuthRequest();
+  const loading = working || registration.loading;
   const [error, setError] = useState('');
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
@@ -75,21 +78,21 @@ export default function RegisterScreen({ navigation }: Props) {
       return;
     }
     Keyboard.dismiss();
-    setLoading(true);
     setError('');
-    try {
-      const result = await registerWithEmail(email, password, name);
+    registration.run(async () => {
+      try {
+        return await registerWithEmail(email, password, name);
+      } catch (failure) {
+        throw new ApiError(firebaseErrorMessage(failure));
+      }
+    }, result => {
       setPendingVerification(true);
       setVerificationSent(result.verificationSent);
       setResendCooldown(result.verificationSent ? 30 : 0);
       if (!result.profileUpdated) {
         setError('Your account was created, but we could not save your name. You can update it later.');
       }
-    } catch (failure) {
-      setError(firebaseErrorMessage(failure));
-    } finally {
-      setLoading(false);
-    }
+    });
   }
 
   async function resendVerification() {
@@ -169,7 +172,7 @@ export default function RegisterScreen({ navigation }: Props) {
           autoCapitalize="words"
           autoComplete="name"
           textContentType="name"
-          editable={!pendingVerification}
+          editable={!pendingVerification && !loading}
           returnKeyType="next"
           onSubmitEditing={() => emailInput.current?.focus()}
         />
@@ -185,7 +188,7 @@ export default function RegisterScreen({ navigation }: Props) {
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
-          editable={!pendingVerification}
+          editable={!pendingVerification && !loading}
           returnKeyType="next"
           onSubmitEditing={() => passwordInput.current?.focus()}
         />
@@ -201,7 +204,7 @@ export default function RegisterScreen({ navigation }: Props) {
           secureTextEntry
           autoComplete="new-password"
           textContentType="newPassword"
-          editable={!pendingVerification}
+          editable={!pendingVerification && !loading}
           returnKeyType="next"
           onSubmitEditing={() => confirmInput.current?.focus()}
         />
@@ -221,7 +224,7 @@ export default function RegisterScreen({ navigation }: Props) {
           secureTextEntry
           autoComplete="new-password"
           textContentType="newPassword"
-          editable={!pendingVerification}
+          editable={!pendingVerification && !loading}
           returnKeyType="go"
           onSubmitEditing={submit}
         />
@@ -249,7 +252,9 @@ export default function RegisterScreen({ navigation }: Props) {
         ) : (
           <Button title="Create account" disabled={loading} loading={loading} onPress={submit} />
         )}
-        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+        {error || registration.error ? (
+          <Text accessibilityRole="alert" style={styles.error}>{error || registration.error}</Text>
+        ) : null}
         {linkRequired ? (
           <View style={styles.verification}>
             <Input

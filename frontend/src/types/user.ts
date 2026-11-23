@@ -1,8 +1,9 @@
 export type UserRole = 'tenant' | 'landlord';
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   name: string;
   role: UserRole | null;
+  canChooseRole?: boolean;
 }

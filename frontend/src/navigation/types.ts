@@ -1,11 +1,10 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-
-type ResetDelivery = 'email' | 'console';
+import type { ResetDelivery } from '../services/authService';
 
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
-  ForgotPassword: { email?: string } | undefined;
+  ForgotPassword: { email?: string; legacy?: boolean } | undefined;
   ResetEmailSent: { email: string; delivery: ResetDelivery };
 };
 
@@ -14,7 +13,10 @@ export type LandlordStackParamList = {
   Dashboard: undefined;
   AddProperty: undefined;
   ScheduleInspection: undefined;
-  AIInspectionReview: undefined;
+  MoveInBaseline: undefined;
+  AIInspectionReview: { inspectionId: string } | undefined;
+  MaintenanceRequests: undefined;
+  SavedMaintenanceDetail: { requestId: string };
 };
 
 export type LandlordSettingsStackParamList = {
@@ -46,12 +48,12 @@ export type TenantStackParamList = {
   TenantTabs:
     | import('@react-navigation/native').NavigatorScreenParams<TenantTabParamList>
     | undefined;
-  GuidedInspection: undefined;
-  ReportMaintenance: undefined;
+  GuidedInspection: { inspectionId: string } | undefined;
+  ReportMaintenance: { draftId?: string } | undefined;
   InspectionAvailability: undefined;
   MaintenanceDetail: {
-    requestId: import('../types/maintenance').MaintenanceRequestId;
+    requestId: string;
   };
   ReviewInspectionPhoto: { stepIndex: number };
-  InspectionSubmitted: undefined;
+  InspectionSubmitted: { inspectionId: string } | undefined;
 };

@@ -205,6 +205,16 @@ export default function LoginScreen({ navigation }: Props) {
         >
           <Text style={styles.link}>Forgot password?</Text>
         </Pressable>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Reset a legacy LeaseGuard password"
+          disabled={loading}
+          onPress={() =>
+            navigation.navigate('ForgotPassword', { email: email.trim(), legacy: true })
+          }
+        >
+          <Text style={styles.link}>Reset a legacy LeaseGuard password</Text>
+        </Pressable>
         <Button
           title="Login"
           disabled={loading}

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -10,12 +11,14 @@ class AccountProfile(models.Model):
     # Account type only: property membership/ownership needs separate authorization.
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
                                 related_name='account_profile')
-    role = models.CharField(max_length=8, choices=Role.choices, null=True, blank=True)
+    role = models.CharField(max_length=8, choices=Role.choices)
 
-    class Meta:
-        constraints = [models.CheckConstraint(
-            check=models.Q(role__in=['tenant', 'landlord']) | models.Q(role__isnull=True),
-            name='valid_account_role')]
+    def save(self, *args, **kwargs):
+        # MongoDB doesn't support Django CheckConstraint, so validate roles in
+        # the model's normal save path as well as in the registration endpoint.
+        if self.role not in self.Role.values:
+            raise ValidationError({'role': 'Select Tenant or Landlord.'})
+        return super().save(*args, **kwargs)
 
 
 class PasswordResetRequest(models.Model):
@@ -23,24 +26,6 @@ class PasswordResetRequest(models.Model):
     email = models.EmailField()
     created_at = models.DateTimeField(auto_now_add=True)
     attempts = models.PositiveSmallIntegerField(default=0)
-
-
-class GoogleIdentity(models.Model):
-    """A verified Google OpenID Connect subject linked to one LeaseGuard user."""
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-                                related_name='google_identity')
-    subject = models.CharField(max_length=255, unique=True)
-    email = models.EmailField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class AppleIdentity(models.Model):
-    """A verified Apple OpenID Connect subject linked to one LeaseGuard user."""
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-                                related_name='apple_identity')
-    subject = models.CharField(max_length=255, unique=True)
-    email = models.EmailField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class FirebaseIdentity(models.Model):

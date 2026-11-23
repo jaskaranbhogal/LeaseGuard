@@ -63,3 +63,19 @@ Ready for frontend PR review into main, with prototype boundaries and Android na
 - `frontend/src/screens/tenant/TenantDashboardScreen.tsx`
 - `frontend/src/screens/tenant/UnitHistoryScreen.tsx`
 - `frontend/src/utils/landlordValidation.ts`
+
+
+## Sprint 3 maintenance update
+
+The dashboard now links to **View saved maintenance requests**, a separate real
+list/detail flow. Explicit property-manager membership authorizes submitted
+requests, private photos and persisted forward-only status/history updates.
+Drafts and unrelated units are excluded. Demo property/inspection screens remain
+marked samples. See [maintenance setup, routes, retention and iOS checks](SPRINT3_MAINTENANCE.md).
+
+## Persisted assignments and reviews
+
+ScheduleInspection now selects verified managed units and eligible tenants. Review
+loads actual evidence, approved baselines, explicit Gemini analyses and human decisions.
+Unit history and in-app notifications use persisted records. See
+[guided API and demo](GUIDED_INSPECTIONS.md).

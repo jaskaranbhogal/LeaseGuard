@@ -28,7 +28,7 @@ export default function RootNavigator() {
         }
       >
         {user ? (
-          user.role === null ? (
+          user.role === null && user.canChooseRole === true ? (
             <ChooseYourRoleScreen key={user.id} />
           ) : user.role === 'tenant' ? (
             <TenantNavigator key={user.id} />
