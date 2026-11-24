@@ -1,0 +1,90 @@
+{
+  "project_info": {
+    "project_number": "812568764381",
+    "project_id": "leaseguard-9141a",
+    "storage_bucket": "leaseguard-9141a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812568764381:android:52c453258806fdd6a7a034",
+        "android_client_info": {
+          "package_name": "com.frontend"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "812568764381-1uh94ab82ngunp0ldqtft7iunb4hcvie.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOW-BnxoWwL2816Jm69N70IWgaV2nvM1Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "812568764381-1uh94ab82ngunp0ldqtft7iunb4hcvie.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "812568764381-t4lnasndf4n1uj6s90ijgvtsdqn4pdqd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.reactjs.native.example.frontend"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812568764381:android:8abd2c13f2726f34a7a034",
+        "android_client_info": {
+          "package_name": "com.leaseguard.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "812568764381-ap060tlh05qj2k4gqqot4l6i26v7ii9u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.leaseguard.app",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "812568764381-1uh94ab82ngunp0ldqtft7iunb4hcvie.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOW-BnxoWwL2816Jm69N70IWgaV2nvM1Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "812568764381-1uh94ab82ngunp0ldqtft7iunb4hcvie.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "812568764381-t4lnasndf4n1uj6s90ijgvtsdqn4pdqd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.reactjs.native.example.frontend"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

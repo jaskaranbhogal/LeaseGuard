@@ -22,7 +22,7 @@ function baseUrl(): string {
 export const API_BASE_URL = baseUrl();
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status?: number) {
+  constructor(message: string, public readonly status?: number, public readonly code?: string) {
     super(message);
   }
 }
@@ -65,6 +65,7 @@ export async function request<T>(
       throw new ApiError(
         typeof data?.detail === 'string' ? data.detail : fallback,
         response.status,
+        typeof data?.code === 'string' ? data.code : undefined,
       );
     }
     if (!data || typeof data !== 'object') {

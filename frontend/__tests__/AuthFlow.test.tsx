@@ -14,11 +14,23 @@ import RegisterScreen from '../src/screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../src/screens/auth/ForgotPasswordScreen';
 import ResetEmailSentScreen from '../src/screens/auth/ResetEmailSentScreen';
 import Button from '../src/components/Button';
+import * as firebase from '../src/services/firebaseAuthService';
+import ChooseYourRoleScreen from '../src/screens/auth/ChooseYourRoleScreen';
 import * as auth from '../src/services/authService';
 import { ApiError } from '../src/services/api';
 
 jest.mock('../src/services/authService');
-const login = jest.mocked(auth.login);
+jest.mock('../src/services/firebaseAuthService', () => ({
+  ...jest.requireActual('../src/services/firebaseAuthService'),
+  signInWithEmail: jest.fn(),
+  registerWithEmail: jest.fn(),
+  sendPasswordReset: jest.fn(),
+  refreshEmailVerification: jest.fn(),
+}));
+const login = jest.mocked(firebase.signInWithEmail);
+const register = jest.mocked(firebase.registerWithEmail);
+const verifiedUser = { emailVerified: true, getIdToken: jest.fn().mockResolvedValue('firebase-token') } as unknown as Awaited<ReturnType<typeof firebase.signInWithEmail>>;
+const registrationResult = { user: verifiedUser, profileUpdated: true, verificationSent: true };
 const reset = jest.mocked(auth.requestPasswordReset);
 let app: ReactTestRenderer;
 let navigation: ReturnType<
@@ -64,9 +76,13 @@ async function typeLogin(email: string, password: string) {
     fields[1].props.onChangeText(password);
   });
 }
-async function forgot() {
+async function forgot(legacy = false) {
   await act(async () => {
-    screen().findAllByProps({ accessibilityRole: 'link' })[0].props.onPress();
+    if (legacy) {
+      screen().findAllByProps({ accessibilityLabel: 'Reset a legacy LeaseGuard password' })[0].props.onPress();
+    } else {
+      screen().findAllByProps({ accessibilityRole: 'link' })[0].props.onPress();
+    }
   });
 }
 
@@ -89,7 +105,7 @@ it('validates login without a request and uses secure password entry', async () 
   expect(screen().findAllByType(TextInput)[1].props.secureTextEntry).toBe(true);
 });
 it('passes credentials to the service and never treats a rejection as success', async () => {
-  login.mockRejectedValue(new ApiError('Email or password is incorrect.'));
+  login.mockRejectedValue(new ApiError('Email or password is incorrect.', 401));
   await typeLogin('resident@example.com', 'incorrect');
   await act(async () => {
     screen().findByType(Button).props.onPress();
@@ -97,7 +113,6 @@ it('passes credentials to the service and never treats a rejection as success', 
   expect(login).toHaveBeenCalledWith(
     'resident@example.com',
     'incorrect',
-    expect.any(AbortSignal),
   );
   expect(JSON.stringify(app.toJSON())).toContain(
     'Email or password is incorrect.',
@@ -105,7 +120,8 @@ it('passes credentials to the service and never treats a rejection as success', 
   expect(JSON.stringify(app.toJSON())).not.toContain('Signed in as');
 });
 it('acknowledges a legacy account without granting access to a role dashboard', async () => {
-  login.mockResolvedValue({
+  login.mockResolvedValue(verifiedUser);
+  jest.mocked(auth.synchronizeFirebaseUser).mockResolvedValue({
     id: '000000000000000000000001',
     email: 'resident@example.com',
     name: 'Resident',
@@ -115,13 +131,12 @@ it('acknowledges a legacy account without granting access to a role dashboard', 
   await act(async () => {
     screen().findByType(Button).props.onPress();
   });
-  expect(JSON.stringify(app.toJSON())).toContain('Signed in as');
   expect(app.root.findAllByType(LoginScreen)).toHaveLength(0);
   expect(JSON.stringify(app.toJSON())).toContain('Account type not assigned');
   expect(JSON.stringify(app.toJSON())).not.toContain('Start inspection');
 });
 it('validates reset input and preserves request failures on the form', async () => {
-  await forgot();
+  await forgot(true);
   const form = app.root.findByType(ForgotPasswordScreen);
   await act(async () => {
     form.findAllByType(Button)[0].props.onPress();
@@ -139,7 +154,7 @@ it('validates reset input and preserves request failures on the form', async () 
 });
 it('blocks duplicate requests, confirms acceptance, and clears reset history', async () => {
   await typeLogin('person@example.com', '');
-  await forgot();
+  await forgot(true);
   const form = app.root.findByType(ForgotPasswordScreen);
   expect(form.findByType(TextInput).props.value).toBe('person@example.com');
   let accept!: (value: auth.ResetDelivery) => void;
@@ -173,7 +188,7 @@ it('blocks duplicate requests, confirms acceptance, and clears reset history', a
   expect(navigation.getRootState()!.routes.map(r => r.name)).toEqual(['Login']);
 });
 it('returns from Forgot Password directly to Login', async () => {
-  await forgot();
+  await forgot(true);
   await act(async () => {
     app.root
       .findByType(ForgotPasswordScreen)
@@ -183,7 +198,7 @@ it('returns from Forgot Password directly to Login', async () => {
   expect(navigation.getRootState()!.routes.map(r => r.name)).toEqual(['Login']);
 });
 it('cancels requests when leaving the reset form', async () => {
-  await forgot();
+  await forgot(true);
   const form = app.root.findByType(ForgotPasswordScreen);
   await act(async () => {
     form.findByType(TextInput).props.onChangeText('person@example.com');
@@ -220,7 +235,6 @@ async function fillRegistration(
   confirmation = 'Fresh-Passphrase-583!',
 ) {
   await act(async () => {
-    form.findAllByProps({ accessibilityLabel: 'Tenant' })[0].props.onPress();
     const fields = form.findAllByType(TextInput);
     [
       'New Resident',
@@ -235,13 +249,13 @@ it('validates registration fields and confirmation before sending credentials', 
   await act(async () => {
     form.findByType(Button).props.onPress();
   });
-  expect(auth.register).not.toHaveBeenCalled();
+  expect(register).not.toHaveBeenCalled();
   expect(JSON.stringify(app.toJSON())).toContain('Enter your full name');
   await fillRegistration(form, 'mismatch');
   await act(async () => {
     form.findByType(Button).props.onPress();
   });
-  expect(auth.register).not.toHaveBeenCalled();
+  expect(register).not.toHaveBeenCalled();
   expect(JSON.stringify(app.toJSON())).toContain('Passwords do not match.');
   expect(
     form
@@ -253,10 +267,9 @@ it('validates registration fields and confirmation before sending credentials', 
 it('keeps failed registrations editable and allows retry', async () => {
   const form = await registrationForm();
   await fillRegistration(form);
-  jest
-    .mocked(auth.register)
+  register
     .mockRejectedValue(
-      new ApiError('An account with this email already exists.'),
+      new ApiError('An account with this email already exists.', 409),
     );
   await act(async () => {
     form.findByType(Button).props.onPress();
@@ -270,8 +283,8 @@ it('keeps failed registrations editable and allows retry', async () => {
 it('blocks duplicate registration and confirms creation before returning to sign in', async () => {
   const form = await registrationForm();
   await fillRegistration(form);
-  let accept!: (value: Awaited<ReturnType<typeof auth.register>>) => void;
-  jest.mocked(auth.register).mockImplementation(
+  let accept!: (value: typeof registrationResult) => void;
+  register.mockImplementation(
     () =>
       new Promise(resolve => {
         accept = resolve;
@@ -281,33 +294,16 @@ it('blocks duplicate registration and confirms creation before returning to sign
     form.findByType(Button).props.onPress();
     form.findByType(Button).props.onPress();
   });
-  expect(auth.register).toHaveBeenCalledTimes(1);
+  expect(register).toHaveBeenCalledTimes(1);
   expect(
     form.findAllByType(TextInput).every(field => !field.props.editable),
   ).toBe(true);
-  expect(auth.register).toHaveBeenCalledWith(
-    {
-      role: 'tenant',
-      name: 'New Resident',
-      email: 'new@example.com',
-      password: 'Fresh-Passphrase-583!',
-      confirmPassword: 'Fresh-Passphrase-583!',
-    },
-    expect.any(AbortSignal),
+  expect(register).toHaveBeenCalledWith(
+    'new@example.com', 'Fresh-Passphrase-583!', 'New Resident',
   );
-  await act(async () => {
-    accept({
-      id: '00000000000000000000000a',
-      name: 'New Resident',
-      email: 'new@example.com',
-      role: 'tenant',
-    });
-  });
-  expect(JSON.stringify(app.toJSON())).toContain('Account created');
-  expect(form.findAllByType(TextInput)).toHaveLength(0);
-  await act(async () => {
-    form.findByType(Button).props.onPress();
-  });
+  await act(async () => accept(registrationResult));
+  expect(JSON.stringify(app.toJSON())).toContain('We sent a verification link');
+  await act(async () => app.root.findByProps({ accessibilityLabel: 'Sign in' }).props.onPress());
   expect(navigation.getRootState()!.routes.map(route => route.name)).toEqual([
     'Login',
   ]);
@@ -315,8 +311,8 @@ it('blocks duplicate registration and confirms creation before returning to sign
 it('cancels registration on leaving the screen', async () => {
   const form = await registrationForm();
   await fillRegistration(form);
-  let accept!: (value: Awaited<ReturnType<typeof auth.register>>) => void;
-  jest.mocked(auth.register).mockImplementation(
+  let accept!: (value: typeof registrationResult) => void;
+  register.mockImplementation(
     () =>
       new Promise(resolve => {
         accept = resolve;
@@ -325,64 +321,48 @@ it('cancels registration on leaving the screen', async () => {
   await act(async () => {
     form.findByType(Button).props.onPress();
   });
-  const signal = jest.mocked(auth.register).mock.calls[0][1];
-  await act(async () => {
-    navigation.goBack();
-  });
-  expect(signal?.aborted).toBe(true);
-  await act(async () => {
-    accept({
-      id: '00000000000000000000000a',
-      name: 'New Resident',
-      email: 'new@example.com',
-      role: 'tenant',
-    });
-  });
+  await act(async () => navigation.goBack());
+  await act(async () => accept(registrationResult));
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
 });
 
-it('requires an explicit role even when every registration field is valid', async () => {
+it('requires email verification before choosing an account role', async () => {
   const form = await registrationForm();
-  await act(async () => {
-    const fields = form.findAllByType(TextInput);
-    [
-      'New Resident',
-      'new@example.com',
-      'Fresh-Passphrase-583!',
-      'Fresh-Passphrase-583!',
-    ].forEach((value, index) => fields[index].props.onChangeText(value));
-  });
+  await fillRegistration(form);
+  register.mockResolvedValueOnce(registrationResult);
+  jest.mocked(firebase.refreshEmailVerification).mockResolvedValueOnce(null);
   await act(async () => form.findByType(Button).props.onPress());
-  expect(auth.register).not.toHaveBeenCalled();
-  expect(JSON.stringify(app.toJSON())).toContain('Select Tenant or Landlord.');
+  await act(async () => form.findAllByType(Button).find(button => button.props.title === 'I verified my email')!.props.onPress());
+  expect(auth.synchronizeFirebaseUser).not.toHaveBeenCalled();
+  expect(JSON.stringify(app.toJSON())).toContain('Your email is not verified yet');
 });
+
 it.each(['tenant', 'landlord'] as const)(
-  'sends the selected %s role and preserves registration success',
+  'routes a verified Firebase account choosing %s to the existing navigator',
   async role => {
     const form = await registrationForm();
     await fillRegistration(form);
-    await act(async () =>
-      form
-        .findAllByProps({
-          accessibilityLabel: role === 'tenant' ? 'Tenant' : 'Landlord',
-        })[0]
-        .props.onPress(),
-    );
-    jest
-      .mocked(auth.register)
-      .mockResolvedValueOnce({
-        id: '000000000000000000000014',
-        name: 'New Resident',
-        email: 'new@example.com',
-        role,
-      });
+    register.mockResolvedValueOnce(registrationResult);
+    jest.mocked(firebase.refreshEmailVerification).mockResolvedValueOnce(verifiedUser);
+    const user = { id: '000000000000000000000014', name: 'New Resident', email: 'new@example.com' };
+    jest.mocked(auth.synchronizeFirebaseUser).mockResolvedValueOnce({ ...user, role: null, canChooseRole: true });
+    jest.mocked(auth.chooseRole).mockResolvedValueOnce({ ...user, role });
     await act(async () => form.findByType(Button).props.onPress());
-    expect(auth.register).toHaveBeenCalledWith(
-      expect.objectContaining({ role }),
-      expect.any(AbortSignal),
-    );
-    expect(JSON.stringify(app.toJSON())).toContain('Account created');
-    expect(auth.login).not.toHaveBeenCalled();
-    expect(navigation.getCurrentRoute()?.name).toBe('Register');
+    await act(async () => form.findAllByType(Button).find(button => button.props.title === 'I verified my email')!.props.onPress());
+    const roleScreen = app.root.findByType(ChooseYourRoleScreen);
+    await act(async () => roleScreen.findAllByProps({ accessibilityRole: 'radio' })
+      .find(item => item.props.accessibilityLabel?.toLowerCase().startsWith(`i'm a ${role}`))!.props.onPress());
+    await act(async () => roleScreen.findAllByProps({ accessibilityLabel: 'Continue' })[0].props.onPress());
+    expect(auth.chooseRole).toHaveBeenCalledWith(role, expect.any(AbortSignal));
+    expect(app.root.findAllByType(ChooseYourRoleScreen)).toHaveLength(0);
+    expect(navigation.getCurrentRoute()?.name).toBe(role === 'tenant' ? 'Home' : 'Dashboard');
   },
 );
+
+it('sends a Firebase reset request from the default Forgot Password link', async () => {
+  await typeLogin('person@example.com', '');
+  await forgot();
+  await act(async () => app.root.findByType(ForgotPasswordScreen).findAllByType(Button)[0].props.onPress());
+  expect(firebase.sendPasswordReset).toHaveBeenCalledWith('person@example.com');
+  expect(navigation.getCurrentRoute()?.name).toBe('ResetEmailSent');
+});

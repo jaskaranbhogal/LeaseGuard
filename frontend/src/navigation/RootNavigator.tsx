@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import AccountScreen from '../components/AccountScreen';
 import Button from '../components/Button';
@@ -8,6 +8,7 @@ import { colors } from '../theme/colors';
 import AuthNavigator from './AuthNavigator';
 import TenantNavigator from './TenantNavigator';
 import LandlordNavigator from './LandlordNavigator';
+import ChooseYourRoleScreen from '../screens/auth/ChooseYourRoleScreen';
 
 export default function RootNavigator() {
   const { user, checking, sessionError, refreshSession, showLogin } = useAuth();
@@ -27,7 +28,9 @@ export default function RootNavigator() {
         }
       >
         {user ? (
-          user.role === 'tenant' ? (
+          user.role === null && user.canChooseRole === true ? (
+            <ChooseYourRoleScreen key={user.id} />
+          ) : user.role === 'tenant' ? (
             <TenantNavigator key={user.id} />
           ) : user.role === 'landlord' ? (
             <LandlordNavigator key={user.id} />
@@ -42,7 +45,12 @@ export default function RootNavigator() {
         )}
       </View>
       {checking || sessionError ? (
-        <View style={styles.overlay} accessibilityViewIsModal>
+        <ScrollView
+          style={styles.overlay}
+          contentContainerStyle={styles.overlayContent}
+          accessibilityViewIsModal
+          keyboardShouldPersistTaps="handled"
+        >
           {checking ? (
             <ActivityIndicator
               accessibilityLabel="Checking your session"
@@ -62,7 +70,7 @@ export default function RootNavigator() {
               <Button title="Return to sign in" onPress={showLogin} />
             </>
           )}
-        </View>
+        </ScrollView>
       ) : null}
     </View>
   );
@@ -76,8 +84,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     backgroundColor: colors.background,
+  },
+  overlayContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    paddingVertical: 32,
     gap: 16,
   },
   error: { color: colors.error, fontSize: 16, lineHeight: 24 },

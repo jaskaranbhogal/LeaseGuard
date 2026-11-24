@@ -26,3 +26,12 @@ class PasswordResetRequest(models.Model):
     email = models.EmailField()
     created_at = models.DateTimeField(auto_now_add=True)
     attempts = models.PositiveSmallIntegerField(default=0)
+
+
+class FirebaseIdentity(models.Model):
+    """A Firebase Authentication UID linked to one LeaseGuard user."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                                related_name='firebase_identity')
+    uid = models.CharField(max_length=128, unique=True)
+    email = models.EmailField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)

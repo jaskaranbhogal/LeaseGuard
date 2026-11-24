@@ -6,6 +6,8 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import ScreenContainer from '../../components/ScreenContainer';
 import type { AuthStackParamList } from '../../navigation/types';
+import { ApiError } from '../../services/api';
+import { firebaseErrorMessage, sendPasswordReset } from '../../services/firebaseAuthService';
 import { requestPasswordReset } from '../../services/authService';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
@@ -26,7 +28,15 @@ export default function ForgotPasswordScreen({ navigation, route }: Props) {
     Keyboard.dismiss();
     const address = email.trim();
     request.run(
-      signal => requestPasswordReset(address, signal),
+      async signal => {
+        if (route.params?.legacy) return requestPasswordReset(address, signal);
+        try {
+          await sendPasswordReset(address);
+          return 'email' as const;
+        } catch (error) {
+          throw new ApiError(firebaseErrorMessage(error));
+        }
+      },
       delivery =>
         navigation.replace('ResetEmailSent', { email: address, delivery }),
     );

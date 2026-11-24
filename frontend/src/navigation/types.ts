@@ -4,7 +4,7 @@ import type { ResetDelivery } from '../services/authService';
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
-  ForgotPassword: { email?: string } | undefined;
+  ForgotPassword: { email?: string; legacy?: boolean } | undefined;
   ResetEmailSent: { email: string; delivery: ResetDelivery };
 };
 

@@ -1,4 +1,5 @@
 import UIKit
+import GoogleSignIn
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
@@ -8,6 +9,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
   var reactNativeDelegate: ReactNativeDelegate?
   var reactNativeFactory: RCTReactNativeFactory?
+
+  func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    for context in URLContexts {
+      _ = GIDSignIn.sharedInstance.handle(context.url)
+    }
+  }
 
   func scene(
     _ scene: UIScene,
