@@ -154,7 +154,7 @@ export default function SettingsScreen({
         title="Log out"
         loading={request.loading}
         variant="outline"
-        onPress={() => request.run(signOut, () => {})}
+        onPress={() => request.run(() => signOut(), () => {})}
         style={styles.logoutButton}
       />
     </ScreenContainer>

@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.db import connections
 from django.test import Client, TestCase, TransactionTestCase, override_settings
+from firebase_admin import auth
 
 from .firebase_auth import FirebaseAuthenticationError, verify_firebase_id_token
 from .models import AccountProfile, FirebaseIdentity
@@ -44,7 +45,11 @@ class FirebaseSessionTests(TestCase):
         self.assertFalse(AccountProfile.objects.filter(user=user).exists())
         self.assertTrue(ObjectId.is_valid(response.json()['user']['id']))
         self.assertEqual(user.firebase_identity.uid, self.claims['uid'])
-        self.assertEqual(self.client.get('/api/auth/session/').status_code, 200)
+        self.assertEqual(self.client.session['firebase_session_uid'], self.claims['uid'])
+        self.assertLessEqual(self.client.session.get_expiry_age(), 300)
+        session = self.client.get('/api/auth/session/')
+        self.assertEqual(session.status_code, 200)
+        self.assertEqual(session.json()['firebaseUid'], self.claims['uid'])
         verify.assert_called_once_with('mock-token')
 
     @patch('accounts.views.verify_firebase_id_token')
@@ -59,6 +64,59 @@ class FirebaseSessionTests(TestCase):
         self.assertEqual(response.json()['user']['id'], str(user.pk))
         self.assertEqual(response.json()['user']['role'], 'tenant')
         self.assertEqual(get_user_model().objects.count(), 1)
+
+    @patch('accounts.views.verify_firebase_id_token')
+    def test_switching_firebase_accounts_replaces_the_django_session(self, verify):
+        account_a = get_user_model().objects.create_user(
+            username='firebase_a', email='a@example.com',
+        )
+        account_b = get_user_model().objects.create_user(
+            username='firebase_b', email='b@example.com',
+        )
+        FirebaseIdentity.objects.create(user=account_a, uid='firebase-a', email=account_a.email)
+        FirebaseIdentity.objects.create(user=account_b, uid='firebase-b', email=account_b.email)
+        claims = {
+            'token-a': {**self.claims, 'uid': 'firebase-a', 'email': account_a.email},
+            'token-b': {**self.claims, 'uid': 'firebase-b', 'email': account_b.email},
+        }
+        verify.side_effect = claims.__getitem__
+
+        first = self.post('session', {'idToken': 'token-a'})
+        self.assertEqual(first.json()['user']['id'], str(account_a.pk))
+        self.assertEqual(self.client.session['firebase_session_uid'], 'firebase-a')
+
+        second = self.post('session', {'idToken': 'token-b'})
+        self.assertEqual(second.json()['user']['id'], str(account_b.pk))
+        self.assertEqual(self.client.session['firebase_session_uid'], 'firebase-b')
+        session = self.client.get('/api/auth/session/')
+        self.assertEqual(session.json()['user']['id'], str(account_b.pk))
+
+        # A delayed logout retry from account A must not clear account B's
+        # cookie after B's session exchange has completed.
+        delayed_logout = self.client.post(
+            '/api/auth/logout/', json.dumps({'firebaseUid': 'firebase-a'}),
+            content_type='application/json',
+        )
+        self.assertEqual(delayed_logout.status_code, 200)
+        self.assertEqual(
+            self.client.get('/api/auth/session/').json()['user']['id'],
+            str(account_b.pk),
+        )
+
+    @patch('accounts.views.verify_firebase_id_token')
+    def test_rejected_firebase_reauthentication_invalidates_prior_session(self, verify):
+        verify.return_value = self.claims
+        self.assertEqual(self.post('session', {'idToken': 'valid'}).status_code, 201)
+        verify.side_effect = FirebaseAuthenticationError
+        self.assertEqual(self.post('session', {'idToken': 'revoked'}).status_code, 401)
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+        legacy_user = get_user_model().objects.create_user(
+            username='legacy-before-firebase', email='legacy@example.com',
+            password='Legacy-Passphrase-583!',
+        )
+        self.client.force_login(legacy_user)
+        self.assertEqual(self.post('session', {'idToken': 'invalid'}).status_code, 401)
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
 
     @patch('accounts.views.verify_firebase_id_token')
     def test_existing_email_is_not_automatically_linked(self, verify):
@@ -116,6 +174,16 @@ class FirebaseSessionTests(TestCase):
         }
         with self.assertRaises(FirebaseAuthenticationError):
             verify_firebase_id_token('signed-token')
+
+    @patch('accounts.firebase_auth.auth.verify_id_token')
+    @patch('accounts.firebase_auth._firebase_app')
+    def test_revoked_firebase_id_token_is_rejected(self, app, verify):
+        verify.side_effect = auth.RevokedIdTokenError('revoked token')
+        with self.assertRaises(FirebaseAuthenticationError):
+            verify_firebase_id_token('signed-token')
+        verify.assert_called_once_with(
+            'signed-token', app=app.return_value, check_revoked=True,
+        )
 
     @patch('accounts.views.verify_firebase_id_token')
     def test_different_uid_cannot_replace_existing_identity(self, verify):

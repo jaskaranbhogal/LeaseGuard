@@ -83,6 +83,30 @@ it('posts logout with a fresh CSRF token and includes the cookie session', async
   });
 });
 
+it('serializes logout before a newer Firebase session exchange', async () => {
+  let finishLogout!: (value: ReturnType<typeof response>) => void;
+  fetchMock.mockResolvedValueOnce(response({ csrfToken: 'logout-csrf' }));
+  fetchMock.mockImplementationOnce(
+    () => new Promise(resolve => { finishLogout = resolve; }),
+  );
+  fetchMock.mockResolvedValueOnce(response({ csrfToken: 'signin-csrf' }));
+  fetchMock.mockResolvedValueOnce(response({ user }, 200));
+
+  const pendingLogout = logout();
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+
+  const pendingSignIn = synchronizeFirebaseUser('new-account-token');
+  await Promise.resolve();
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+
+  finishLogout(response({ detail: 'Signed out.' }));
+  await pendingLogout;
+  await pendingSignIn;
+  expect(fetchMock.mock.calls[1][0]).toContain('/auth/logout/');
+  expect(fetchMock.mock.calls[3][0]).toContain('/auth/firebase/session/');
+});
+
 it('reports request network errors and backend failures', async () => {
   fetchMock.mockRejectedValueOnce(new TypeError('network'));
   await expect(request('/auth/csrf/')).rejects.toThrow(
@@ -112,6 +136,14 @@ it('times out stalled requests', async () => {
 
 it('does not restore a Firebase cookie when the native Firebase user is gone', async () => {
   firebaseAuth.currentUser = null;
-  fetchMock.mockResolvedValueOnce(response({ user, firebaseSession: true }));
+  fetchMock.mockResolvedValueOnce(response({
+    user, firebaseSession: true, firebaseUid: 'firebase-account-a',
+  }));
+  fetchMock.mockResolvedValueOnce(response({ csrfToken: 'logout-csrf' }));
+  fetchMock.mockResolvedValueOnce(response({ detail: 'Signed out.' }));
   await expect(getSession()).resolves.toBeNull();
+  expect(fetchMock.mock.calls[2][0]).toContain('/auth/logout/');
+  expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
+    firebaseUid: 'firebase-account-a',
+  });
 });

@@ -119,7 +119,7 @@ export default function RegisterScreen({ navigation }: Props) {
         return;
       }
       try {
-        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken(true)));
+        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken(true)), firebaseUser.uid);
       } catch (failure) {
         if (failure instanceof ApiError && failure.code === 'account_link_required') {
           setLinkRequired(true);
@@ -144,7 +144,7 @@ export default function RegisterScreen({ navigation }: Props) {
     setLoading(true);
     setError('');
     try {
-      completeSignIn(await linkLegacyAccount(await firebaseUser.getIdToken(), legacyPassword));
+      completeSignIn(await linkLegacyAccount(await firebaseUser.getIdToken(), legacyPassword), firebaseUser.uid);
     } catch (failure) {
       setError(firebaseErrorMessage(failure));
     } finally {

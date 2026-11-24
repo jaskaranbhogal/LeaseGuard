@@ -219,6 +219,10 @@ PASSWORD_RESET_DELIVERY = (
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+# Firebase cookie sessions are renewed only when the backend re-verifies a
+# Firebase ID token. A short idle limit bounds server-side access if logout
+# cannot reach Django or the native Firebase session is revoked while offline.
+FIREBASE_SESSION_AGE = 300
 
 # Backend only; validate lazily so offline tests need no provider credentials.
 CLOUDINARY_URL = os.environ.get('CLOUDINARY_URL', '').strip()

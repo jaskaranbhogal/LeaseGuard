@@ -293,7 +293,7 @@ it('shows stored photos side by side and saves a human decision', async () => {
   expect(app.root.findAllByType(ConditionHistoryScreen)).toHaveLength(1);
 });
 
-it('keeps settings switches local, marks unsupported rows unavailable, and handles failed logout', async () => {
+it('keeps settings local and clears account state after a failed logout', async () => {
   await mount();
   await press('Settings');
   const settings = app.root.findByType(SettingsScreen);
@@ -315,9 +315,8 @@ it('keeps settings switches local, marks unsupported rows unavailable, and handl
     .mocked(auth.logout)
     .mockRejectedValueOnce(new ApiError('Logout unavailable'));
   await press('Log out', settings);
-  expect(json()).toContain('Logout unavailable');
-  // Settings is a nested stack for landlords; its first screen is SettingsHome.
-  expect(navigation.getCurrentRoute()?.name).toBe('SettingsHome');
+  expect(json()).toContain('could not confirm sign-out');
+  expect(navigation.getCurrentRoute()?.name).toBe('Login');
   let resolve!: () => void;
   jest.mocked(auth.logout).mockImplementationOnce(
     () =>
@@ -325,8 +324,8 @@ it('keeps settings switches local, marks unsupported rows unavailable, and handl
         resolve = accept;
       }),
   );
-  await press('Log out', settings);
-  expect(settings.findByType(Button).props.loading).toBe(true);
+  await press('Retry session check');
+  expect(JSON.stringify(app.toJSON())).toContain('Loading LeaseGuard');
   await act(async () => resolve());
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
   expect(navigation.canGoBack()).toBe(false);

@@ -12,7 +12,7 @@ from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
-from .models import AccountProfile, PasswordResetRequest
+from .models import AccountProfile, FirebaseIdentity, PasswordResetRequest
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
@@ -288,9 +288,27 @@ class SessionTests(TestCase):
         session.set_expiry(-1)
         session.save()
         self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+        protected = self.client.post(
+            '/api/auth/role/', json.dumps({'role': 'tenant'}),
+            content_type='application/json',
+        )
+        self.assertEqual(protected.status_code, 401)
         self.client.force_login(user)
         user.is_active = False
         user.save()
+        self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
+
+    def test_firebase_session_without_a_matching_identity_is_rejected(self):
+        user = get_user_model().objects.create_user(username='wrong-session-user')
+        other = get_user_model().objects.create_user(username='other-session-user')
+        FirebaseIdentity.objects.create(
+            user=other, uid='other-firebase-user', email='other@example.com',
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session['firebase_session'] = True
+        session['firebase_session_uid'] = 'other-firebase-user'
+        session.save()
         self.assertEqual(self.client.get('/api/auth/session/').status_code, 401)
 
     def test_logout_requires_csrf_and_invalidates_session(self):

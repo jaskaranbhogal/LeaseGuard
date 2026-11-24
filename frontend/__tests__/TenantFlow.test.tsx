@@ -13,7 +13,7 @@ import {
   createNavigationContainerRef,
 } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Alert, AppState, Image, Text, TextInput } from 'react-native';
+import { Alert, AppState, Image, ScrollView, Text, TextInput } from 'react-native';
 import { AuthProvider } from '../src/context/AuthContext';
 import RootNavigator from '../src/navigation/RootNavigator';
 import type { TenantStackParamList } from '../src/navigation/types';
@@ -75,6 +75,7 @@ let navigation: ReturnType<
 beforeEach(() => {
   jest.useFakeTimers();
   jest.clearAllMocks();
+  jest.requireMock('@react-native-firebase/auth').__mockAuthInstance.currentUser = null;
   jest
     .mocked(guided.listGuided)
     .mockResolvedValue({ inspections: [guidedFixture], next: null });
@@ -222,17 +223,25 @@ it('resumes an assigned draft from its saved inspection record', async () => {
     inspectionId: guidedFixture.id,
   });
 });
-it('shows logout failures and permits a retry', async () => {
+it('clears the account after logout failure and permits a backend retry', async () => {
   await mount(landlord);
   jest
     .mocked(auth.logout)
     .mockRejectedValueOnce(new ApiError('Unable to reach LeaseGuard.'));
   await press('Settings');
   await press('Log out');
-  // Landlord Settings is a nested stack; its first screen is SettingsHome.
-  expect(navigation.getCurrentRoute()?.name).toBe('SettingsHome');
-  expect(JSON.stringify(app.toJSON())).toContain('Unable to reach LeaseGuard.');
-  await press('Log out');
+  expect(navigation.getCurrentRoute()?.name).toBe('Login');
+  expect(JSON.stringify(app.toJSON())).toContain('could not confirm sign-out');
+  const recoveryDialog = app.root.findAllByType(ScrollView).find(
+    view => view.props.accessibilityViewIsModal,
+  );
+  expect(recoveryDialog).toBeDefined();
+  expect(recoveryDialog?.props.contentContainerStyle).toEqual(
+    expect.objectContaining({ flexGrow: 1, padding: 24, paddingVertical: 32 }),
+  );
+  expect(app.root.findByProps({ accessibilityLabel: 'Retry session check' })).toBeTruthy();
+  expect(app.root.findByProps({ accessibilityLabel: 'Return to sign in' })).toBeTruthy();
+  await press('Retry session check');
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
 });
 it('recovers from network failures and removes expired dashboard sessions', async () => {
@@ -619,6 +628,34 @@ it('reloads persisted inspection progress during session revalidation', async ()
   expect(guided.getGuided).toHaveBeenCalledWith(guidedFixture.id);
 });
 
+it('keeps an in-progress inspection mounted through a temporary session outage and restores it silently', async () => {
+  const listener = jest.spyOn(AppState, 'addEventListener');
+  const firebaseAuth = jest.requireMock('@react-native-firebase/auth').__mockAuthInstance;
+  firebaseAuth.currentUser = {
+    uid: 'firebase-tenant',
+    emailVerified: true,
+    getIdToken: jest.fn().mockResolvedValue('firebase-token'),
+  };
+  await mount();
+  await press('Start guided inspection');
+  expect(navigation.getCurrentRoute()?.name).toBe('GuidedInspection');
+  const appStateChange = listener.mock.calls[listener.mock.calls.length - 1][1];
+
+  jest.mocked(auth.getSession).mockRejectedValueOnce(
+    new ApiError('Unable to reach LeaseGuard. Check your connection and try again.'),
+  );
+  await act(async () => appStateChange('active'));
+  expect(navigation.getCurrentRoute()?.name).toBe('GuidedInspection');
+  expect(app.root.findAllByType(GuidedInspectionScreen)).toHaveLength(1);
+  expect(JSON.stringify(app.toJSON())).toContain('Unable to reach LeaseGuard');
+
+  jest.mocked(auth.getSession).mockResolvedValueOnce(tenant);
+  await act(async () => appStateChange('active'));
+  expect(navigation.getCurrentRoute()?.name).toBe('GuidedInspection');
+  expect(app.root.findAllByType(GuidedInspectionScreen)).toHaveLength(1);
+  expect(JSON.stringify(app.toJSON())).not.toContain('Unable to reach LeaseGuard');
+});
+
 it('does not restore a session while logout is pending', async () => {
   const listener = jest.spyOn(AppState, 'addEventListener');
   await mount(landlord);
@@ -635,6 +672,7 @@ it('does not restore a session while logout is pending', async () => {
     listener.mock.calls[listener.mock.calls.length - 1][1]('active'),
   );
   expect(auth.getSession).toHaveBeenCalledTimes(1);
+  expect(navigation.getCurrentRoute()?.name).toBe('Login');
   await act(async () => resolve());
   expect(navigation.getCurrentRoute()?.name).toBe('Login');
 });

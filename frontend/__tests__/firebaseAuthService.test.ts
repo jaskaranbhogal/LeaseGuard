@@ -83,7 +83,9 @@ it('hides unknown SDK error details and configures Google at initialization', ()
   jest.isolateModules(() => {
     require('../src/services/firebaseAuthService');
   });
-  expect(GoogleSignin.configure).toHaveBeenCalledWith({ webClientId: '' });
+  expect(GoogleSignin.configure).toHaveBeenCalledWith({
+    webClientId: expect.stringMatching(/^[\w-]+\.apps\.googleusercontent\.com$/),
+  });
 });
 
 it('requires the existing Firebase password before linking a Google provider', async () => {

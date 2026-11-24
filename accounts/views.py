@@ -35,7 +35,19 @@ def user_data(user):
 def session_status(request):
     if not request.user.is_authenticated:
         return JsonResponse({'detail': 'Please sign in.'}, status=401)
-    return JsonResponse({'user': user_data(request.user), 'firebaseSession': request.session.get('firebase_session', False)})
+    firebase_uid = request.session.get('firebase_session_uid')
+    if request.session.get('firebase_session') and (
+        not firebase_uid or not FirebaseIdentity.objects.filter(
+            uid=firebase_uid, user=request.user,
+        ).exists()
+    ):
+        logout(request)
+        return JsonResponse({'detail': 'Please sign in again.'}, status=401)
+    return JsonResponse({
+        'user': user_data(request.user),
+        'firebaseSession': request.session.get('firebase_session', False),
+        'firebaseUid': firebase_uid if request.session.get('firebase_session') else None,
+    })
 
 
 def rate_limit(scope, limit):
@@ -110,9 +122,11 @@ def _firebase_identity(request):
     return data, {**decoded, 'email': email}
 
 
-def _sign_in_django_session(request, user):
+def _sign_in_django_session(request, user, firebase_uid):
     login(request, user, backend='django.contrib.auth.backends.ModelBackend')
     request.session['firebase_session'] = True
+    request.session['firebase_session_uid'] = firebase_uid
+    request.session.set_expiry(settings.FIREBASE_SESSION_AGE)
     data = user_data(user)
     if data['role'] is None:
         data['canChooseRole'] = True
@@ -124,7 +138,7 @@ def _sign_in_linked_identity(request, identity, decoded):
         return JsonResponse({'detail': 'The Firebase account email changed. Contact support.'}, status=409)
     if not identity.user.is_active:
         return JsonResponse({'detail': 'This account is unavailable.'}, status=403)
-    return _sign_in_django_session(request, identity.user)
+    return _sign_in_django_session(request, identity.user, decoded['uid'])
 
 
 @never_cache
@@ -137,11 +151,21 @@ def firebase_session(request):
     try:
         _, decoded = _firebase_identity(request)
     except ValidationError as error:
+        if request.user.is_authenticated:
+            logout(request)
         detail = error.messages[0]
         status = 503 if not settings.FIREBASE_PROJECT_ID else 401
         return JsonResponse({'detail': detail}, status=status)
 
     uid = decoded['uid']
+    # A Firebase exchange is an identity boundary. Never leave a legacy or
+    # different Firebase user's Django cookie active when this identity cannot
+    # be resolved or linked below.
+    if (
+        request.user.is_authenticated and
+        request.session.get('firebase_session_uid') != uid
+    ):
+        logout(request)
     identity = FirebaseIdentity.objects.select_related('user').filter(uid=uid).first()
     if identity:
         return _sign_in_linked_identity(request, identity, decoded)
@@ -175,7 +199,7 @@ def firebase_session(request):
         return JsonResponse({'detail': 'An account already uses this email. Sign in or link that account.'}, status=409)
     except AccountCreationBusy:
         return JsonResponse({'detail': 'Account creation is busy. Please retry.'}, status=503)
-    response = _sign_in_django_session(request, user)
+    response = _sign_in_django_session(request, user, uid)
     response.status_code = 201
     return response
 
@@ -208,7 +232,7 @@ def link_legacy_account(request):
         FirebaseIdentity.objects.create(user=user, uid=decoded['uid'], email=decoded['email'])
     except IntegrityError:
         return JsonResponse({'detail': 'This Firebase account or LeaseGuard account is already linked.'}, status=409)
-    return _sign_in_django_session(request, user)
+    return _sign_in_django_session(request, user, decoded['uid'])
 
 
 @never_cache
@@ -337,6 +361,30 @@ def sign_in(request):
 @require_POST
 @csrf_protect
 def sign_out(request):
+    if request.content_type == 'application/json':
+        try:
+            data = json.loads(request.body) if request.body else {}
+        except (ValueError, UnicodeDecodeError):
+            return JsonResponse({'detail': 'Unable to sign out. Please retry.'}, status=400)
+    else:
+        # Legacy callers may submit an empty form body; CSRF middleware can
+        # consume that stream before this view runs, so don't read request.body.
+        data = request.POST.dict()
+    if not isinstance(data, dict):
+        return JsonResponse({'detail': 'Unable to sign out. Please retry.'}, status=400)
+    expected_uid = data.get('firebaseUid')
+    if expected_uid is not None:
+        if not isinstance(expected_uid, str) or not expected_uid or len(expected_uid) > 128:
+            return JsonResponse({'detail': 'Unable to sign out. Please retry.'}, status=400)
+        current_uid = request.session.get('firebase_session_uid')
+        if current_uid is None and request.user.is_authenticated:
+            current_uid = FirebaseIdentity.objects.filter(user=request.user).values_list(
+                'uid', flat=True,
+            ).first()
+        if current_uid != expected_uid:
+            # A delayed logout retry from an older auth state must not clear a
+            # newer account's cookie session.
+            return JsonResponse({'detail': 'A different account is active.'})
     logout(request)
     return JsonResponse({'detail': 'Signed out.'})
 

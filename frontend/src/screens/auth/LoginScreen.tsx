@@ -64,7 +64,7 @@ export default function LoginScreen({ navigation }: Props) {
         return;
       }
       try {
-        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken()));
+        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken()), firebaseUser.uid);
       } catch (failure) {
         if (failure instanceof ApiError && failure.code === 'account_link_required') {
           setLinkRequired(true);
@@ -88,7 +88,7 @@ export default function LoginScreen({ navigation }: Props) {
       const firebaseUser = await signInWithGoogle();
       if (!firebaseUser) return;
       try {
-        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken()));
+        completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken()), firebaseUser.uid);
       } catch (failure) {
         if (failure instanceof ApiError && failure.code === 'account_link_required') {
           setLinkRequired(true);
@@ -123,7 +123,7 @@ export default function LoginScreen({ navigation }: Props) {
         await firebaseUser.getIdToken(),
         legacyPassword,
       );
-      completeSignIn(user);
+      completeSignIn(user, firebaseUser.uid);
     } catch (failure) {
       setError(firebaseErrorMessage(failure));
     } finally {
@@ -145,7 +145,7 @@ export default function LoginScreen({ navigation }: Props) {
         googleConflict.credential,
         googleConflict.googleEmail,
       );
-      completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken()));
+      completeSignIn(await synchronizeFirebaseUser(await firebaseUser.getIdToken()), firebaseUser.uid);
     } catch (failure) {
       if (failure instanceof ApiError && failure.code === 'account_link_required') {
         setLinkRequired(true);

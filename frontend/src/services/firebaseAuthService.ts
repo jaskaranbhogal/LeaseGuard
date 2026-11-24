@@ -19,7 +19,7 @@ import { Platform } from 'react-native';
 
 // Set this to the Web OAuth client ID from Firebase Authentication's Google
 // provider settings after that provider has been enabled for leaseguard-9141a.
-const GOOGLE_WEB_CLIENT_ID = '';
+const GOOGLE_WEB_CLIENT_ID = '812568764381-1uh94ab82ngunp0ldqtft7iunb4hcvie.apps.googleusercontent.com';
 
 GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID });
 
